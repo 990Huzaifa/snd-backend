@@ -8,19 +8,37 @@ import {
 } from 'typeorm';
 import { TenantDbConfig } from './tenant-db-config.entity';
 
+export enum TenantStatus {
+    REGISTERED = 'REGISTERED',
+    PROVISIONING = 'PROVISIONING',
+    PROVISIONED = 'PROVISIONED',
+    FAILED = 'FAILED',
+    SUSPENDED = 'SUSPENDED',
+}
+
 @Entity({ name: 'tenants' })
 export class Tenant {
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
     @Column({ unique: true })
-    code: string; // 🔐 internal resolve code (6-digit / name+digits)
+    code: string; // 🔐 auto-generated (6 digit)
 
     @Column({ unique: true })
     name: string;
 
+    @Column({ unique: true })
+    email: string;
+
     @Column({ default: true })
     isActive: boolean;
+
+    @Column({
+        type: 'enum',
+        enum: TenantStatus,
+        default: TenantStatus.REGISTERED,
+    })
+    status: TenantStatus;
 
     @OneToOne(() => TenantDbConfig, (db) => db.tenant)
     dbConfig: TenantDbConfig;
