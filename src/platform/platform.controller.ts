@@ -1,8 +1,10 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, NotFoundException, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, NotFoundException, UseGuards, Put } from '@nestjs/common';
 import { PlatformService } from './platform.service';
 import { ResolveTenantDto } from './dto/resolve-tenant.dto';
 import { CreateTenantDto } from './dto/create-tenant.dto';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
+import { UpdateTenantProfileDto } from './dto/update-tenant-profile.dto';
+import { UpdateTenantSettingsDto } from './dto/update-tenant-settings.dto';
 
 @Controller('platform/tenant')
 export class PlatformController {
@@ -64,6 +66,31 @@ export class PlatformController {
   @Post(':id/resume')
   async resume(@Param('id') id: string) {
     return this.platformService.resumeTenant(id);
+  }
+
+
+  @UseGuards(JwtAuthGuard)
+  @Get(':id/profile')
+  async getProfile(@Param('id') id: string) {
+    return this.platformService.getTenantProfile(id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Put(':id/profile')
+  async updateProfile(@Param('id') id: string, @Body() dto: UpdateTenantProfileDto) {
+    return this.platformService.updateTenantProfile(id, dto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get(':id/settings')
+  async getSettings(@Param('id') id: string) {
+    return this.platformService.getTenantSettings(id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Put(':id/settings')
+  async updateSettings(@Param('id') id: string, @Body() dto: UpdateTenantSettingsDto) {
+    return this.platformService.updateTenantSettings(id, dto);
   }
 
 }

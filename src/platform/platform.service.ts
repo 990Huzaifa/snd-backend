@@ -6,6 +6,9 @@ import { CreateTenantDto } from './dto/create-tenant.dto';
 import { TenantProvisioningJob } from 'src/master-db/entities/tenant-provisioning-job.entity';
 import { TenantProvisioningLog } from 'src/master-db/entities/tenant-provisioning-log.entity';
 import { TenantSettings } from 'src/master-db/entities/tenant-settings.entity';
+import { TenantProfile } from 'src/master-db/entities/tenant-profile.entity';
+import { UpdateTenantProfileDto } from './dto/update-tenant-profile.dto';
+import { UpdateTenantSettingsDto } from './dto/update-tenant-settings.dto';
 
 @Injectable()
 export class PlatformService {
@@ -18,6 +21,8 @@ export class PlatformService {
     private readonly logRepo: Repository<TenantProvisioningLog>,
     @InjectRepository(TenantSettings)
     private readonly settingsRepo: Repository<TenantSettings>,
+    @InjectRepository(TenantProfile)
+    private readonly profileRepo: Repository<TenantProfile>,
   ) { }
 
   private async generateUniqueCode(): Promise<string> {
@@ -143,6 +148,7 @@ export class PlatformService {
         email: dto.email,
         code: await this.generateUniqueCode(),
         status: TenantStatus.REGISTERED,
+        industryType: dto.industryType
       }),
     );
 
@@ -257,8 +263,20 @@ export class PlatformService {
       });
 
       // ===============================
-      // 🔹 STEP 2: 
+      // 🔹 STEP 2: Create tenant profile
       // ===============================
+      await this.profileRepo.save(
+        this.profileRepo.create({
+          tenant,
+          displayName: tenant.name, // default
+        }),
+      );
+
+      await this.logRepo.save({
+        job,
+        level: 'INFO',
+        message: 'Tenant profile created',
+      });
 
       // 🚧 STOP HERE — (future steps plug below) 
 
@@ -359,6 +377,73 @@ export class PlatformService {
       message: 'Tenant resumed successfully',
       tenantId: tenant.id,
       status: tenant.status,
+    };
+  }
+
+
+  // tenant profile service
+
+  async getTenantProfile(tenantId: string) {
+    const profile = await this.profileRepo.findOne({
+      where: { tenant: { id: tenantId } },
+    });
+
+    if (!profile) {
+      throw new NotFoundException('Tenant profile not found');
+    }
+
+    return profile;
+  }
+
+  async updateTenantProfile(tenantId: string, dto: UpdateTenantProfileDto) {
+    const profile = await this.profileRepo.findOne({
+      where: { tenant: { id: tenantId } },
+    });
+
+    if (!profile) {
+      throw new NotFoundException('Tenant profile not found');
+    }
+
+    Object.assign(profile, dto);
+
+    await this.profileRepo.save(profile);
+
+    return {
+      message: 'Tenant profile updated successfully',
+      profile,
+    };
+  }
+
+  // tenant settings service
+
+  async getTenantSettings(tenantId: string) {
+    const settings = await this.settingsRepo.findOne({
+      where: { tenant: { id: tenantId } },
+    });
+
+    if (!settings) {
+      throw new NotFoundException('Tenant settings not found');
+    }
+
+    return settings;
+  }
+
+  async updateTenantSettings(tenantId: string, dto: UpdateTenantSettingsDto) {
+    const settings = await this.settingsRepo.findOne({
+      where: { tenant: { id: tenantId } },
+    });
+
+    if (!settings) {
+      throw new NotFoundException('Tenant settings not found');
+    }
+
+    Object.assign(settings, dto);
+
+    await this.settingsRepo.save(settings);
+
+    return {
+      message: 'Tenant settings updated successfully',
+      settings,
     };
   }
 

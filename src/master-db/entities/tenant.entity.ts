@@ -15,6 +15,14 @@ export enum TenantStatus {
     FAILED = 'FAILED',
     SUSPENDED = 'SUSPENDED',
 }
+export enum IndustryType {
+    SOFTWARE = 'SOFTWARE',
+    RETAIL = 'RETAIL',
+    SERVICES = 'SERVICES',
+    MANUFACTURING = 'MANUFACTURING',
+    WHOLESALE = 'WHOLESALE',
+    OTHER = 'OTHER',
+}
 
 @Entity({ name: 'tenants' })
 export class Tenant {
@@ -29,6 +37,13 @@ export class Tenant {
 
     @Column({ unique: true })
     email: string;
+
+    @Column({
+        type: 'enum',
+        enum: IndustryType,
+        nullable: true,
+    })
+    industryType: IndustryType;
 
     @Column({ default: true })
     isActive: boolean;

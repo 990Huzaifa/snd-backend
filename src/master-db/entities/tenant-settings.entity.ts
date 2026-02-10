@@ -12,6 +12,7 @@ import { Tenant } from './tenant.entity';
 export enum BaseUom {
     PCS = 'PCS',
     LTR = 'LTR',
+    KGS = 'KGS',
 }
 
 export enum BaseLocale {
@@ -22,8 +23,10 @@ export enum BaseLocale {
 export enum Currency {
     USD = 'USD',
     SAR = 'SAR',
+    KWD = 'KWD',
+    AED = 'AED',
+    PKR = 'PKR',
 }
-
 
 @Entity({ name: 'tenant_settings' })
 export class TenantSettings {
@@ -38,13 +41,13 @@ export class TenantSettings {
     timezone: string;
 
     @Column({ type: 'enum', enum: Currency, default: Currency.USD })
-    currency: string;
+    currency: Currency;
 
     @Column({ type: 'enum', enum: BaseUom, default: BaseUom.PCS })
     baseUom: BaseUom;
 
     @Column({ type: 'enum', enum: BaseLocale, default: BaseLocale.EN })
-    baseLocale: string;
+    baseLocale: BaseLocale;
 
     @CreateDateColumn()
     createdAt: Date;
