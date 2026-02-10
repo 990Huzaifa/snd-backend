@@ -51,6 +51,7 @@ export class TenantResolverMiddleware implements NestMiddleware {
             tenantId: tenant.id,
             name: tenant.name,
             code: tenant.code,
+            status: tenant.status,
         };
 
         return next();

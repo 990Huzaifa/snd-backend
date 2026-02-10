@@ -37,9 +37,33 @@ export class PlatformController {
   }
 
   @UseGuards(JwtAuthGuard)
-  @Post(':id/provision')
-  async provisionTenant(@Param('id') tenantId: string) {
-    return this.platformService.startProvisioning(tenantId);
+  @Post(':id/retry-provisioning')
+  async retryTenantProvisioning(@Param('id') tenantId: string) {
+    return this.platformService.retryProvisioning(tenantId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('/provisioning')
+  async provisioning() {
+    return this.platformService.getProvisioningList();
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('/provisioning/:id')
+  async provisioningDetails(@Param('id') id: string) {
+    return this.platformService.getProvisioningDetails(id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/suspend')
+  async suspend(@Param('id') id: string) {
+    return this.platformService.suspendTenant(id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/resume')
+  async resume(@Param('id') id: string) {
+    return this.platformService.resumeTenant(id);
   }
 
 }

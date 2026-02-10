@@ -3,10 +3,18 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { PlatformController } from './platform.controller';
 import { PlatformService } from './platform.service';
 import { Tenant } from '../master-db/entities/tenant.entity';
+import { TenantProvisioningJob } from 'src/master-db/entities/tenant-provisioning-job.entity';
+import { TenantProvisioningLog } from 'src/master-db/entities/tenant-provisioning-log.entity';
+import { TenantSettings } from 'src/master-db/entities/tenant-settings.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Tenant]), // 🔥 THIS IS THE KEY
+    TypeOrmModule.forFeature([
+      Tenant,
+      TenantProvisioningJob,
+      TenantProvisioningLog,
+      TenantSettings,
+    ]),
   ],
   controllers: [PlatformController],
   providers: [PlatformService],
