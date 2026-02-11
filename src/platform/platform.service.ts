@@ -12,6 +12,8 @@ import { UpdateTenantSettingsDto } from './dto/update-tenant-settings.dto';
 import { diskStorage } from 'multer';
 import { UpdateTenantThemeDto } from './dto/update-tenant-theme.dto';
 import { TenantTheme } from 'src/master-db/entities/tenant-themes.entity';
+import { ProvisioningAdminService } from './services/provisioning-admin.service';
+import { TenantDbConfig } from 'src/master-db/entities/tenant-db-config.entity';
 
 @Injectable()
 export class PlatformService {
@@ -28,6 +30,11 @@ export class PlatformService {
     private readonly profilesRepo: Repository<TenantProfile>,
     @InjectRepository(TenantTheme)
     private readonly themesRepo: Repository<TenantTheme>,
+    @InjectRepository(TenantDbConfig)
+    private readonly dbConfigRepo: Repository<TenantDbConfig>,
+
+
+    private readonly provisioningAdminService: ProvisioningAdminService,
   ) { }
 
   private async generateUniqueCode(): Promise<string> {
@@ -244,7 +251,62 @@ export class PlatformService {
       message: 'Provisioning started (skeleton)',
     });
 
-    try{     
+    try{
+      // ===============================
+      // 🔹 STEP 0: Setup Database & User
+      // ===============================
+      await this.provisioningAdminService.createAdminConnection();
+      const dbName = `snd_t_${tenant.code}`;
+      await this.provisioningAdminService.createDatabase(dbName);
+      // 🔹 Log: database created
+      await this.logRepo.save({
+        job,
+        level: 'INFO',
+        message: 'Provison Tenant DB created',
+      });
+      const dbUser = `snd_u_${tenant.code}`;
+      const dbPass = this.generateStrongPassword();
+
+      await this.provisioningAdminService.createUser(dbUser, dbPass);
+      
+      // 🔹 Log: database user created
+      await this.logRepo.save({
+        job,
+        level: 'INFO',
+        message: 'Provison Tenant DB User created',
+      });
+
+      await this.provisioningAdminService.grantPrivileges(dbName, dbUser);
+
+      // 🔹 Log: grant privileges
+      await this.logRepo.save({
+        job,
+        level: 'INFO',
+        message: 'Tenant DB User Set Privileges',
+      });
+
+      await this.dbConfigRepo.save(
+        this.dbConfigRepo.create({
+          tenant,
+          host: process.env.PROVISION_DB_HOST,
+          port: Number(process.env.PROVISION_DB_PORT),
+          database: dbName,
+          username: dbUser,
+          password: dbPass,
+        }),
+      );
+
+      // 🔹 Log: database config created
+      await this.logRepo.save({
+        job,
+        level: 'INFO',
+        message: 'Tenant DB Config created',
+      });
+      await this.provisioningAdminService.closeConnection();
+
+      
+
+
       // ===============================
       // 🔹 STEP 1: Create tenant settings
       // ===============================
@@ -530,5 +592,16 @@ export class PlatformService {
       logoUrl: profile.logoUrl,
     };
   }
+
+  private generateStrongPassword(length = 16): string {
+    const chars =
+      'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let result = '';
+    for (let i = 0; i < length; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+  }
+
 
 }

@@ -8,6 +8,8 @@ import { TenantProvisioningLog } from 'src/master-db/entities/tenant-provisionin
 import { TenantSettings } from 'src/master-db/entities/tenant-settings.entity';
 import { TenantProfile } from 'src/master-db/entities/tenant-profile.entity';
 import { TenantTheme } from 'src/master-db/entities/tenant-themes.entity';
+import { ProvisioningAdminService } from './services/provisioning-admin.service';
+import { TenantDbConfig } from 'src/master-db/entities/tenant-db-config.entity';
 
 @Module({
   imports: [
@@ -18,9 +20,10 @@ import { TenantTheme } from 'src/master-db/entities/tenant-themes.entity';
       TenantSettings,
       TenantProfile,
       TenantTheme,
+      TenantDbConfig
     ]),
   ],
   controllers: [PlatformController],
-  providers: [PlatformService],
+  providers: [PlatformService, ProvisioningAdminService,],
 })
 export class PlatformModule {}
