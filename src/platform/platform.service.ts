@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Tenant, TenantStatus } from '../master-db/entities/tenant.entity';
 import { Repository } from 'typeorm';
@@ -9,6 +9,9 @@ import { TenantSettings } from 'src/master-db/entities/tenant-settings.entity';
 import { TenantProfile } from 'src/master-db/entities/tenant-profile.entity';
 import { UpdateTenantProfileDto } from './dto/update-tenant-profile.dto';
 import { UpdateTenantSettingsDto } from './dto/update-tenant-settings.dto';
+import { diskStorage } from 'multer';
+import { UpdateTenantThemeDto } from './dto/update-tenant-theme.dto';
+import { TenantTheme } from 'src/master-db/entities/tenant-themes.entity';
 
 @Injectable()
 export class PlatformService {
@@ -22,7 +25,9 @@ export class PlatformService {
     @InjectRepository(TenantSettings)
     private readonly settingsRepo: Repository<TenantSettings>,
     @InjectRepository(TenantProfile)
-    private readonly profileRepo: Repository<TenantProfile>,
+    private readonly profilesRepo: Repository<TenantProfile>,
+    @InjectRepository(TenantTheme)
+    private readonly themesRepo: Repository<TenantTheme>,
   ) { }
 
   private async generateUniqueCode(): Promise<string> {
@@ -265,8 +270,8 @@ export class PlatformService {
       // ===============================
       // 🔹 STEP 2: Create tenant profile
       // ===============================
-      await this.profileRepo.save(
-        this.profileRepo.create({
+      await this.profilesRepo.save(
+        this.profilesRepo.create({
           tenant,
           displayName: tenant.name, // default
         }),
@@ -275,7 +280,22 @@ export class PlatformService {
       await this.logRepo.save({
         job,
         level: 'INFO',
-        message: 'Tenant profile created',
+        message: 'Tenant default profile created',
+      });
+
+      // ===============================
+      // 🔹 STEP 3: Create tenant theme
+      // ===============================
+      await this.themesRepo.save(
+        this.themesRepo.create({
+          tenant,
+        }),
+      );
+
+      await this.logRepo.save({
+        job,
+        level: 'INFO',
+        message: 'Tenant default theme created',
       });
 
       // 🚧 STOP HERE — (future steps plug below) 
@@ -384,7 +404,7 @@ export class PlatformService {
   // tenant profile service
 
   async getTenantProfile(tenantId: string) {
-    const profile = await this.profileRepo.findOne({
+    const profile = await this.profilesRepo.findOne({
       where: { tenant: { id: tenantId } },
     });
 
@@ -396,7 +416,7 @@ export class PlatformService {
   }
 
   async updateTenantProfile(tenantId: string, dto: UpdateTenantProfileDto) {
-    const profile = await this.profileRepo.findOne({
+    const profile = await this.profilesRepo.findOne({
       where: { tenant: { id: tenantId } },
     });
 
@@ -406,7 +426,7 @@ export class PlatformService {
 
     Object.assign(profile, dto);
 
-    await this.profileRepo.save(profile);
+    await this.profilesRepo.save(profile);
 
     return {
       message: 'Tenant profile updated successfully',
@@ -447,5 +467,68 @@ export class PlatformService {
     };
   }
 
+  // tenant theme service
+
+  async getTenantThemes(tenantId: string) {
+    const theme = await this.themesRepo.findOne({
+      where: { tenant: { id: tenantId } },
+    });
+
+    if (!theme) {
+      throw new NotFoundException('Tenant theme not found');
+    }
+
+    return theme;
+  }
+
+
+  async updateTenantThemes(tenantId: string, dto: UpdateTenantThemeDto) {
+    const theme = await this.themesRepo.findOne({
+      where: { tenant: { id: tenantId } },
+    });
+
+    if (!theme) {
+      throw new NotFoundException('Tenant theme not found');
+    }
+
+    Object.assign(theme, dto);
+
+    await this.themesRepo.save(theme);
+
+    return {
+      message: 'Tenant theme updated successfully',
+      theme,
+    };
+  }
+  async updateTenantLogo(
+    tenantId: string,
+    logo: Express.Multer.File,
+  ) {
+    if (!logo) {
+      throw new BadRequestException('Logo file is required');
+    }
+
+    const profile = await this.profilesRepo.findOne({
+      where: { tenant: { id: tenantId } },
+    });
+
+    if (!profile) {
+      throw new NotFoundException('Tenant profile not found');
+    }
+
+    // 🔹 TEMP logic (future: S3 / Cloudinary)
+    // make file name
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    const filename = `${uniqueSuffix}-${logo.originalname}`;
+
+    profile.logoUrl = `/uploads/logos/${filename}`;
+
+    await this.profilesRepo.save(profile);
+
+    return {
+      message: 'Tenant logo updated successfully',
+      logoUrl: profile.logoUrl,
+    };
+  }
 
 }

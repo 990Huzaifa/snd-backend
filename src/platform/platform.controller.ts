@@ -1,10 +1,12 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, NotFoundException, UseGuards, Put } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, NotFoundException, UseGuards, Put, UseInterceptors, UploadedFile } from '@nestjs/common';
 import { PlatformService } from './platform.service';
 import { ResolveTenantDto } from './dto/resolve-tenant.dto';
 import { CreateTenantDto } from './dto/create-tenant.dto';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { UpdateTenantProfileDto } from './dto/update-tenant-profile.dto';
 import { UpdateTenantSettingsDto } from './dto/update-tenant-settings.dto';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { UpdateTenantThemeDto } from './dto/update-tenant-theme.dto';
 
 @Controller('platform/tenant')
 export class PlatformController {
@@ -91,6 +93,25 @@ export class PlatformController {
   @Put(':id/settings')
   async updateSettings(@Param('id') id: string, @Body() dto: UpdateTenantSettingsDto) {
     return this.platformService.updateTenantSettings(id, dto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get(':id/themes')
+  async getThemes(@Param('id') id: string) {
+    return this.platformService.getTenantThemes(id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Put(':id/themes')
+  async getTheme(@Param('id') id: string, @Body() dto: UpdateTenantThemeDto) {
+    return this.platformService.updateTenantThemes(id, dto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/profile/logo')
+  @UseInterceptors(FileInterceptor('logo'))
+  async uploadLogo(@Param('id') id: string, @UploadedFile() logo: Express.Multer.File) {
+    return this.platformService.updateTenantLogo(id, logo);
   }
 
 }

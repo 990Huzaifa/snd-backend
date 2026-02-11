@@ -7,6 +7,7 @@ import { TenantProvisioningJob } from 'src/master-db/entities/tenant-provisionin
 import { TenantProvisioningLog } from 'src/master-db/entities/tenant-provisioning-log.entity';
 import { TenantSettings } from 'src/master-db/entities/tenant-settings.entity';
 import { TenantProfile } from 'src/master-db/entities/tenant-profile.entity';
+import { TenantTheme } from 'src/master-db/entities/tenant-themes.entity';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { TenantProfile } from 'src/master-db/entities/tenant-profile.entity';
       TenantProvisioningLog,
       TenantSettings,
       TenantProfile,
+      TenantTheme,
     ]),
   ],
   controllers: [PlatformController],
