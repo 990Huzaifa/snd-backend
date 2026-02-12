@@ -27,22 +27,42 @@ export class ProvisioningAdminService {
 
     // start from here
 
-    async createDatabase(dbName: string) 
-    {
+    async createDatabaseIfNotExists(dbName: string) {
         if (!this.adminDataSource?.isInitialized) {
             throw new Error('Admin connection not initialized');
         }
 
-        await this.adminDataSource.query(
-            `CREATE DATABASE "${dbName}";`
+        const result = await this.adminDataSource.query(
+            `SELECT 1 FROM pg_database WHERE datname = $1`,
+            [dbName],
         );
+
+        if (result.length === 0) {
+            await this.adminDataSource.query(
+                `CREATE DATABASE "${dbName}";`
+            );
+            return { created: true };
+        }
+
+        return { created: false };
     }
 
-    async createUser(username: string, password: string) {
-        await this.adminDataSource.query(
-            `CREATE USER "${username}" WITH PASSWORD '${password}';`
+
+    async createUserIfNotExists(username: string, password: string) {
+        const result = await this.adminDataSource.query(
+            `SELECT 1 FROM pg_roles WHERE rolname = '${username}'`,
         );
+
+        if (result.length === 0) {
+            await this.adminDataSource.query(
+                `CREATE USER "${username}" WITH PASSWORD '${password}';`
+            );
+            return { created: true };
+        }
+
+        return { created: false };
     }
+
 
     async grantPrivileges(dbName: string, username: string) {
         await this.adminDataSource.query(
@@ -51,13 +71,26 @@ export class ProvisioningAdminService {
     }
 
     async grantSchemaPrivileges(dbName: string, username: string) {
-        await this.adminDataSource.query(
+        const tenantDs = new DataSource({
+            type: 'postgres',
+            host: process.env.PROVISION_DB_HOST,
+            port: Number(process.env.PROVISION_DB_PORT),
+            username: process.env.PROVISION_DB_USER,
+            password: process.env.PROVISION_DB_PASS,
+            database: dbName,
+        });
+
+        await tenantDs.initialize();
+
+        await tenantDs.query(
             `GRANT ALL ON SCHEMA public TO "${username}";`
         );
 
-        await this.adminDataSource.query(
+        await tenantDs.query(
             `ALTER DATABASE "${dbName}" OWNER TO "${username}";`
         );
+
+        await tenantDs.destroy();
     }
 
     getDataSource() {

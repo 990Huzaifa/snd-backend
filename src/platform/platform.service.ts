@@ -260,17 +260,30 @@ export class PlatformService {
       // ===============================
       await this.provisioningAdminService.createAdminConnection();
       const dbName = `snd_t_${tenant.code}`;
-      await this.provisioningAdminService.createDatabase(dbName);
+
+
+      await this.provisioningAdminService.createDatabaseIfNotExists(dbName);
       // 🔹 Log: database created
       await this.logRepo.save({
         job,
         level: 'INFO',
         message: 'Provison Tenant DB created',
       });
+      
       const dbUser = `snd_u_${tenant.code}`;
-      const dbPass = this.generateStrongPassword();
+      const existingConfig = await this.dbConfigRepo.findOne({
+        where: { tenant: { id: tenant.id } },
+      });
 
-      await this.provisioningAdminService.createUser(dbUser, dbPass);
+      let dbPass: string;
+
+      if (existingConfig) {
+        dbPass = existingConfig.password;
+      } else {
+        dbPass = this.generateStrongPassword();
+      }
+
+      await this.provisioningAdminService.createUserIfNotExists(dbUser, dbPass);
       
       // 🔹 Log: database user created
       await this.logRepo.save({
@@ -289,16 +302,7 @@ export class PlatformService {
         message: 'Tenant DB User Set Privileges',
       });
 
-      await this.dbConfigRepo.save(
-        this.dbConfigRepo.create({
-          tenant,
-          host: process.env.PROVISION_DB_HOST,
-          port: Number(process.env.PROVISION_DB_PORT),
-          database: dbName,
-          username: dbUser,
-          password: dbPass,
-        }),
-      );
+      await this.saveDbConfigIfNotExists(tenant, dbName, dbUser, dbPass);
 
       // 🔹 Log: database config created
       await this.logRepo.save({
@@ -330,16 +334,7 @@ export class PlatformService {
       // ===============================
       // 🔹 STEP 1: Create tenant settings
       // ===============================
-      await this.settingsRepo.save(
-        this.settingsRepo.create({
-          tenant,
-          // defaults auto-apply:
-          // timezone: UTC
-          // currency: USD
-          // baseUom: PCS
-          // baseLocale: EN
-        }),
-      );
+      await this.createDefaultSettingsIfNotExists(tenant);
       // throw new Error('Simulated provisioning failure'); // test fail line
 
       // 🔹 Log: settings created
@@ -352,12 +347,7 @@ export class PlatformService {
       // ===============================
       // 🔹 STEP 2: Create tenant profile
       // ===============================
-      await this.profilesRepo.save(
-        this.profilesRepo.create({
-          tenant,
-          displayName: tenant.name, // default
-        }),
-      );
+      await this.createDefaultProfileIfNotExists(tenant);
 
       await this.logRepo.save({
         job,
@@ -368,11 +358,7 @@ export class PlatformService {
       // ===============================
       // 🔹 STEP 3: Create tenant theme
       // ===============================
-      await this.themesRepo.save(
-        this.themesRepo.create({
-          tenant,
-        }),
-      );
+      await this.createDefaultThemeIfNotExists(tenant);
 
       await this.logRepo.save({
         job,
@@ -481,6 +467,93 @@ export class PlatformService {
       status: tenant.status,
     };
   }
+
+
+  // sub functions
+
+  private async saveDbConfigIfNotExists(
+    tenant: Tenant,
+    dbName: string,
+    dbUser: string,
+    dbPass: string,
+  ) {
+    const existing = await this.dbConfigRepo.findOne({
+      where: { tenant: { id: tenant.id } },
+    });
+
+    if (!existing) {
+      await this.dbConfigRepo.save(
+        this.dbConfigRepo.create({
+          tenant,
+          host: process.env.PROVISION_DB_HOST,
+          port: Number(process.env.PROVISION_DB_PORT),
+          database: dbName,
+          username: dbUser,
+          password: dbPass,
+        }),
+      );
+
+      return { created: true };
+    }
+
+    return { created: false };
+  }
+
+  private async createDefaultSettingsIfNotExists(tenant: Tenant) {
+    const existing = await this.settingsRepo.findOne({
+      where: { tenant: { id: tenant.id } },
+    });
+
+    if (!existing) {
+      await this.settingsRepo.save(
+        this.settingsRepo.create({
+          tenant,
+        }),
+      );
+
+      return { created: true };
+    }
+
+    return { created: false };
+  }
+
+  private async createDefaultProfileIfNotExists(tenant: Tenant) {
+    const existing = await this.profilesRepo.findOne({
+      where: { tenant: { id: tenant.id } },
+    });
+
+    if (!existing) {
+      await this.profilesRepo.save(
+        this.profilesRepo.create({
+          tenant,
+          displayName: tenant.name
+        }),
+      );
+
+      return { created: true };
+    }
+
+    return { created: false };
+  }
+
+  private async createDefaultThemeIfNotExists(tenant: Tenant) {
+    const existing = await this.themesRepo.findOne({
+      where: { tenant: { id: tenant.id } },
+    });
+
+    if (!existing) {
+      await this.themesRepo.save(
+        this.themesRepo.create({
+          tenant
+        }),
+      );
+
+      return { created: true };
+    }
+
+    return { created: false };
+  }
+
 
 
   // tenant profile service
@@ -620,6 +693,8 @@ export class PlatformService {
     for (let i = 0; i < length; i++) {
       result += chars.charAt(Math.floor(Math.random() * chars.length));
     }
+
+    
     return result;
   }
 
