@@ -19,6 +19,7 @@ export enum IndustryType {
     SOFTWARE = 'SOFTWARE',
     RETAIL = 'RETAIL',
     SERVICES = 'SERVICES',
+    BRAND = 'BRAND',
     MANUFACTURING = 'MANUFACTURING',
     WHOLESALE = 'WHOLESALE',
     OTHER = 'OTHER',

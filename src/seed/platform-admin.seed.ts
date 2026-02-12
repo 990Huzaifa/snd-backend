@@ -1,6 +1,6 @@
 import { DataSource } from 'typeorm';
 import * as bcrypt from 'bcrypt';
-import dataSource from '../../typeorm.config';
+import dataSource from '../../typeorm.master.config';
 import { PlatformUser } from '../master-db/entities/platform-user.entity';
 import { PlatformRole } from '../master-db/entities/platform-role.entity';
 

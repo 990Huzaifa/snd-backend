@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Tenant, TenantStatus } from '../master-db/entities/tenant.entity';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { CreateTenantDto } from './dto/create-tenant.dto';
 import { TenantProvisioningJob } from 'src/master-db/entities/tenant-provisioning-job.entity';
 import { TenantProvisioningLog } from 'src/master-db/entities/tenant-provisioning-log.entity';
@@ -14,6 +14,8 @@ import { UpdateTenantThemeDto } from './dto/update-tenant-theme.dto';
 import { TenantTheme } from 'src/master-db/entities/tenant-themes.entity';
 import { ProvisioningAdminService } from './services/provisioning-admin.service';
 import { TenantDbConfig } from 'src/master-db/entities/tenant-db-config.entity';
+import { createTenantDataSource } from 'src/tenant-db/tenant-datasource.factory';
+import { TenantDatabaseService } from 'src/tenant-db/services/tenant-database.service';
 
 @Injectable()
 export class PlatformService {
@@ -35,6 +37,7 @@ export class PlatformService {
 
 
     private readonly provisioningAdminService: ProvisioningAdminService,
+    private readonly tenantDatabaseService: TenantDatabaseService,
   ) { }
 
   private async generateUniqueCode(): Promise<string> {
@@ -277,6 +280,7 @@ export class PlatformService {
       });
 
       await this.provisioningAdminService.grantPrivileges(dbName, dbUser);
+      await this.provisioningAdminService.grantSchemaPrivileges(dbName, dbUser);
 
       // 🔹 Log: grant privileges
       await this.logRepo.save({
@@ -303,6 +307,22 @@ export class PlatformService {
         message: 'Tenant DB Config created',
       });
       await this.provisioningAdminService.closeConnection();
+
+
+      // migrations
+      await this.tenantDatabaseService.runMigrations(
+        String(process.env.PROVISION_DB_HOST),
+        Number(process.env.PROVISION_DB_PORT),
+        dbUser,
+        dbPass,
+        dbName,
+      );
+
+      await this.logRepo.save({
+        job,
+        level: 'INFO',
+        message: 'Tenant DB migrations executed',
+      });
 
       
 

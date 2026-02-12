@@ -10,6 +10,7 @@ import { TenantProfile } from 'src/master-db/entities/tenant-profile.entity';
 import { TenantTheme } from 'src/master-db/entities/tenant-themes.entity';
 import { ProvisioningAdminService } from './services/provisioning-admin.service';
 import { TenantDbConfig } from 'src/master-db/entities/tenant-db-config.entity';
+import { TenantDatabaseService } from 'src/tenant-db/services/tenant-database.service';
 
 @Module({
   imports: [
@@ -24,6 +25,6 @@ import { TenantDbConfig } from 'src/master-db/entities/tenant-db-config.entity';
     ]),
   ],
   controllers: [PlatformController],
-  providers: [PlatformService, ProvisioningAdminService,],
+  providers: [PlatformService, ProvisioningAdminService, TenantDatabaseService],
 })
 export class PlatformModule {}

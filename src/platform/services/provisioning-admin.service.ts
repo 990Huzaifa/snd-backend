@@ -50,6 +50,16 @@ export class ProvisioningAdminService {
         );
     }
 
+    async grantSchemaPrivileges(dbName: string, username: string) {
+        await this.adminDataSource.query(
+            `GRANT ALL ON SCHEMA public TO "${username}";`
+        );
+
+        await this.adminDataSource.query(
+            `ALTER DATABASE "${dbName}" OWNER TO "${username}";`
+        );
+    }
+
     getDataSource() {
         return this.adminDataSource;
     }
