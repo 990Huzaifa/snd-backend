@@ -13,6 +13,7 @@ import { TenantDbConfig } from 'src/master-db/entities/tenant-db-config.entity';
 import { TenantDatabaseService } from 'src/tenant-db/services/tenant-database.service';
 import { PlatformRole } from 'src/master-db/entities/platform-role.entity';
 import { PlatformUser } from 'src/master-db/entities/platform-user.entity';
+import { TenantGeoPolicy } from 'src/master-db/entities/tenant-geo-policy.entity';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { PlatformUser } from 'src/master-db/entities/platform-user.entity';
       TenantProvisioningLog,
       TenantSettings,
       TenantProfile,
+      TenantGeoPolicy,
       TenantTheme,
       TenantDbConfig,
       PlatformRole,

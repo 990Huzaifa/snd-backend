@@ -2,38 +2,41 @@ import {
     Column,
     CreateDateColumn,
     Entity,
-    JoinColumn,
-    ManyToOne,
     OneToMany,
     PrimaryGeneratedColumn,
     UpdateDateColumn,
+    Index,
 } from 'typeorm';
-import { City } from './city.entity';
 import { Area } from './area.entity';
 
 @Entity({ name: 'regions' })
+@Index(['city_id', 'name'], { unique: true })
 export class Region {
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
-    @ManyToOne(() => City, (city) => city.regions, {
-        onDelete: 'CASCADE',
-    })
-    @JoinColumn({ name: 'city_id' })
-    city: City;
+    /**
+     * Logical reference to Master DB cities.id
+     * No FK constraint (cross-database relation)
+     */
+    @Column('uuid')
+    city_id: string;
 
-    @Column()
+    @Column({ length: 150 })
     name: string;
 
-    @Column()
+    @Column({ length: 50, nullable: true })
     code: string;
+
+    @Column({ default: true })
+    is_active: boolean;
 
     @OneToMany(() => Area, (area) => area.region)
     areas: Area[];
 
     @CreateDateColumn()
-    createdAt: Date;
+    created_at: Date;
 
     @UpdateDateColumn()
-    updatedAt: Date;
+    updated_at: Date;
 }

@@ -18,6 +18,7 @@ import { CreatePlatformUser } from './dto/create-platform-user.dto';
 import { PlatformUser } from 'src/master-db/entities/platform-user.entity';
 import { PlatformRole } from 'src/master-db/entities/platform-role.entity';
 import * as bcrypt from 'bcrypt';
+import { TenantGeoPolicy } from 'src/master-db/entities/tenant-geo-policy.entity';
 
 @Injectable()
 export class PlatformService {
@@ -32,6 +33,8 @@ export class PlatformService {
     private readonly settingsRepo: Repository<TenantSettings>,
     @InjectRepository(TenantProfile)
     private readonly profilesRepo: Repository<TenantProfile>,
+    @InjectRepository(TenantGeoPolicy)
+    private readonly geoPolicyRepo: Repository<TenantGeoPolicy>,
     @InjectRepository(TenantTheme)
     private readonly themesRepo: Repository<TenantTheme>,
     @InjectRepository(TenantDbConfig)
@@ -372,6 +375,19 @@ export class PlatformService {
         message: 'Tenant default theme created',
       });
 
+
+      // ===============================
+      // 🔹 STEP 1: Create tenant Geo Policy
+      // ===============================
+      await this.createDefaultGeoPolicyIfNotExists(tenant);
+      // throw new Error('Simulated provisioning failure'); // test fail line
+
+      // 🔹 Log: settings created
+      await this.logRepo.save({
+        job,
+        level: 'INFO',
+        message: 'Tenant default geo policy created',
+      });
       // 🚧 STOP HERE — (future steps plug below) 
 
       // 🔥 FINALIZE provisioning (CURRENT SCOPE)
@@ -513,6 +529,24 @@ export class PlatformService {
     if (!existing) {
       await this.settingsRepo.save(
         this.settingsRepo.create({
+          tenant,
+        }),
+      );
+
+      return { created: true };
+    }
+
+    return { created: false };
+  }
+
+  private async createDefaultGeoPolicyIfNotExists(tenant: Tenant) {
+    const existing = await this.geoPolicyRepo.findOne({
+      where: { tenant: { id: tenant.id } },
+    });
+
+    if (!existing) {
+      await this.geoPolicyRepo.save(
+        this.geoPolicyRepo.create({
           tenant,
         }),
       );
