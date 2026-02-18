@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Tenant, TenantStatus } from '../master-db/entities/tenant.entity';
-import { DataSource, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import { CreateTenantDto } from './dto/create-tenant.dto';
 import { TenantProvisioningJob } from 'src/master-db/entities/tenant-provisioning-job.entity';
 import { TenantProvisioningLog } from 'src/master-db/entities/tenant-provisioning-log.entity';
@@ -9,13 +9,15 @@ import { TenantSettings } from 'src/master-db/entities/tenant-settings.entity';
 import { TenantProfile } from 'src/master-db/entities/tenant-profile.entity';
 import { UpdateTenantProfileDto } from './dto/update-tenant-profile.dto';
 import { UpdateTenantSettingsDto } from './dto/update-tenant-settings.dto';
-import { diskStorage } from 'multer';
 import { UpdateTenantThemeDto } from './dto/update-tenant-theme.dto';
 import { TenantTheme } from 'src/master-db/entities/tenant-themes.entity';
 import { ProvisioningAdminService } from './services/provisioning-admin.service';
 import { TenantDbConfig } from 'src/master-db/entities/tenant-db-config.entity';
-import { createTenantDataSource } from 'src/tenant-db/tenant-datasource.factory';
 import { TenantDatabaseService } from 'src/tenant-db/services/tenant-database.service';
+import { CreatePlatformUser } from './dto/create-platform-user.dto';
+import { PlatformUser } from 'src/master-db/entities/platform-user.entity';
+import { PlatformRole } from 'src/master-db/entities/platform-role.entity';
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class PlatformService {
@@ -34,6 +36,10 @@ export class PlatformService {
     private readonly themesRepo: Repository<TenantTheme>,
     @InjectRepository(TenantDbConfig)
     private readonly dbConfigRepo: Repository<TenantDbConfig>,
+    @InjectRepository(PlatformUser)
+    private readonly platformUserRepo: Repository<PlatformUser>,
+    @InjectRepository(PlatformRole)
+    private readonly platformRoleRepo: Repository<PlatformRole>,
 
 
     private readonly provisioningAdminService: ProvisioningAdminService,
@@ -698,5 +704,36 @@ export class PlatformService {
     return result;
   }
 
+
+  // user, role CRUD
+  async getPlatformRoleList() {
+    // 1️⃣ Fetch tenants
+    const roles = await this.platformRoleRepo.find({
+      select: ['id', 'name', 'code', 'updatedAt'],
+      order: { updatedAt: 'DESC' },
+    });
+    
+    return {
+      result: roles
+    };
+  }
+
+  async createPlatformUser(dto: CreatePlatformUser){
+
+    let password = String(dto.passwordHash);
+
+    await this.platformUserRepo.save(
+      this.platformUserRepo.create({
+        fullName: dto.fullname,
+        email: dto.email,
+        passwordHash: await bcrypt.hash(password, 10),
+        role: dto.role
+      }) 
+    );
+
+    return {
+      message: 'User is created successfully'
+    }
+  }
 
 }

@@ -11,6 +11,8 @@ import { TenantTheme } from 'src/master-db/entities/tenant-themes.entity';
 import { ProvisioningAdminService } from './services/provisioning-admin.service';
 import { TenantDbConfig } from 'src/master-db/entities/tenant-db-config.entity';
 import { TenantDatabaseService } from 'src/tenant-db/services/tenant-database.service';
+import { PlatformRole } from 'src/master-db/entities/platform-role.entity';
+import { PlatformUser } from 'src/master-db/entities/platform-user.entity';
 
 @Module({
   imports: [
@@ -21,7 +23,9 @@ import { TenantDatabaseService } from 'src/tenant-db/services/tenant-database.se
       TenantSettings,
       TenantProfile,
       TenantTheme,
-      TenantDbConfig
+      TenantDbConfig,
+      PlatformRole,
+      PlatformUser,
     ]),
   ],
   controllers: [PlatformController],

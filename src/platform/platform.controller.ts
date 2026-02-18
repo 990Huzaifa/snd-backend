@@ -7,6 +7,8 @@ import { UpdateTenantProfileDto } from './dto/update-tenant-profile.dto';
 import { UpdateTenantSettingsDto } from './dto/update-tenant-settings.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UpdateTenantThemeDto } from './dto/update-tenant-theme.dto';
+import { RequirePermissions } from 'src/auth/require-permission.decorator';
+import { PermissionGuard } from 'src/auth/permission.guard';
 
 @Controller('platform/tenant')
 export class PlatformController {
@@ -27,7 +29,8 @@ export class PlatformController {
     };
   }
 
-  @UseGuards(JwtAuthGuard)
+  @RequirePermissions('TENANT_CREATE')
+  @UseGuards(JwtAuthGuard, PermissionGuard)
   @Post()
   async createTenant(@Body() dto: CreateTenantDto) {
     const tenant = await this.platformService.createTenant(dto);
@@ -46,7 +49,8 @@ export class PlatformController {
     return this.platformService.retryProvisioning(tenantId);
   }
 
-  @UseGuards(JwtAuthGuard)
+  @RequirePermissions('TENANT_VIEW')
+  @UseGuards(JwtAuthGuard, PermissionGuard)
   @Get('/provisioning')
   async provisioning() {
     return this.platformService.getProvisioningList();
@@ -114,4 +118,11 @@ export class PlatformController {
     return this.platformService.updateTenantLogo(id, logo);
   }
 
+
+
+
+  @Get('roles')
+  async getRoleList(){
+    return this.platformService.getPlatformRoleList();
+  }
 }
