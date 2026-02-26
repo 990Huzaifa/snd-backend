@@ -1,46 +1,38 @@
-name: Deploy NestJS Project to API Server
+name: Deploy NestJS Project to Server
 
 on:
   push:
     branches:
-      - main
+      - main  # Trigger on push to the main branch (or change to 'master' as per your workflow)
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
+      # Checkout the code from the repository
       - name: Checkout code
         uses: actions/checkout@v2
 
+      # Set up Node.js environment
       - name: Set up Node.js
         uses: actions/setup-node@v2
         with:
           node-version: '16'
 
+      # Install dependencies and build the NestJS project
       - name: Install dependencies and build
         run: |
           npm install
           npm run build
 
-      - name: Check if dist directory exists
-        run: |
-          if [ -d "./dist" ]; then
-            echo "dist directory exists";
-          else
-            echo "dist directory does not exist" && exit 1;
-          fi
-
+      # Deploy via FTP (using lftp)
       - name: Deploy via FTP
         run: |
           sudo apt-get update
           sudo apt-get install -y lftp
-          
-          # Escape special characters in FTP_PASSWORD using printf
-          FTP_PASSWORD_ESCAPED=$(printf '%s' "${{ secrets.FTP_PASSWORD }}" | sed 's/[]\$*.^[]/\\&/g')
-          
           lftp -f "
-            open -u ${{ secrets.FTP_USERNAME }},$FTP_PASSWORD_ESCAPED -p 21 ${{ secrets.FTP_SERVER }}
+            open -u ${{ secrets.FTP_USERNAME }},${{ secrets.FTP_PASSWORD }} -p 21 ${{ secrets.FTP_SERVER }}
             mirror -R ./dist /var/www/api.salesvince.com
             quit
           "
