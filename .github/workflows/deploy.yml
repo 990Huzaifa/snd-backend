@@ -10,29 +10,52 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Checkout the code from the repository
+      # Step 1: Checkout the code from the repository
       - name: Checkout code
         uses: actions/checkout@v2
 
-      # Set up Node.js environment
+      # Step 2: Set up Node.js environment
       - name: Set up Node.js
         uses: actions/setup-node@v2
         with:
           node-version: '16'
 
-      # Install dependencies and build the NestJS project
-      - name: Install dependencies and build
+      # Step 3: Install dependencies locally (on the CI/CD runner)
+      - name: Install dependencies
         run: |
           npm install
-          npm run build
 
-      # Deploy via FTP (using lftp)
-      - name: Deploy via FTP
+      # Step 4: Push the source code to the server using SCP (FTP is slower for large codebases)
+      - name: Push source code to server
         run: |
-          sudo apt-get update
-          sudo apt-get install -y lftp
-          lftp -f "
-            open -u ${{ secrets.FTP_USERNAME }},${{ secrets.FTP_PASSWORD }} -p 21 ${{ secrets.FTP_SERVER }}
-            mirror -R ./dist /api.salesvince.com
-            quit
-          "
+          scp -r . user@${{ secrets.FTP_SERVER }}:/api.salesvince.com
+
+      # Step 5: SSH into the server, install dependencies, run migrations, and build the project
+      - name: Run migrations, install dependencies, and build on the server
+        run: |
+          ssh -o StrictHostKeyChecking=no user@${{ secrets.FTP_SERVER }} << 'EOF'
+            # Navigate to the project directory
+            cd /var/www/api.salesvince.com
+
+            # Install dependencies on the server (since it's a production build)
+            npm install
+
+            # Run migrations to apply DB changes
+            # npx typeorm-ts-node-commonjs migration:run -d typeorm.master.config.ts
+
+            # Run seeders (if applicable)
+            # npm run seed:platform
+
+            # Build the project (create the dist folder)
+            npm run build
+
+            exit
+          EOF
+
+      # Step 6: Restart the application (using PM2 or any process manager)
+      - name: Restart the app
+        run: |
+          ssh -o StrictHostKeyChecking=no user@${{ secrets.FTP_SERVER }} << 'EOF'
+            pm2 restart api.salesvince.com  # Restart the NestJS app
+            exit
+          EOF
