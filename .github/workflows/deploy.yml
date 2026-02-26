@@ -33,6 +33,6 @@ jobs:
           sudo apt-get install -y lftp
           lftp -f "
             open -u ${{ secrets.FTP_USERNAME }},${{ secrets.FTP_PASSWORD }} -p 21 ${{ secrets.FTP_SERVER }}
-            mirror -R ./dist /var/www/api.salesvince.com
+            mirror -R ./dist /api.salesvince.com
             quit
           "
