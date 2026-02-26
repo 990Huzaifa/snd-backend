@@ -14,9 +14,16 @@ import { TenantDatabaseService } from 'src/tenant-db/services/tenant-database.se
 import { PlatformRole } from 'src/master-db/entities/platform-role.entity';
 import { PlatformUser } from 'src/master-db/entities/platform-user.entity';
 import { TenantGeoPolicy } from 'src/master-db/entities/tenant-geo-policy.entity';
+import { Customer } from 'src/master-db/entities/customer.entity';
+import { CustomerService } from './services/customer.service';
+import { CustomerController } from './controller/customer.controller';
+import { MailService } from 'src/common/mail/mail.service';
+import { HttpModule } from '@nestjs/axios';
+import { JwtService } from '@nestjs/jwt';
 
 @Module({
   imports: [
+    HttpModule,
     TypeOrmModule.forFeature([
       Tenant,
       TenantProvisioningJob,
@@ -28,9 +35,10 @@ import { TenantGeoPolicy } from 'src/master-db/entities/tenant-geo-policy.entity
       TenantDbConfig,
       PlatformRole,
       PlatformUser,
+      Customer,
     ]),
   ],
-  controllers: [PlatformController],
-  providers: [PlatformService, ProvisioningAdminService, TenantDatabaseService],
+  controllers: [PlatformController, CustomerController],
+  providers: [PlatformService, ProvisioningAdminService, TenantDatabaseService, CustomerService, MailService, JwtService],
 })
 export class PlatformModule {}

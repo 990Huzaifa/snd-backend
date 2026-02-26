@@ -9,6 +9,7 @@ import { PlatformUser } from 'src/master-db/entities/platform-user.entity';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './jwt.strategy';
+import { CustomerJwtStrategy } from './customer-jwt.strategy';
 
 @Module({
     imports: [
@@ -25,7 +26,7 @@ import { JwtStrategy } from './jwt.strategy';
             }),
         })
     ],
-    providers: [AuthService,JwtStrategy],
+    providers: [AuthService,JwtStrategy,CustomerJwtStrategy],
     controllers: [AuthController],
 })
 export class AuthModule {}
