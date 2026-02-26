@@ -1,0 +1,38 @@
+name: Deploy NestJS Project to Server
+
+on:
+  push:
+    branches:
+      - main  # Trigger on push to the main branch (or change to 'master' as per your workflow)
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checkout the code from the repository
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      # Set up Node.js environment
+      - name: Set up Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '16'
+
+      # Install dependencies and build the NestJS project
+      - name: Install dependencies and build
+        run: |
+          npm install
+          npm run build
+
+      # Deploy via FTP (using lftp)
+      - name: Deploy via FTP
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lftp
+          lftp -f "
+            open -u ${{ secrets.FTP_USERNAME }},${{ secrets.FTP_PASSWORD }} -p 21 ${{ secrets.FTP_SERVER }}
+            mirror -R ./dist /var/www/api.salesvince.com
+            quit
+          "
