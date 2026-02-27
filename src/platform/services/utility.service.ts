@@ -35,10 +35,14 @@ export class UtilityService {
         return states;
     }
 
-    async getCities(stateId: any) {
+    async getCities(stateId: any, name: string) {
         // this should ideally come from a database or external API, but for simplicity, we'll hardcode it here
         const cities = await this.cityRepo.find({ 
-            where: { state: { id: stateId } }, 
+            where: { 
+                state: { id: stateId },
+                name: name ? Like(`%${name}%`) : undefined
+            }, 
+            order: { name: 'ASC' }
         });
         return cities;
     }

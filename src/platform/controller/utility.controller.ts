@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Get, Param } from '@nestjs/common';
+import { Controller, Post, Body, Get, Param, Query } from '@nestjs/common';
 import { UtilityService } from '../services/utility.service';
 @Controller('utility')
 export class UtilityController {
@@ -13,12 +13,12 @@ export class UtilityController {
     }
 
     @Get('states/:countryId')
-    async getStates(@Param('countryId') countryId: any, @Body('name') name: string) {
+    async getStates(@Param('countryId') countryId: any, @Query('name') name: string) {
         return this.UtilityService.getStates(countryId, name);
     }
 
     @Get('cities/:stateId')
-    async getCities(@Param('stateId') stateId: any) {
-        return this.UtilityService.getCities(stateId);
+    async getCities(@Param('stateId') stateId: any, @Query('name') name: string) {
+        return this.UtilityService.getCities(stateId, name);
     }
 }
