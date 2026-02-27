@@ -5,8 +5,9 @@ import { State } from '../entities/state.entity';
 import { City } from '../entities/city.entity';
 
 export async function geoDataSeeder(dataSource: DataSource) {
-    const cityRepo = dataSource.getRepository(City);
+    const countryRepo = dataSource.getRepository(Country);
     const stateRepo = dataSource.getRepository(State);
+    const cityRepo = dataSource.getRepository(City);
 
     console.log('🌱 Seeding geo data...');
     
@@ -14,8 +15,8 @@ export async function geoDataSeeder(dataSource: DataSource) {
     // Read JSON files
     // const countriesData = JSON.parse(fs.readFileSync('src/master-db/seed-data/countries.json', 'utf-8'));
     // const statesData = JSON.parse(fs.readFileSync('src/master-db/seed-data/states.json', 'utf-8'));
-    const citiesData = JSON.parse(fs.readFileSync('src/master-db/seed-data/cities.json', 'utf-8'));
-    
+    const citiesData = JSON.parse(fs.readFileSync('src/master-db/seed-data/cities_10.json', 'utf-8'));
+        
     console.log(`📊 Loaded ${citiesData.length} cities`);
 
     // Insert countries (batch insert)
@@ -27,53 +28,69 @@ export async function geoDataSeeder(dataSource: DataSource) {
     // console.log('✅ Countries seeded.');
 
     // Insert states (batch insert)
-    // const stateEntities = statesData.map((state: any) => stateRepo.create({
-    //     name: state.name,
-    //     code: state.iso2,
-    //     country_id: state.country_id
-    // }));
-    // await stateRepo.save(stateEntities);
-    // console.log('✅ States seeded.');
+    // for (const state of statesData) {
+    //     // Check if the state already exists in the database based on the 'id'
+    //     const existingState = await stateRepo.findOne({ where: { id: state.id } });
 
-    console.log(`📊 Loaded ${citiesData.length} cities.`);
+    //     if (existingState) {
+    //         // If state exists, update its name and code
+    //         existingState.name = state.name;
+    //         existingState.code = state.iso2;
 
-    const batchSize = 500;  // Adjust batch size based on your server's memory
-    let batchCount = 0;
+    //         // Save the updated state
+    //         await stateRepo.save(existingState);
+    //         console.log(`✅ State with ID ${state.id} updated.`);
+    //     } else {
+    //         // If state doesn't exist, create a new one
+    //         const newState = stateRepo.create({
+    //             id: state.id, // Ensure we set the ID
+    //             name: state.name,
+    //             code: state.iso2,
+    //             country_id: state.country_id
+    //         });
 
-    // Process cities in batches
-    for (let i = 0; i < citiesData.length; i += batchSize) {
-        // Slice the data to create smaller batches
-        const batch = citiesData.slice(i, i + batchSize);
-        const cityEntities: City[] = [];
+    //         // Insert the new state
+    //         await stateRepo.save(newState);
+    //         console.log(`✅ New state with ID ${state.id} inserted.`);
+    //     }
+    // }
+    console.log('✅ States seeded.');
 
-        // Prepare city entities for batch insertion
-        for (const city of batch) {
-            // Find the corresponding state for the given state_id
-            const state = await stateRepo.findOne({ where: { id: city.state_id } });
-            if (!state) {
-                console.log(`⚠️ State with ID '${city.state_id}' not found for city '${city.name}', skipping.`);
-                continue;
+    const validCities: City[] = [];
+
+    for (const city of citiesData) {
+        // Fetch the state before creating the city entity
+        const state = await stateRepo.findOne({ where: { id: city.state_id } });
+
+        // If the state exists, check if the city already exists by id
+        if (state) {
+            const existingCity = await cityRepo.findOne({ where: { id: city.id } });
+
+            if (!existingCity) {
+                // If the city doesn't exist, create and push the new city entity
+                const cityEntity = cityRepo.create({
+                    id: city.id, // Ensure we set the ID
+                    name: city.name,
+                    state_id: state.id,
+                    code: city.state_code
+                });
+
+                validCities.push(cityEntity);
+                console.log(`✅ New city with ID ${city.id} inserted.`);
+            } else {
+                // If the city exists, skip it
             }
-
-            const cityEntity: City = cityRepo.create({
-                name: city.name,
-                code: city.state_code,
-                state_id: state.id, // Reference the state ID
-                is_active: true, // Default active
-            });
-
-            cityEntities.push(cityEntity);
+        } else {
+            console.log(`❌ Skipping city "${city.name}" as state with ID ${city.state_id} not found.`);
         }
+    }
 
-        // Insert the current batch into the database
-        if (cityEntities.length > 0) {
-            await cityRepo.save(cityEntities);
-            batchCount++;
-            console.log(`✅ Batch ${batchCount} of cities seeded.`);
-        }
-
-        // Clear the memory before processing the next batch
-        cityEntities.length = 0;  // Clear the array
+    // Insert the valid cities
+    if (validCities.length > 0) {
+        await cityRepo.save(validCities);
+        console.log(`✅ Successfully seeded ${validCities.length} cities.`);
+    } else {
+        console.log('❌ No valid cities to seed.');
     }
 
     console.log('🌱 Geo data seeding completed.\n');

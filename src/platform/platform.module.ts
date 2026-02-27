@@ -20,6 +20,9 @@ import { CustomerController } from './controller/customer.controller';
 import { MailService } from 'src/common/mail/mail.service';
 import { HttpModule } from '@nestjs/axios';
 import { JwtService } from '@nestjs/jwt';
+import { UtilityController } from './controller/utility.controller';
+import { UtilityService } from './services/utility.service';
+import { Country } from 'src/master-db/entities/country.entity';
 
 @Module({
   imports: [
@@ -36,9 +39,10 @@ import { JwtService } from '@nestjs/jwt';
       PlatformRole,
       PlatformUser,
       Customer,
+      Country
     ]),
   ],
-  controllers: [PlatformController, CustomerController],
-  providers: [PlatformService, ProvisioningAdminService, TenantDatabaseService, CustomerService, MailService, JwtService],
+  controllers: [PlatformController, CustomerController, UtilityController],
+  providers: [PlatformService, ProvisioningAdminService, TenantDatabaseService, CustomerService, UtilityService, MailService, JwtService],
 })
 export class PlatformModule {}

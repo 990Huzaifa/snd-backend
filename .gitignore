@@ -2,7 +2,8 @@
 /dist
 /node_modules
 /build
-
+/dist
+/src/master-db/seed-data
 # Logs
 logs
 *.log
