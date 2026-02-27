@@ -32,6 +32,17 @@ export async function geoDataSeeder(dataSource: DataSource) {
             await countryRepo.save(existingCountry);
             console.log(`✅ Country with ID ${existingCountry.id} updated.`);
         } else {
+
+            // If country doesn't exist, create a new one
+            const newCountry = countryRepo.create({
+                id: Country.id, // Ensure we set the ID
+                name: Country.name,
+                iso_code: Country.iso3
+            });
+
+            // Insert the new country
+            await countryRepo.save(newCountry);
+            console.log(`✅ New country with ID ${newCountry.id} inserted.`);
         }
     }
     console.log('✅ Countries seeded.');
