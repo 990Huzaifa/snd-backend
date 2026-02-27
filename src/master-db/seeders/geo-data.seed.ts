@@ -13,49 +13,58 @@ export async function geoDataSeeder(dataSource: DataSource) {
     
     // Read cities JSON file
     // Read JSON files
-    // const countriesData = JSON.parse(fs.readFileSync('src/master-db/seed-data/countries.json', 'utf-8'));
-    const statesData = JSON.parse(fs.readFileSync('src/master-db/seed-data/states.json', 'utf-8'));
-    const citiesData = JSON.parse(fs.readFileSync('src/master-db/seed-data/cities_10.json', 'utf-8'));
+    const countriesData = JSON.parse(fs.readFileSync('src/master-db/seed-data/countries.json', 'utf-8'));
+    // const statesData = JSON.parse(fs.readFileSync('src/master-db/seed-data/states.json', 'utf-8'));
+    // const citiesData = JSON.parse(fs.readFileSync('src/master-db/seed-data/cities_10.json', 'utf-8'));
         
-    console.log(`📊 Loaded ${citiesData.length} cities`);
+    console.log(`📊 Loaded ${countriesData.length} Countries`);
 
     // Insert countries (batch insert)
-    // const countryEntities = countriesData.map((country: any) => countryRepo.create({
-    //     name: country.name,
-    //     iso_code: country.iso3
-    // }));
-    // await countryRepo.save(countryEntities);
-    // console.log('✅ Countries seeded.');
+    for (const Country of countriesData) {
+        // Check if the country already exists in the database based on the 'iso_code'
+        const existingCountry = await countryRepo.findOne({ where: { iso_code: Country.iso3 } });
 
-    // Insert states (batch insert)
-    for (const state of statesData) {
-        // Check if the state already exists in the database based on the 'id'
-        const existingState = await stateRepo.findOne({ where: { id: state.id } });
+        if (existingCountry) {
+            // If country exists, update its name and code
+            existingCountry.id = Country.id; // Ensure we also update the ID if it has changed
 
-        if (existingState) {
-            // If state exists, update its name and code
-            existingState.name = state.name;
-            existingState.code = state.iso2;
-            existingState.country_id = state.country_id; // Ensure we also update the country_id if it has changed
-
-            // Save the updated state
-            await stateRepo.save(existingState);
-            console.log(`✅ State with ID ${state.id} updated.`);
+            // Save the updated country
+            await countryRepo.save(existingCountry);
+            console.log(`✅ Country with ID ${existingCountry.id} updated.`);
         } else {
-            // If state doesn't exist, create a new one
-            const newState = stateRepo.create({
-                id: state.id, // Ensure we set the ID
-                name: state.name,
-                code: state.iso2,
-                country_id: state.country_id
-            });
-
-            // Insert the new state
-            await stateRepo.save(newState);
-            console.log(`✅ New state with ID ${state.id} inserted.`);
         }
     }
-    console.log('✅ States seeded.');
+    console.log('✅ Countries seeded.');
+
+    // Insert states (batch insert)
+    // for (const state of statesData) {
+    //     // Check if the state already exists in the database based on the 'id'
+    //     const existingState = await stateRepo.findOne({ where: { id: state.id } });
+
+    //     if (existingState) {
+    //         // If state exists, update its name and code
+    //         existingState.name = state.name;
+    //         existingState.code = state.iso2;
+    //         existingState.country_id = state.country_id; // Ensure we also update the country_id if it has changed
+
+    //         // Save the updated state
+    //         await stateRepo.save(existingState);
+    //         console.log(`✅ State with ID ${state.id} updated.`);
+    //     } else {
+    //         // If state doesn't exist, create a new one
+    //         const newState = stateRepo.create({
+    //             id: state.id, // Ensure we set the ID
+    //             name: state.name,
+    //             code: state.iso2,
+    //             country_id: state.country_id
+    //         });
+
+    //         // Insert the new state
+    //         await stateRepo.save(newState);
+    //         console.log(`✅ New state with ID ${state.id} inserted.`);
+    //     }
+    // }
+    // console.log('✅ States seeded.');
 
     // const validCities: City[] = [];
 
