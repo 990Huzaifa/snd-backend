@@ -11,12 +11,11 @@ import {
 import { State } from './state.entity';
 
 @Entity({ name: 'cities' })
-@Index(['state_id', 'name'], { unique: true })
 export class City {
-    @PrimaryGeneratedColumn('uuid')
+    @PrimaryGeneratedColumn()
     id: string;
 
-    @Column('uuid')
+    @Column()
     state_id: string;
 
     @ManyToOne(() => State, { onDelete: 'CASCADE' })

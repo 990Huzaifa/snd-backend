@@ -9,7 +9,7 @@ import {
 
 @Entity({ name: 'countries' })
 export class Country {
-    @PrimaryGeneratedColumn('uuid')
+    @PrimaryGeneratedColumn()
     id: string;
 
     @Column({ length: 100 })

@@ -3,6 +3,7 @@ import { seedPlatformRoles } from './platform-role.seed';
 import { seedPlatformPermissions } from './platform-permission.seed';
 import { seedRolePermissions } from './platform-role-has-permission.seed';
 import { seedPlatformAdminUser } from './platform-admin.seed';
+import { geoDataSeeder } from './geo-data.seed';
 
 async function runPlatformSeeders() {
     try {
@@ -10,10 +11,12 @@ async function runPlatformSeeders() {
 
         console.log('\n🚀 Running Platform Seeders...\n');
 
-        await seedPlatformRoles(dataSource);
-        await seedPlatformPermissions(dataSource);
-        await seedRolePermissions(dataSource);
-        await seedPlatformAdminUser(dataSource);
+        // await seedPlatformRoles(dataSource);
+        // await seedPlatformPermissions(dataSource);
+        // await seedRolePermissions(dataSource);
+        // await seedPlatformAdminUser(dataSource);
+
+        await geoDataSeeder(dataSource);
 
         console.log('🎉 All platform seeders completed successfully.');
     } catch (error) {
