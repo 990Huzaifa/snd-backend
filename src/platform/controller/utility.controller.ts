@@ -1,6 +1,6 @@
-import { Controller, Post, Body, Get } from '@nestjs/common';
+import { Controller, Post, Body, Get, Param } from '@nestjs/common';
 import { UtilityService } from '../services/utility.service';
-@Controller('platform/utility')
+@Controller('utility')
 export class UtilityController {
     constructor(private readonly UtilityService: UtilityService) {}
     
@@ -10,5 +10,15 @@ export class UtilityController {
     @Get('countries')
     async getCountries() {
         return this.UtilityService.getCountries();
+    }
+
+    @Get('states/:countryId')
+    async getStates(@Param('countryId') countryId: any, @Body('name') name: string) {
+        return this.UtilityService.getStates(countryId, name);
+    }
+
+    @Get('cities/:stateId')
+    async getCities(@Param('stateId') stateId: any) {
+        return this.UtilityService.getCities(stateId);
     }
 }

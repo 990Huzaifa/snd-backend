@@ -23,6 +23,8 @@ import { JwtService } from '@nestjs/jwt';
 import { UtilityController } from './controller/utility.controller';
 import { UtilityService } from './services/utility.service';
 import { Country } from 'src/master-db/entities/country.entity';
+import { State } from 'src/master-db/entities/state.entity';
+import { City } from 'src/master-db/entities/city.entity';
 
 @Module({
   imports: [
@@ -39,7 +41,9 @@ import { Country } from 'src/master-db/entities/country.entity';
       PlatformRole,
       PlatformUser,
       Customer,
-      Country
+      Country,
+      State,
+      City
     ]),
   ],
   controllers: [PlatformController, CustomerController, UtilityController],
