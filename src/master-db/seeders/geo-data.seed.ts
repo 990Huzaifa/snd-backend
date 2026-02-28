@@ -15,7 +15,7 @@ export async function geoDataSeeder(dataSource: DataSource) {
     // Read JSON files
     const countriesData = JSON.parse(fs.readFileSync('src/master-db/seed-data/countries.json', 'utf-8'));
     const statesData = JSON.parse(fs.readFileSync('src/master-db/seed-data/states.json', 'utf-8'));
-    const citiesData = JSON.parse(fs.readFileSync('src/master-db/seed-data/cities_1.json', 'utf-8'));
+    const citiesData = JSON.parse(fs.readFileSync('src/master-db/seed-data/cities_10.json', 'utf-8'));
         
     console.log(`📊 Loaded ${statesData.length} States`);
 
@@ -50,18 +50,22 @@ export async function geoDataSeeder(dataSource: DataSource) {
     // Insert states (batch insert)
     for (const state of statesData) {
 
-        
-            // If state doesn't exist, create a new one
-        const newState = stateRepo.create({
-            id: state.id, // Ensure we set the ID
-            name: state.name,
-            code: state.iso2,
-            country_id: state.country_id
-        });
+        // Check if the state already exists in the database based on the 'id'
+        const existingState = await stateRepo.findOne({ where: { name: state.name } });
 
-        // Insert the new state
-        await stateRepo.save(newState);
-        console.log(`✅ New state with ID ${newState.id} inserted.`);
+        if (existingState) {
+            // If state exists, update its name and code
+            existingState.id = state.id; // Ensure we also update the ID if it has changed
+
+            // // Save the updated state
+            await stateRepo.save(existingState);
+            console.log(`✅ State with ID ${existingState.id} updated.`);
+            // skip
+            // console.log(`⏭️ State with ID ${existingState.id} already exists. Skipping update.`);
+        } else {
+            
+            console.log(`✅ skipping`);
+        }
 
     }
     console.log('✅ States seeded.');
@@ -72,9 +76,11 @@ export async function geoDataSeeder(dataSource: DataSource) {
     //     // Fetch the state before creating the city entity
     //     const state = await stateRepo.findOne({ where: { id: city.state_id } });
 
-    //     // If the state exists, check if the city already exists by id
+    //     // If the state exists, check if the city already exists by id and state_id
     //     if (state) {
-    //         const existingCity = await cityRepo.findOne({ where: { id: city.id } });
+    //         const existingCity = await cityRepo.findOne({
+    //             where: { id: city.id, state_id: city.state_id } // Check for both ID and state_id
+    //         });
 
     //         if (!existingCity) {
     //             // If the city doesn't exist, create and push the new city entity
@@ -88,7 +94,7 @@ export async function geoDataSeeder(dataSource: DataSource) {
     //             validCities.push(cityEntity);
     //             console.log(`✅ New city with ID ${city.id} inserted.`);
     //         } else {
-    //             // If the city exists, skip it
+    //             console.log(`❌ Skipping city with ID ${city.id} as it already exists.`);
     //         }
     //     } else {
     //         console.log(`❌ Skipping city "${city.name}" as state with ID ${city.state_id} not found.`);
