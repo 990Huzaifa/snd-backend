@@ -46,4 +46,29 @@ export class UtilityService {
         });
         return cities;
     }
+
+    async getIndustries() {
+        // this should ideally come from a database or external API, but for simplicity, we'll hardcode it here
+
+        return [
+            'SOFTWARE',
+            'RETAIL',
+            'SERVICES',
+            'BRAND',
+            'MANUFACTURING',
+            'WHOLESALE',
+            'OTHER',
+        ];
+    }
+
+    async getCurrencies() {
+        // this should ideally come from a database or external API, but for simplicity, we'll hardcode it here
+        return [
+            'USD',
+            'SAR',
+            'KWD',
+            'AED',
+            'PKR',
+        ];
+    }
 }

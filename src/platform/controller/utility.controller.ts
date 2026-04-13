@@ -21,4 +21,14 @@ export class UtilityController {
     async getCities(@Param('stateId') stateId: any, @Query('name') name: string) {
         return this.UtilityService.getCities(stateId, name);
     }
+
+    @Get('industries')
+    async getIndustries() {
+        return this.UtilityService.getIndustries();
+    }
+
+    @Get('currencies')
+    async getCurrencies() {
+        return this.UtilityService.getCurrencies();
+    }
 }
