@@ -6,6 +6,7 @@ import {
     JoinColumn,
     CreateDateColumn,
     UpdateDateColumn,
+    ManyToOne,
 } from 'typeorm';
 
 export enum DisplayMode {
@@ -69,4 +70,42 @@ export class Announcement {
 
     @UpdateDateColumn()
     updatedAt?: Date;
+}
+
+@Entity({ name: 'announcement_tenants' })
+export class AnnouncementTenant {
+
+    @PrimaryGeneratedColumn('uuid')
+    id?: string;
+
+    @Column()
+    announcement_id?: string;
+
+    @ManyToOne(() => Announcement, { onDelete: 'CASCADE' })
+    @JoinColumn({ name: 'announcement_id' })
+    announcement?: Announcement;
+
+    @Column()
+    tenant_id?: string;
+
+    
+}
+
+@Entity({ name: 'announcement_plans' })
+export class AnnouncementPlan {
+
+    @PrimaryGeneratedColumn('uuid')
+    id?: string;
+
+    @Column()
+    announcement_id?: string;
+
+    @ManyToOne(() => Announcement, { onDelete: 'CASCADE' })
+    @JoinColumn({ name: 'announcement_id' })
+    announcement?: Announcement;
+
+    @Column()
+    plan_id?: string;
+
+    
 }

@@ -1,4 +1,10 @@
-import { Column, CreateDateColumn, PrimaryGeneratedColumn, Entity, UpdateDateColumn } from "typeorm";
+import { Column, CreateDateColumn, PrimaryGeneratedColumn, Entity, UpdateDateColumn, OneToOne, JoinColumn } from "typeorm";
+
+export enum LIMIT_KEY {
+    USER = 'USER',
+    STORAGE = 'STORAGE',
+}
+
 
 @Entity({ name: 'plans' })
 export class Plan {
@@ -11,6 +17,9 @@ export class Plan {
 
     @Column({ nullable: true })
     stripe_price_id: string;
+
+    @Column({ nullable: true })
+    payfast_price_id: string;
 
     @Column()
     slug: string;
@@ -38,4 +47,22 @@ export class Plan {
     
     @UpdateDateColumn()
     updatedAt: Date;
+}
+
+
+@Entity({ name: 'plan_limits' })
+export class PlanLimit {
+
+    @PrimaryGeneratedColumn()
+    id: number;
+
+    @OneToOne(() => Plan, { onDelete: 'CASCADE' })
+    @JoinColumn({ name: 'plan_id' })
+    plan: Plan;
+
+    @Column({ type: 'enum', enum: LIMIT_KEY })
+    limitKey: LIMIT_KEY;
+
+    @Column()
+    limitValue: number;
 }
