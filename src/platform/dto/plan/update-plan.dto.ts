@@ -1,4 +1,5 @@
 import { IsBoolean, IsOptional, IsString } from 'class-validator';
+import { PlanLimit } from 'src/master-db/entities/plan.entity';
 
 export class UpdatePlan {
     
@@ -41,5 +42,9 @@ export class UpdatePlan {
     @IsBoolean()
     @IsOptional()
     is_display?: boolean;
+
+    @IsOptional()
+    @IsString({ each: true })
+    plan_limits?: PlanLimit[];
 
 }

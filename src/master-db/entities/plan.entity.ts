@@ -21,8 +21,8 @@ export class Plan {
     @Column({ nullable: true })
     payfast_price_id: string;
 
-    @OneToMany(() => PlanLimit, (planLimit) => planLimit.plan) // Assuming it's a OneToMany relation
-    planLimits: PlanLimit[];
+    @OneToMany(() => PlanLimit, (plan_limits) => plan_limits.plan) // Assuming it's a OneToMany relation
+    plan_limits: PlanLimit[];
 
     @Column()
     slug: string;
@@ -59,7 +59,7 @@ export class PlanLimit {
     @PrimaryGeneratedColumn()
     id: number;
 
-    @ManyToOne(() => Plan, (plan) => plan.planLimits , { onDelete: 'CASCADE' })
+    @ManyToOne(() => Plan, (plan) => plan.plan_limits , { onDelete: 'CASCADE' })
     @JoinColumn({ name: 'plan_id' })
     plan: Plan;
 

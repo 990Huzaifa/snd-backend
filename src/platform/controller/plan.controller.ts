@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Param, Post, Put, Query, Req, UseGuards } from "@nestjs/common";
 import { PlanService } from "../services/plan.service";
 import { PermissionGuard } from "src/auth/permission.guard";
 import { JwtAuthGuard } from "src/auth/jwt-auth.guard";
@@ -17,7 +17,7 @@ export class PlanController {
 
     @RequirePermissions('PLAN_VIEW')
     @Get('/:id')
-    async showPlan(id: string) {
+    async showPlan(@Param('id') id: string) {
         return this.planService.showPlan(id);
     }
 
@@ -29,13 +29,13 @@ export class PlanController {
 
     @RequirePermissions('PLAN_UPDATE')
     @Post('/:id')
-    async updatePlan(@Body() updatePlanDto: any, id: string) {
+    async updatePlan(@Body() updatePlanDto: any, @Param('id') id: string) {
         return this.planService.updatePlan(id, updatePlanDto);
     }
 
     @RequirePermissions('PLAN_UPDATE')
-    @Post('/:id/status')
-    async updatePlanStatus(@Body() updatePlanDto: any, id: string) {
-        return this.planService.updatePlanStatus(id, updatePlanDto.is_active);
+    @Put('/:id/status')
+    async updatePlanStatus(@Query('is_active') is_active: boolean, @Param('id') id: string) {
+        return this.planService.updatePlanStatus(id, is_active);
     }
 }

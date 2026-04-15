@@ -39,6 +39,6 @@ export class CreatePlan {
 
     @IsOptional()
     @IsString({ each: true })
-    limits?: PlanLimit[];
+    plan_limits?: PlanLimit[];
 
 }

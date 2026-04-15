@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Plan, PlanLimit } from "src/master-db/entities/plan.entity";
-import { Repository } from "typeorm";
+import { Not, Repository } from "typeorm";
 import { CreatePlan } from "../dto/plan/create-plan.dto";
 import { UpdatePlan } from "../dto/plan/update-plan.dto";
 
@@ -17,15 +17,16 @@ export class PlanService {
     async getPlans() {
         const plans = await this.planRepo.find({
             order: { createdAt: 'ASC' },
-            relations: ['planLimits'] 
+            relations: ['plan_limits'] 
         });
         return plans;
     }
 
     async showPlan(id: string) {
+        console.log('Fetching plan with id:', id);
         const plan = await this.planRepo.findOne({ 
             where: { id: id },
-            relations: ['planLimits']
+            relations: ['plan_limits']
         });
         return plan;
     }
@@ -52,9 +53,9 @@ export class PlanService {
         );
 
         // Check if 'limits' is an array before proceeding
-        if (Array.isArray(createPlanDto.limits)) {
+        if (Array.isArray(createPlanDto.plan_limits)) {
             // Use for...of to properly await async operations
-            for (const limit of createPlanDto.limits) {
+            for (const limit of createPlanDto.plan_limits) {
                 const planLimit = this.planLimitRepo.create({
                     plan: plan,  // Use the created plan directly
                     limitKey: limit.limitKey,
@@ -62,7 +63,7 @@ export class PlanService {
                 });
                 await this.planLimitRepo.save(planLimit);
             }
-        } else if (createPlanDto.limits) {
+        } else if (createPlanDto.plan_limits) {
             // If limits is not an array, handle the error case
             throw new BadRequestException('Limits should be an array');
         }
@@ -71,19 +72,53 @@ export class PlanService {
     }
 
     async updatePlan(id: string, updatePlanDto: UpdatePlan) {
-        const plan = await this.planRepo.findOne({ where: { id: id } });
+        // Find the existing plan along with its limits
+        const plan = await this.planRepo.findOne({ where: { id: id }, relations: ['plan_limits'] });
 
         if (!plan) {
             throw new NotFoundException('Plan not found');
         }
+
+        // Check if the slug is being changed and whether the new slug already exists (excluding current plan)
         if (updatePlanDto.slug && updatePlanDto.slug !== plan.slug) {
-            const slugExists = await this.planRepo.findOne({ where: { slug: updatePlanDto.slug } });
+            const slugExists = await this.planRepo.findOne({
+                where: { slug: updatePlanDto.slug, id: Not(id) }, // Exclude the current plan's ID
+            });
             if (slugExists) {
                 throw new ConflictException('Plan slug already exists');
             }
         }
+
+        // Update the plan properties
         Object.assign(plan, updatePlanDto);
-        await this.planRepo.update({ id: id }, plan);
+
+        // Handle limits update (adding new limits or updating existing ones)
+        if (Array.isArray(updatePlanDto.plan_limits)) {
+            for (const limit of updatePlanDto.plan_limits) {
+                // Check if the limit already exists for the given plan
+                const existingLimit = plan.plan_limits.find(
+                    (pl) => pl.limitKey === limit.limitKey 
+                );
+
+                if (existingLimit) {
+                    // If the limit exists, update it
+                    existingLimit.limitValue = limit.limitValue;
+                    await this.planLimitRepo.save(existingLimit);
+                } else {
+                    // If the limit does not exist, create a new one
+                    const planLimit = this.planLimitRepo.create({
+                        plan: plan,  // Use the current plan
+                        limitKey: limit.limitKey,
+                        limitValue: limit.limitValue,
+                    });
+                    await this.planLimitRepo.save(planLimit);
+                }
+            }
+        }
+
+        // Save the updated plan
+        await this.planRepo.save(plan);
+
         return plan;
     }
 
