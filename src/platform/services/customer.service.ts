@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { LoginCustomerDto } from '../dto/customer/login-customer.dto';
@@ -176,7 +176,7 @@ export class CustomerService {
         });
 
         if (!customer) {
-            throw new Error('Customer not found');
+            throw new NotFoundException('Customer not found');
         }
 
         // Update customer data

@@ -1,4 +1,4 @@
-import { Column, CreateDateColumn, PrimaryGeneratedColumn, Entity, UpdateDateColumn, OneToOne, JoinColumn } from "typeorm";
+import { Column, CreateDateColumn, PrimaryGeneratedColumn, Entity, UpdateDateColumn, JoinColumn, OneToMany, ManyToOne } from "typeorm";
 
 export enum LIMIT_KEY {
     USER = 'USER',
@@ -20,6 +20,9 @@ export class Plan {
 
     @Column({ nullable: true })
     payfast_price_id: string;
+
+    @OneToMany(() => PlanLimit, (planLimit) => planLimit.plan) // Assuming it's a OneToMany relation
+    planLimits: PlanLimit[];
 
     @Column()
     slug: string;
@@ -56,7 +59,7 @@ export class PlanLimit {
     @PrimaryGeneratedColumn()
     id: number;
 
-    @OneToOne(() => Plan, { onDelete: 'CASCADE' })
+    @ManyToOne(() => Plan, (plan) => plan.planLimits , { onDelete: 'CASCADE' })
     @JoinColumn({ name: 'plan_id' })
     plan: Plan;
 

@@ -9,10 +9,13 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { UpdateTenantThemeDto } from './dto/update-tenant-theme.dto';
 import { RequirePermissions } from 'src/auth/require-permission.decorator';
 import { PermissionGuard } from 'src/auth/permission.guard';
+import { FileUploadService } from './services/file-upload.service';
 
 @Controller('platform/tenant')
 export class PlatformController {
-  constructor(private readonly platformService: PlatformService) {}
+  constructor(
+    private readonly platformService: PlatformService,
+  ) {}
 
   @Post('resolve')
   async resolve(@Body() dto: ResolveTenantDto) {
@@ -113,16 +116,11 @@ export class PlatformController {
 
   @UseGuards(JwtAuthGuard)
   @Post(':id/profile/logo')
-  @UseInterceptors(FileInterceptor('logo'))
+  @UseInterceptors(FileInterceptor('logo', FileUploadService.prototype.multerConfig))
   async uploadLogo(@Param('id') id: string, @UploadedFile() logo: Express.Multer.File) {
     return this.platformService.updateTenantLogo(id, logo);
   }
 
 
 
-
-  @Get('roles')
-  async getRoleList(){
-    return this.platformService.getPlatformRoleList();
-  }
 }

@@ -17,7 +17,6 @@ import { TenantDatabaseService } from 'src/tenant-db/services/tenant-database.se
 import { CreatePlatformUser } from './dto/create-platform-user.dto';
 import { PlatformUser } from 'src/master-db/entities/platform-user.entity';
 import { PlatformRole } from 'src/master-db/entities/platform-role.entity';
-import * as bcrypt from 'bcrypt';
 import { TenantGeoPolicy } from 'src/master-db/entities/tenant-geo-policy.entity';
 
 @Injectable()
@@ -740,34 +739,6 @@ export class PlatformService {
 
 
   // user, role CRUD
-  async getPlatformRoleList() {
-    // 1️⃣ Fetch tenants
-    const roles = await this.platformRoleRepo.find({
-      select: ['id', 'name', 'code', 'updatedAt'],
-      order: { updatedAt: 'DESC' },
-    });
-    
-    return {
-      result: roles
-    };
-  }
 
-  async createPlatformUser(dto: CreatePlatformUser){
-
-    let password = String(dto.passwordHash);
-
-    await this.platformUserRepo.save(
-      this.platformUserRepo.create({
-        fullName: dto.fullname,
-        email: dto.email,
-        passwordHash: await bcrypt.hash(password, 10),
-        role: dto.role
-      }) 
-    );
-
-    return {
-      message: 'User is created successfully'
-    }
-  }
 
 }

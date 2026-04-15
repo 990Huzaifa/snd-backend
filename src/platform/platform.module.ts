@@ -25,6 +25,15 @@ import { UtilityService } from './services/utility.service';
 import { Country } from 'src/master-db/entities/country.entity';
 import { State } from 'src/master-db/entities/state.entity';
 import { City } from 'src/master-db/entities/city.entity';
+import { PlanController } from './controller/plan.controller';
+import { AnnouncementController } from './controller/announcement.controller';
+import { PlanService } from './services/plan.service';
+import { Announcement } from 'src/master-db/entities/announcement.entity';
+import { AnnouncementService } from './services/announcements.service';
+import { Plan, PlanLimit } from 'src/master-db/entities/plan.entity';
+import { PlatformUserService } from './services/platform-user.service';
+import { PlatformUserController } from './controller/platform-user.controller';
+import { PlatformPermission } from 'src/master-db/entities/platform-premission.entity';
 
 @Module({
   imports: [
@@ -38,15 +47,19 @@ import { City } from 'src/master-db/entities/city.entity';
       TenantGeoPolicy,
       TenantTheme,
       TenantDbConfig,
+      PlatformPermission,
       PlatformRole,
       PlatformUser,
       Customer,
+      Plan,
+      PlanLimit,
+      Announcement,
       Country,
       State,
       City
     ]),
   ],
-  controllers: [PlatformController, CustomerController, UtilityController],
-  providers: [PlatformService, ProvisioningAdminService, TenantDatabaseService, CustomerService, UtilityService, MailService, JwtService],
+  controllers: [PlatformController, PlatformUserController, CustomerController, PlanController, AnnouncementController, UtilityController],
+  providers: [PlatformService, ProvisioningAdminService, TenantDatabaseService, PlatformUserService, CustomerService, PlanService, AnnouncementService, UtilityService, MailService, JwtService],
 })
 export class PlatformModule {}
