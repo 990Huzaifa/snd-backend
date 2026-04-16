@@ -18,7 +18,8 @@ export class AuthService {
     if (!user || !user.isActive) {
       throw new UnauthorizedException('Invalid credentials');
     }
-
+    console.log('password:', password);
+    console.log('hash:', user.passwordHash);
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) {
       throw new UnauthorizedException('Invalid credentials');
@@ -35,9 +36,11 @@ export class AuthService {
       email: user.email,
       role: user.role,
     };
+    delete user.passwordHash;
 
     return {
       access_token: this.jwt.sign(payload),
+      user: user
     };
   }
 }

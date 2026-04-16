@@ -29,7 +29,7 @@ export class PlatformUser {
     // ✅ One User = One Role
     @ManyToOne(() => PlatformRole, (role) => role.users, {
         nullable: false,
-        eager: true, // auto load role
+        // eager: true, // auto load role
     })
     @JoinColumn({ name: 'role_id' })
     role: PlatformRole;
@@ -39,4 +39,5 @@ export class PlatformUser {
 
     @UpdateDateColumn()
     updatedAt: Date;
+
 }

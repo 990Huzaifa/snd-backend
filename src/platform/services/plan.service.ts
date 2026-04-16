@@ -14,8 +14,11 @@ export class PlanService {
         private readonly planLimitRepo: Repository<PlanLimit>
     ) { }
 
-    async getPlans() {
+    async getPlans(page = 1, limit = 10) {
+        const skip = (page - 1) * limit;
         const plans = await this.planRepo.find({
+            skip: skip,
+            take: limit,
             order: { createdAt: 'ASC' },
             relations: ['plan_limits'] 
         });
@@ -28,6 +31,9 @@ export class PlanService {
             where: { id: id },
             relations: ['plan_limits']
         });
+        if (!plan) {
+            throw new NotFoundException('Plan not found');
+        }
         return plan;
     }
 

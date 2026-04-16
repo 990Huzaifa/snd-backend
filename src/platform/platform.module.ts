@@ -28,7 +28,7 @@ import { City } from 'src/master-db/entities/city.entity';
 import { PlanController } from './controller/plan.controller';
 import { AnnouncementController } from './controller/announcement.controller';
 import { PlanService } from './services/plan.service';
-import { Announcement } from 'src/master-db/entities/announcement.entity';
+import { Announcement, AnnouncementPlan, AnnouncementTenant } from 'src/master-db/entities/announcement.entity';
 import { AnnouncementService } from './services/announcements.service';
 import { Plan, PlanLimit } from 'src/master-db/entities/plan.entity';
 import { PlatformUserService } from './services/platform-user.service';
@@ -50,6 +50,9 @@ import { PlatformPermission } from 'src/master-db/entities/platform-premission.e
       PlatformPermission,
       PlatformRole,
       PlatformUser,
+      Announcement,
+      AnnouncementPlan,
+      AnnouncementTenant,
       Customer,
       Plan,
       PlanLimit,

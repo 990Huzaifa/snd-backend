@@ -11,8 +11,8 @@ export class PlanController {
     
     @RequirePermissions('PLAN_LIST')
     @Get('/')
-    async getPlans() {
-        return this.planService.getPlans();
+    async getPlans(@Query('page') page: number, @Query('limit') limit: number) {
+        return this.planService.getPlans(page, limit);
     }
 
     @RequirePermissions('PLAN_VIEW')

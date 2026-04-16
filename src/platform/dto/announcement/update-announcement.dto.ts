@@ -1,5 +1,5 @@
 import { IsBoolean, IsEnum, IsInt, IsOptional, IsString } from "class-validator";
-import { DisplayMode, TargetScope, Type } from "src/master-db/entities/announcement.entity";
+import { AnnouncementPlan, AnnouncementTenant, DisplayMode, TargetScope, Type } from "src/master-db/entities/announcement.entity";
 
 export class UpdateAnnouncementDto {
 
@@ -43,6 +43,13 @@ export class UpdateAnnouncementDto {
     @IsString()
     endsAt?: string;
 
+    @IsOptional()
+    @IsString({ each: true })
+    announcement_plans?: AnnouncementPlan[];
+
+    @IsOptional()
+    @IsString({ each: true })
+    announcement_tenants?: AnnouncementTenant[];
 
     
 }

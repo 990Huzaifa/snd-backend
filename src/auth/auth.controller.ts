@@ -16,6 +16,7 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Get('me')
   me(@CurrentPlatformUser() user: any) {
+    delete user.passwordHash;
     return user;
   }
 
