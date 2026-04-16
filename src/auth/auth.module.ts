@@ -10,10 +10,14 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './jwt.strategy';
 import { CustomerJwtStrategy } from './customer-jwt.strategy';
+import { Customer } from 'src/master-db/entities/customer.entity';
+import { MailService } from 'src/common/mail/mail.service';
+import { HttpModule } from '@nestjs/axios';
 
 @Module({
     imports: [
-        TypeOrmModule.forFeature([PlatformUser, PlatformRole]),
+        HttpModule,
+        TypeOrmModule.forFeature([PlatformUser, PlatformRole,Customer]),
         ConfigModule,
         PassportModule,
         JwtModule.registerAsync({
@@ -26,7 +30,7 @@ import { CustomerJwtStrategy } from './customer-jwt.strategy';
             }),
         })
     ],
-    providers: [AuthService,JwtStrategy,CustomerJwtStrategy],
+    providers: [AuthService,JwtStrategy, CustomerJwtStrategy, MailService],
     controllers: [AuthController],
 })
 export class AuthModule {}

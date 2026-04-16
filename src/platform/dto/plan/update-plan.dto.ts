@@ -1,7 +1,7 @@
 import { IsBoolean, IsOptional, IsString } from 'class-validator';
 import { PlanLimit } from 'src/master-db/entities/plan.entity';
 
-export class UpdatePlan {
+export class UpdatePlanDto {
     
     @IsString()
     @IsOptional()

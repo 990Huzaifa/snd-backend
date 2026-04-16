@@ -1,4 +1,5 @@
 import { IsString, Matches, Length, IsEmail, IsOptional, IsEnum } from 'class-validator';
+import { BillingCycle } from 'src/master-db/entities/subscription.entity';
 import { IndustryType } from 'src/master-db/entities/tenant.entity';
 
 export class CreateTenantDto {
@@ -16,4 +17,12 @@ export class CreateTenantDto {
     @IsOptional()
     @IsEnum(IndustryType)
     industryType?: IndustryType;
+
+    @IsOptional()
+    @IsString()
+    planId?: string
+
+
+    @IsEnum(BillingCycle)
+    billingCycle: BillingCycle;
 }

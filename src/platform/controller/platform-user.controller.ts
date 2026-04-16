@@ -1,8 +1,8 @@
 import { Body, Controller, Get, Param, Post, UseGuards } from "@nestjs/common";
 import { PlatformUserService } from "../services/platform-user.service";
-import { CreateRole } from "../dto/role/create-role.dto";
-import { UpdateRole } from "../dto/role/update-role.dto";
-import { CreatePlatformUser } from "../dto/create-platform-user.dto";
+import { CreateRoleDto } from "../dto/role/create-role.dto";
+import { UpdateRoleDto } from "../dto/role/update-role.dto";
+import { CreatePlatformUserDto } from "../dto/create-platform-user.dto";
 import { PermissionGuard } from "src/auth/permission.guard";
 import { JwtAuthGuard } from "src/auth/jwt-auth.guard";
 import { RequirePermissions } from "src/auth/require-permission.decorator";
@@ -42,13 +42,13 @@ export class PlatformUserController {
 
     @RequirePermissions('ROLE_CREATE')
     @Post('roles/create')
-    async createRole(@Body() roleData: CreateRole){
+    async createRole(@Body() roleData: CreateRoleDto){
         return this.platformUserService.createPlatformRole(roleData);
     }
 
     // @RequirePermissions('ROLE_UPDATE')
     @Post('roles/update/:id')
-    async updateRole(@Param('id') id: string,@Body() roleData: UpdateRole){
+    async updateRole(@Param('id') id: string,@Body() roleData: UpdateRoleDto){
         return this.platformUserService.updatePlatformRole(id, {...roleData});
     }
 
@@ -69,7 +69,7 @@ export class PlatformUserController {
 
     @RequirePermissions('USER_CREATE')
     @Post('users/create')
-    async createUser(@Body() userData: CreatePlatformUser){
+    async createUser(@Body() userData: CreatePlatformUserDto){
         return this.platformUserService.createPlatformUser(userData);
     }
 }

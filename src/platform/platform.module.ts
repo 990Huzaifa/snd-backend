@@ -34,6 +34,9 @@ import { Plan, PlanLimit } from 'src/master-db/entities/plan.entity';
 import { PlatformUserService } from './services/platform-user.service';
 import { PlatformUserController } from './controller/platform-user.controller';
 import { PlatformPermission } from 'src/master-db/entities/platform-premission.entity';
+import { Subscription } from 'src/master-db/entities/subscription.entity';
+import { SubscriptionController } from './controller/subscription.controller';
+import { SubscriptionService } from './services/subscription.service';
 
 @Module({
   imports: [
@@ -56,13 +59,14 @@ import { PlatformPermission } from 'src/master-db/entities/platform-premission.e
       Customer,
       Plan,
       PlanLimit,
+      Subscription,
       Announcement,
       Country,
       State,
       City
     ]),
   ],
-  controllers: [PlatformController, PlatformUserController, CustomerController, PlanController, AnnouncementController, UtilityController],
-  providers: [PlatformService, ProvisioningAdminService, TenantDatabaseService, PlatformUserService, CustomerService, PlanService, AnnouncementService, UtilityService, MailService, JwtService],
+  controllers: [PlatformController, PlatformUserController, CustomerController, PlanController, SubscriptionController, AnnouncementController, UtilityController],
+  providers: [PlatformService, ProvisioningAdminService, TenantDatabaseService, CustomerService, PlatformUserService, PlanService, SubscriptionService, AnnouncementService, UtilityService, MailService, JwtService],
 })
 export class PlatformModule {}

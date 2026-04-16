@@ -1,13 +1,13 @@
 import { ConflictException, Injectable, NotFoundException } from "@nestjs/common";
-import { CreatePlatformUser } from "../dto/create-platform-user.dto";
+import { CreatePlatformUserDto } from "../dto/create-platform-user.dto";
 import { InjectRepository } from "@nestjs/typeorm";
 import { PlatformRole } from "src/master-db/entities/platform-role.entity";
 import { PlatformUser } from "src/master-db/entities/platform-user.entity";
 import { In, Repository } from "typeorm";
 import * as bcrypt from 'bcrypt';
 import { PlatformPermission } from "src/master-db/entities/platform-premission.entity";
-import { CreateRole } from "../dto/role/create-role.dto";
-import { UpdateRole } from "../dto/role/update-role.dto";
+import { CreateRoleDto } from "../dto/role/create-role.dto";
+import { UpdateRoleDto } from "../dto/role/update-role.dto";
 import { IsUppercase } from "class-validator";
 
 @Injectable()
@@ -71,7 +71,7 @@ export class PlatformUserService {
         return role;
     }
 
-    async createPlatformRole(roleData: CreateRole) {
+    async createPlatformRole(roleData: CreateRoleDto) {
         const existing = await this.platformRoleRepo.findOne({
             where: { code: roleData.code },
         });
@@ -102,7 +102,7 @@ export class PlatformUserService {
         return role;
     }
 
-    async updatePlatformRole(roleId: any, roleData: UpdateRole) {
+    async updatePlatformRole(roleId: any, roleData: UpdateRoleDto) {
         const role = await this.platformRoleRepo.findOne({
             where: { id: roleId },
             relations: ['permissions'],
@@ -146,7 +146,7 @@ export class PlatformUserService {
         };
     }
 
-    async createPlatformUser(dto: CreatePlatformUser) {
+    async createPlatformUser(dto: CreatePlatformUserDto) {
 
         let password = String(dto.passwordHash);
 

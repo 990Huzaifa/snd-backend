@@ -2,8 +2,8 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { InjectRepository } from "@nestjs/typeorm";
 import { Plan, PlanLimit } from "src/master-db/entities/plan.entity";
 import { Not, Repository } from "typeorm";
-import { CreatePlan } from "../dto/plan/create-plan.dto";
-import { UpdatePlan } from "../dto/plan/update-plan.dto";
+import { CreatePlanDto } from "../dto/plan/create-plan.dto";
+import { UpdatePlanDto } from "../dto/plan/update-plan.dto";
 
 @Injectable()
 export class PlanService {
@@ -22,7 +22,13 @@ export class PlanService {
             order: { createdAt: 'ASC' },
             relations: ['plan_limits'] 
         });
-        return plans;
+        return {
+            data: plans,
+            meta: {
+                page: page,
+                limit: limit,
+            },
+        };
     }
 
     async showPlan(id: string) {
@@ -37,7 +43,7 @@ export class PlanService {
         return plan;
     }
 
-    async createPlan(createPlanDto: CreatePlan) {
+    async createPlan(createPlanDto: CreatePlanDto) {
         const planExists = await this.planRepo.findOne({ where: { slug: createPlanDto.slug } });
         if (planExists) {
             throw new ConflictException('Plan already exists');
@@ -77,7 +83,7 @@ export class PlanService {
         return plan;
     }
 
-    async updatePlan(id: string, updatePlanDto: UpdatePlan) {
+    async updatePlan(id: string, updatePlanDto: UpdatePlanDto) {
         // Find the existing plan along with its limits
         const plan = await this.planRepo.findOne({ where: { id: id }, relations: ['plan_limits'] });
 

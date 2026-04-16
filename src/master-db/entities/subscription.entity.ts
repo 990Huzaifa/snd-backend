@@ -1,6 +1,7 @@
-import { Column, CreateDateColumn, Entity, JoinColumn, OneToOne, PrimaryGeneratedColumn, UpdateDateColumn } from "typeorm";
+import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, OneToOne, PrimaryGeneratedColumn, UpdateDateColumn } from "typeorm";
 import { Tenant } from "./tenant.entity";
 import { Plan } from "./plan.entity";
+import { Addon } from "./addon.entity";
 
 export enum Status {
     ACTIVE = 'ACTIVE',
@@ -34,13 +35,12 @@ export class Subscription {
     @PrimaryGeneratedColumn()
     id: number;
 
-    @OneToOne(() => Plan, { onDelete: 'CASCADE' })
-    @JoinColumn({ name: 'plan_id' })
-    plan: Plan;
-
     @OneToOne(() => Tenant, { onDelete: 'CASCADE' })
     @JoinColumn({ name: 'tenant_id' })
     tenant: Tenant;
+
+    @ManyToOne(() => Plan, { onDelete: 'CASCADE' })
+    plan: Plan;
 
     @Column({ type: 'enum', enum: BillingCycle })
     billingCycle: BillingCycle;
@@ -60,7 +60,7 @@ export class Subscription {
     @Column()
     expiresAt: Date;
 
-    @Column()
+    @Column({ nullable: true })
     cancelledAt: Date;
 
     @CreateDateColumn()
@@ -68,4 +68,30 @@ export class Subscription {
 
     @UpdateDateColumn()
     updatedAt?: Date;
+}
+
+
+@Entity({ name: 'subscription_addons' })
+export class SubscriptionAddon {
+    @PrimaryGeneratedColumn()
+    id: number;
+
+    @ManyToOne(() => Subscription, { onDelete: 'CASCADE' })
+    @JoinColumn({ name: 'subscription_id' })
+    subscription: Subscription;
+
+    @ManyToOne(() => Addon, { onDelete: 'CASCADE' })
+    @JoinColumn({ name: 'addon_id' })
+    addon: Addon;
+
+    @Column()
+    quantity: number;
+
+    @CreateDateColumn()
+    createdAt?: Date;
+
+    @UpdateDateColumn()
+    updatedAt?: Date;
+
+    
 }

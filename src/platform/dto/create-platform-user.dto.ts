@@ -1,7 +1,7 @@
 import { IsOptional, IsString, IsEmail } from 'class-validator';
 import { PlatformRole } from 'src/master-db/entities/platform-role.entity';
 
-export class CreatePlatformUser {
+export class CreatePlatformUserDto {
     
     @IsEmail()
     email?: string;

@@ -14,10 +14,12 @@ import { TenantTheme } from 'src/master-db/entities/tenant-themes.entity';
 import { ProvisioningAdminService } from './services/provisioning-admin.service';
 import { TenantDbConfig } from 'src/master-db/entities/tenant-db-config.entity';
 import { TenantDatabaseService } from 'src/tenant-db/services/tenant-database.service';
-import { CreatePlatformUser } from './dto/create-platform-user.dto';
+import { CreatePlatformUserDto } from './dto/create-platform-user.dto';
 import { PlatformUser } from 'src/master-db/entities/platform-user.entity';
 import { PlatformRole } from 'src/master-db/entities/platform-role.entity';
 import { TenantGeoPolicy } from 'src/master-db/entities/tenant-geo-policy.entity';
+import { Plan } from 'src/master-db/entities/plan.entity';
+import { Status, BillingCycle, BillingModel, PaymentMode, CollectionType, Subscription } from 'src/master-db/entities/subscription.entity';
 
 @Injectable()
 export class PlatformService {
@@ -42,7 +44,11 @@ export class PlatformService {
     private readonly platformUserRepo: Repository<PlatformUser>,
     @InjectRepository(PlatformRole)
     private readonly platformRoleRepo: Repository<PlatformRole>,
+    @InjectRepository(Subscription)
+    private readonly subscriptionRepo: Repository<Subscription>,
 
+    @InjectRepository(Plan)
+    private readonly planRepo: Repository<Plan>,
 
     private readonly provisioningAdminService: ProvisioningAdminService,
     private readonly tenantDatabaseService: TenantDatabaseService,
@@ -151,7 +157,7 @@ export class PlatformService {
   }
 
 
-  async createTenant(dto: CreateTenantDto) {
+  async createTenant(dto: CreateTenantDto,) {
     // 1️⃣ Subdomain uniqueness check
     const nameExists = await this.tenantRepo.findOne({
       where: { name: dto.name },
@@ -169,11 +175,32 @@ export class PlatformService {
       this.tenantRepo.create({
         name: dto.name,
         email: dto.email,
-        code: await this.generateUniqueCode(),
+        code: code,
         status: TenantStatus.REGISTERED,
         industryType: dto.industryType
       }),
     );
+
+    // 4️⃣ Create tenant subscription
+    const plan = await this.planRepo.findOne({ where: { id: dto.planId } });
+
+    if(plan) {
+      const expiry = plan.monthly_price > 0 ? new Date(new Date().setMonth(new Date().getMonth() + 1)) : new Date(new Date().setFullYear(new Date().getFullYear() + 1))
+      const subscription = new Subscription();
+      subscription.tenant = tenant;
+      subscription.plan = plan;
+      subscription.billingCycle = dto.billingCycle;
+      subscription.billingModel = BillingModel.SELF_SERVE;
+      subscription.paymentMode = PaymentMode.OFFLINE;
+      subscription.collectionType = CollectionType.MANUAL;
+
+      subscription.status = Status.ACTIVE;
+      subscription.expiresAt = expiry;
+      subscription.cancelledAt = null;
+
+      await this.subscriptionRepo.save(subscription);
+    }
+
 
     // 🔥 AUTO provisioning trigger
     await this.startProvisioningSkeleton(tenant.id);

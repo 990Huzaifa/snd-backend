@@ -2,7 +2,7 @@ import { IsArray, IsBoolean, IsOptional, IsString } from "class-validator";
 
 
 
-export class CreateRole {
+export class CreateRoleDto {
     @IsString()
     code: string;
 
