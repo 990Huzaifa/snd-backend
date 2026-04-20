@@ -13,8 +13,8 @@ async function runPlatformSeeders() {
 
         // await seedPlatformRoles(dataSource);
         // await seedPlatformPermissions(dataSource);
-        // await seedRolePermissions(dataSource);
-        // await seedPlatformAdminUser(dataSource);
+        await seedRolePermissions(dataSource);
+        await seedPlatformAdminUser(dataSource);
 
         await geoDataSeeder(dataSource);
 
