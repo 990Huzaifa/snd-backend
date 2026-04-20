@@ -37,6 +37,12 @@ import { PlatformPermission } from 'src/master-db/entities/platform-premission.e
 import { Subscription } from 'src/master-db/entities/subscription.entity';
 import { SubscriptionController } from './controller/subscription.controller';
 import { SubscriptionService } from './services/subscription.service';
+import { AddonController } from './controller/addon.controller';
+import { AddonService } from './services/addon.service';
+import { Addon } from 'src/master-db/entities/addon.entity';
+import { Module as ModuleEntity } from 'src/master-db/entities/module.entity';
+import { ModuleController } from './controller/module.controller';
+import { ModuleService } from './services/module.service';
 
 @Module({
   imports: [
@@ -58,6 +64,8 @@ import { SubscriptionService } from './services/subscription.service';
       AnnouncementTenant,
       Customer,
       Plan,
+      Addon,
+      ModuleEntity,
       PlanLimit,
       Subscription,
       Announcement,
@@ -66,7 +74,7 @@ import { SubscriptionService } from './services/subscription.service';
       City
     ]),
   ],
-  controllers: [PlatformController, PlatformUserController, CustomerController, PlanController, SubscriptionController, AnnouncementController, UtilityController],
-  providers: [PlatformService, ProvisioningAdminService, TenantDatabaseService, CustomerService, PlatformUserService, PlanService, SubscriptionService, AnnouncementService, UtilityService, MailService, JwtService],
+  controllers: [PlatformController, PlatformUserController, CustomerController, PlanController, AddonController, ModuleController, SubscriptionController, AnnouncementController, UtilityController],
+  providers: [PlatformService, ProvisioningAdminService, TenantDatabaseService, CustomerService, PlatformUserService, PlanService, AddonService, SubscriptionService, AnnouncementService, UtilityService, MailService, JwtService, ModuleService],
 })
 export class PlatformModule {}

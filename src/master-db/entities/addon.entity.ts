@@ -9,6 +9,12 @@ export class Addon {
     @Column()
     name: string;
 
+    @Column({ nullable: true })
+    stripe_price_id: string;
+
+    @Column({ nullable: true })
+    payfast_price_id: string;
+
     @Column()
     slug: string;
 
