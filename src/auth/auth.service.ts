@@ -10,6 +10,7 @@ import { Customer } from 'src/master-db/entities/customer.entity';
 import { RegisterCustomerDto } from './dto/customer/register-customer.dto';
 import { LoginCustomerDto } from './dto/customer/login-customer.dto';
 import { UpdateCustomerDto } from './dto/customer/update-customer.dto';
+import { PlatformRole } from 'src/master-db/entities/platform-role.entity';
 @Injectable()
 export class AuthService {
     constructor(
@@ -20,15 +21,17 @@ export class AuthService {
         @InjectRepository(Customer)
         private readonly customerRepo: Repository<Customer>,  // Inject the Customer repository
         private readonly mailService: MailService,
+
+        @InjectRepository(PlatformRole)
+        private readonly platformRoleRepo: Repository<PlatformRole>,
+
     ) { }
 
     async validateUser(email: string, password: string) {
-        const user = await this.userRepo.findOne({ where: { email } });
+        const user = await this.userRepo.findOne({ where: { email },relations: ['role'], });
         if (!user || !user.isActive) {
             throw new UnauthorizedException('Invalid credentials');
         }
-        console.log('password:', password);
-        console.log('hash:', user.passwordHash);
         const ok = await bcrypt.compare(password, user.passwordHash);
         if (!ok) {
             throw new UnauthorizedException('Invalid credentials');
@@ -43,13 +46,15 @@ export class AuthService {
         const payload = {
             sub: user.id,
             email: user.email,
-            role: user.role,
+            role: user.role.code,
         };
+
         delete user.passwordHash;
 
         return {
             access_token: this.jwt.sign(payload),
-            user: user
+            user: user,
+            // role: role
         };
     }
 
