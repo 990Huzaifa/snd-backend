@@ -12,7 +12,7 @@ async function runPlatformSeeders() {
         console.log('\n🚀 Running Platform Seeders...\n');
 
         // await seedPlatformRoles(dataSource);
-        // await seedPlatformPermissions(dataSource);
+        await seedPlatformPermissions(dataSource);
         await seedRolePermissions(dataSource);
         await seedPlatformAdminUser(dataSource);
 
