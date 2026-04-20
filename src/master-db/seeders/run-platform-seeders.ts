@@ -16,7 +16,7 @@ async function runPlatformSeeders() {
         await seedRolePermissions(dataSource);
         await seedPlatformAdminUser(dataSource);
 
-        await geoDataSeeder(dataSource);
+        // await geoDataSeeder(dataSource);
 
         console.log('🎉 All platform seeders completed successfully.');
     } catch (error) {
