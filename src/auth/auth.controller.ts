@@ -78,6 +78,8 @@ export class AuthController {
     // Platform user from JWT
 
     // Optional: restrict channels
+    console.log(channel,`private-platform-user-${user.id}`);
+    console.log(user);
     if (!channel.includes(`private-platform-user-${user.id}`)) {
       return res.status(403).json({ message: 'Unauthorized',user: user });
     }
