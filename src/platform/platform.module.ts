@@ -47,6 +47,8 @@ import { Notification } from 'src/master-db/entities/notification.entity';
 import { NotificationService } from './services/notification.service';
 import { NotificationController } from './controller/notification.controller';
 import { PusherService } from 'src/common/pusher/pusher.service';
+import { ActivityLog } from 'src/master-db/entities/activity-log.entity';
+import { ActivityLogService } from './services/activity-log.service';
 
 @Module({
   imports: [
@@ -73,6 +75,7 @@ import { PusherService } from 'src/common/pusher/pusher.service';
       PlanLimit,
       Subscription,
       Notification,
+      ActivityLog,
       Announcement,
       Country,
       State,
@@ -80,6 +83,6 @@ import { PusherService } from 'src/common/pusher/pusher.service';
     ]),
   ],
   controllers: [PlatformController, PlatformUserController, CustomerController, PlanController, AddonController, ModuleController, SubscriptionController, AnnouncementController, UtilityController, NotificationController],
-  providers: [PlatformService, ProvisioningAdminService, TenantDatabaseService, CustomerService, PlatformUserService, PlanService, AddonService, SubscriptionService, AnnouncementService, UtilityService, MailService, JwtService, ModuleService, NotificationService, PusherService],
+  providers: [PlatformService, ProvisioningAdminService, TenantDatabaseService, CustomerService, PlatformUserService, PlanService, AddonService, SubscriptionService, AnnouncementService, UtilityService, MailService, JwtService, ModuleService, NotificationService, PusherService, ActivityLogService],
 })
 export class PlatformModule {}

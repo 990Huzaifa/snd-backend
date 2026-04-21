@@ -4,6 +4,8 @@ import { Plan, PlanLimit } from "src/master-db/entities/plan.entity";
 import { Not, Repository } from "typeorm";
 import { CreatePlanDto } from "../dto/plan/create-plan.dto";
 import { UpdatePlanDto } from "../dto/plan/update-plan.dto";
+import { ActivityLogService } from "./activity-log.service";
+import { ActivityLogActorType } from "src/master-db/entities/activity-log.entity";
 
 @Injectable()
 export class PlanService {
@@ -11,8 +13,19 @@ export class PlanService {
         @InjectRepository(Plan)
         private readonly planRepo: Repository<Plan>,
         @InjectRepository(PlanLimit)
-        private readonly planLimitRepo: Repository<PlanLimit>
+        private readonly planLimitRepo: Repository<PlanLimit>,
+        private readonly activityLogService: ActivityLogService,
     ) { }
+
+    private async recordAction(action: string, description: string, metadata?: Record<string, any>) {
+        await this.activityLogService.recordActivityLog({
+            actorType: ActivityLogActorType.SYSTEM,
+            actorId: null,
+            action,
+            description,
+            metadata: metadata ?? null,
+        });
+    }
 
     async getPlans(page = 1, limit = 10) {
         const skip = (page - 1) * limit;
@@ -40,6 +53,7 @@ export class PlanService {
         if (!plan) {
             throw new NotFoundException('Plan not found');
         }
+        await this.recordAction('PLAN_SHOW', 'Plan details fetched', { planId: id });
         return plan;
     }
 
@@ -79,7 +93,7 @@ export class PlanService {
             // If limits is not an array, handle the error case
             throw new BadRequestException('Limits should be an array');
         }
-
+        await this.recordAction('PLAN_CREATE', 'Plan created', { planId: plan.id, slug: plan.slug });
         return plan;
     }
 
@@ -130,6 +144,7 @@ export class PlanService {
 
         // Save the updated plan
         await this.planRepo.save(plan);
+        await this.recordAction('PLAN_UPDATE', 'Plan updated', { planId: id });
 
         return plan;
     }
@@ -141,6 +156,7 @@ export class PlanService {
         }
         plan.is_active = is_active;
         await this.planRepo.update({ id: id }, plan);
+        await this.recordAction('PLAN_STATUS_UPDATE', 'Plan status updated', { planId: id, isActive: is_active });
         return plan;
     }
 }

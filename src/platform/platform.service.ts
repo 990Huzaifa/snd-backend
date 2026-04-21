@@ -21,6 +21,8 @@ import { TenantGeoPolicy } from 'src/master-db/entities/tenant-geo-policy.entity
 import { Plan } from 'src/master-db/entities/plan.entity';
 import { Status, BillingCycle, BillingModel, PaymentMode, CollectionType, Subscription } from 'src/master-db/entities/subscription.entity';
 import { NotificationService } from './services/notification.service';
+import { ActivityLogService } from './services/activity-log.service';
+import { ActivityLogActorType } from 'src/master-db/entities/activity-log.entity';
 
 @Injectable()
 export class PlatformService {
@@ -54,7 +56,18 @@ export class PlatformService {
     private readonly provisioningAdminService: ProvisioningAdminService,
     private readonly tenantDatabaseService: TenantDatabaseService,
     private readonly notificationService: NotificationService,
+    private readonly activityLogService: ActivityLogService,
   ) { }
+
+  private async recordAction(action: string, description: string, metadata?: Record<string, any>) {
+    await this.activityLogService.recordActivityLog({
+      actorType: ActivityLogActorType.SYSTEM,
+      actorId: null,
+      action,
+      description,
+      metadata: metadata ?? null,
+    });
+  }
 
   private async generateUniqueCode(): Promise<string> {
     while (true) {
@@ -77,6 +90,7 @@ export class PlatformService {
     if (!tenant) {
       return null
     }
+    await this.recordAction('TENANT_RESOLVE', 'Tenant resolved by code', { code, tenantId: tenant.id });
     return tenant
   }
 
@@ -107,6 +121,7 @@ export class PlatformService {
       }),
     );
 
+    await this.recordAction('TENANT_PROVISIONING_LIST', 'Fetched tenant provisioning list', { total: results.length });
     return results;
   }
 
@@ -148,6 +163,7 @@ export class PlatformService {
       }),
     );
 
+    await this.recordAction('TENANT_PROVISIONING_DETAILS', 'Fetched tenant provisioning details', { tenantId, jobsCount: jobsWithLogs.length });
     return {
       tenant: {
         id: tenant.id,
@@ -213,6 +229,11 @@ export class PlatformService {
       message: `Tenant ${tenant.name} is created and provisioning has started`,
       type: 'success',
     });
+    await this.recordAction('TENANT_CREATE', 'Tenant created and provisioning started', {
+      tenantId: tenant.id,
+      tenantName: tenant.name,
+      userId: user?.id ?? null,
+    });
     return tenant;
   }
 
@@ -232,6 +253,7 @@ export class PlatformService {
 
     tenant.status = TenantStatus.PROVISIONING;
     await this.tenantRepo.save(tenant);
+    await this.recordAction('TENANT_PROVISIONING_START', 'Tenant provisioning started', { tenantId });
 
     return {
       message: 'Provisioning started',
@@ -267,6 +289,7 @@ export class PlatformService {
 
     // 🔁 Start provisioning again
     await this.startProvisioningSkeleton(tenant.id);
+    await this.recordAction('TENANT_PROVISIONING_RETRY', 'Tenant provisioning retry started', { tenantId });
 
     return {
       message: 'Provisioning retry started',
@@ -491,6 +514,7 @@ export class PlatformService {
 
     tenant.status = TenantStatus.SUSPENDED;
     await this.tenantRepo.save(tenant);
+    await this.recordAction('TENANT_SUSPEND', 'Tenant suspended', { tenantId });
 
     return {
       message: 'Tenant suspended successfully',
@@ -516,6 +540,7 @@ export class PlatformService {
 
     tenant.status = TenantStatus.PROVISIONED;
     await this.tenantRepo.save(tenant);
+    await this.recordAction('TENANT_RESUME', 'Tenant resumed', { tenantId });
 
     return {
       message: 'Tenant resumed successfully',
@@ -641,6 +666,7 @@ export class PlatformService {
       throw new NotFoundException('Tenant profile not found');
     }
 
+    await this.recordAction('TENANT_PROFILE_GET', 'Tenant profile fetched', { tenantId });
     return profile;
   }
 
@@ -656,6 +682,7 @@ export class PlatformService {
     Object.assign(profile, dto);
 
     await this.profilesRepo.save(profile);
+    await this.recordAction('TENANT_PROFILE_UPDATE', 'Tenant profile updated', { tenantId });
 
     return {
       message: 'Tenant profile updated successfully',
@@ -674,6 +701,7 @@ export class PlatformService {
       throw new NotFoundException('Tenant settings not found');
     }
 
+    await this.recordAction('TENANT_SETTINGS_GET', 'Tenant settings fetched', { tenantId });
     return settings;
   }
 
@@ -689,6 +717,7 @@ export class PlatformService {
     Object.assign(settings, dto);
 
     await this.settingsRepo.save(settings);
+    await this.recordAction('TENANT_SETTINGS_UPDATE', 'Tenant settings updated', { tenantId });
 
     return {
       message: 'Tenant settings updated successfully',
@@ -707,6 +736,7 @@ export class PlatformService {
       throw new NotFoundException('Tenant theme not found');
     }
 
+    await this.recordAction('TENANT_THEME_GET', 'Tenant theme fetched', { tenantId });
     return theme;
   }
 
@@ -723,6 +753,7 @@ export class PlatformService {
     Object.assign(theme, dto);
 
     await this.themesRepo.save(theme);
+    await this.recordAction('TENANT_THEME_UPDATE', 'Tenant theme updated', { tenantId });
 
     return {
       message: 'Tenant theme updated successfully',
@@ -753,6 +784,7 @@ export class PlatformService {
     profile.logoUrl = `/uploads/logos/${filename}`;
 
     await this.profilesRepo.save(profile);
+    await this.recordAction('TENANT_LOGO_UPDATE', 'Tenant logo updated', { tenantId, logoUrl: profile.logoUrl });
 
     return {
       message: 'Tenant logo updated successfully',
