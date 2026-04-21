@@ -34,6 +34,10 @@ export class PermissionGuard implements CanActivate {
             throw new ForbiddenException('User role not assigned');
         }
 
+        if (user.role.code === 'SUPER_ADMIN') {
+            return true;
+        }
+
         if (!user.role.permissions || user.role.permissions.length === 0) {
             throw new ForbiddenException('Role has no permissions assigned');
         }

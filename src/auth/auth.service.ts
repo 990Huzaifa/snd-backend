@@ -3,7 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
-
+import Pusher from 'pusher';
 import { PlatformUser } from '../master-db/entities/platform-user.entity';
 import { MailService } from 'src/common/mail/mail.service';
 import { Customer } from 'src/master-db/entities/customer.entity';
@@ -13,6 +13,14 @@ import { UpdateCustomerDto } from './dto/customer/update-customer.dto';
 import { PlatformRole } from 'src/master-db/entities/platform-role.entity';
 @Injectable()
 export class AuthService {
+    private readonly pusher = new Pusher({
+        appId: process.env.PUSHER_APP_ID!,
+        key: process.env.PUSHER_KEY!,
+        secret: process.env.PUSHER_SECRET!,
+        cluster: process.env.PUSHER_CLUSTER!,
+        useTLS: true,
+    });
+
     constructor(
         @InjectRepository(PlatformUser)
         private readonly userRepo: Repository<PlatformUser>,
@@ -24,11 +32,10 @@ export class AuthService {
 
         @InjectRepository(PlatformRole)
         private readonly platformRoleRepo: Repository<PlatformRole>,
-
     ) { }
 
     async validateUser(email: string, password: string) {
-        const user = await this.userRepo.findOne({ where: { email },relations: ['role'], });
+        const user = await this.userRepo.findOne({ where: { email }, relations: ['role'], });
         if (!user || !user.isActive) {
             throw new UnauthorizedException('Invalid credentials');
         }
@@ -236,5 +243,11 @@ export class AuthService {
 
         // Save updated data using repository's save method
         return await this.customerRepo.save(customer);
+    }
+
+
+    // Pusher Authentication
+    async triggerEvent(channel: string, event: string, data: any) {
+        await this.pusher.trigger(channel, event, data);
     }
 }
