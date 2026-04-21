@@ -43,6 +43,9 @@ import { Addon } from 'src/master-db/entities/addon.entity';
 import { Module as ModuleEntity } from 'src/master-db/entities/module.entity';
 import { ModuleController } from './controller/module.controller';
 import { ModuleService } from './services/module.service';
+import { Notification } from 'src/master-db/entities/notification.entity';
+import { NotificationService } from './services/notification.service';
+import { NotificationController } from './controller/notification.controller';
 
 @Module({
   imports: [
@@ -68,13 +71,14 @@ import { ModuleService } from './services/module.service';
       ModuleEntity,
       PlanLimit,
       Subscription,
+      Notification,
       Announcement,
       Country,
       State,
       City
     ]),
   ],
-  controllers: [PlatformController, PlatformUserController, CustomerController, PlanController, AddonController, ModuleController, SubscriptionController, AnnouncementController, UtilityController],
-  providers: [PlatformService, ProvisioningAdminService, TenantDatabaseService, CustomerService, PlatformUserService, PlanService, AddonService, SubscriptionService, AnnouncementService, UtilityService, MailService, JwtService, ModuleService],
+  controllers: [PlatformController, PlatformUserController, CustomerController, PlanController, AddonController, ModuleController, SubscriptionController, AnnouncementController, UtilityController, NotificationController],
+  providers: [PlatformService, ProvisioningAdminService, TenantDatabaseService, CustomerService, PlatformUserService, PlanService, AddonService, SubscriptionService, AnnouncementService, UtilityService, MailService, JwtService, ModuleService, NotificationService],
 })
 export class PlatformModule {}

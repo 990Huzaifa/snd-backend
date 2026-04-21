@@ -3,11 +3,13 @@ import {
     PrimaryGeneratedColumn,
     Column,
     ManyToOne,
+    OneToMany,
     JoinColumn,
     CreateDateColumn,
     UpdateDateColumn,
 } from 'typeorm';
 import { PlatformRole } from './platform-role.entity';
+import { Notification } from './notification.entity';
 
 @Entity('platform_users')
 export class PlatformUser {
@@ -33,6 +35,9 @@ export class PlatformUser {
     })
     @JoinColumn({ name: 'role_id' })
     role: PlatformRole;
+
+    @OneToMany(() => Notification, (notification) => notification.user)
+    notifications: Notification[];
 
     @CreateDateColumn()
     createdAt: Date;

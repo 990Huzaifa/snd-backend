@@ -29,8 +29,16 @@ export class AuthController {
 
   @UseGuards(JwtAuthGuard)
   @Get('me')
-  me(@CurrentPlatformUser() user: any) {
+  async me(@CurrentPlatformUser() user: any) {
     delete user.passwordHash;
+    await this.pusher.trigger(
+      `private-platform-user-${user.id}`,
+      'notification.new',
+      {
+        message: 'Hello, world! by pusher',
+        user: user,
+      }
+    );
     return user;
   }
 
