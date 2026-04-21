@@ -13,6 +13,7 @@ import { CustomerJwtStrategy } from './customer-jwt.strategy';
 import { Customer } from 'src/master-db/entities/customer.entity';
 import { MailService } from 'src/common/mail/mail.service';
 import { HttpModule } from '@nestjs/axios';
+import { PusherService } from 'src/common/pusher/pusher.service';
 
 @Module({
     imports: [
@@ -30,7 +31,7 @@ import { HttpModule } from '@nestjs/axios';
             }),
         })
     ],
-    providers: [AuthService,JwtStrategy, CustomerJwtStrategy, MailService],
+    providers: [AuthService,JwtStrategy, CustomerJwtStrategy, MailService, PusherService],
     controllers: [AuthController],
 })
 export class AuthModule {}

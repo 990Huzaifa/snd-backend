@@ -3,7 +3,6 @@ import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
-import Pusher from 'pusher';
 import { PlatformUser } from '../master-db/entities/platform-user.entity';
 import { MailService } from 'src/common/mail/mail.service';
 import { Customer } from 'src/master-db/entities/customer.entity';
@@ -11,15 +10,9 @@ import { RegisterCustomerDto } from './dto/customer/register-customer.dto';
 import { LoginCustomerDto } from './dto/customer/login-customer.dto';
 import { UpdateCustomerDto } from './dto/customer/update-customer.dto';
 import { PlatformRole } from 'src/master-db/entities/platform-role.entity';
+import { PusherService } from 'src/common/pusher/pusher.service';
 @Injectable()
 export class AuthService {
-    private readonly pusher = new Pusher({
-        appId: process.env.PUSHER_APP_ID!,
-        key: process.env.PUSHER_KEY!,
-        secret: process.env.PUSHER_SECRET!,
-        cluster: process.env.PUSHER_CLUSTER!,
-        useTLS: true,
-    });
 
     constructor(
         @InjectRepository(PlatformUser)
@@ -32,6 +25,7 @@ export class AuthService {
 
         @InjectRepository(PlatformRole)
         private readonly platformRoleRepo: Repository<PlatformRole>,
+        private readonly pusherService: PusherService,
     ) { }
 
     async validateUser(email: string, password: string) {
@@ -248,6 +242,6 @@ export class AuthService {
 
     // Pusher Authentication
     async triggerEvent(channel: string, event: string, data: any) {
-        await this.pusher.trigger(channel, event, data);
+        await this.pusherService.trigger(channel, event, data);
     }
 }

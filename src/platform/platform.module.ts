@@ -46,6 +46,7 @@ import { ModuleService } from './services/module.service';
 import { Notification } from 'src/master-db/entities/notification.entity';
 import { NotificationService } from './services/notification.service';
 import { NotificationController } from './controller/notification.controller';
+import { PusherService } from 'src/common/pusher/pusher.service';
 
 @Module({
   imports: [
@@ -79,6 +80,6 @@ import { NotificationController } from './controller/notification.controller';
     ]),
   ],
   controllers: [PlatformController, PlatformUserController, CustomerController, PlanController, AddonController, ModuleController, SubscriptionController, AnnouncementController, UtilityController, NotificationController],
-  providers: [PlatformService, ProvisioningAdminService, TenantDatabaseService, CustomerService, PlatformUserService, PlanService, AddonService, SubscriptionService, AnnouncementService, UtilityService, MailService, JwtService, ModuleService, NotificationService],
+  providers: [PlatformService, ProvisioningAdminService, TenantDatabaseService, CustomerService, PlatformUserService, PlanService, AddonService, SubscriptionService, AnnouncementService, UtilityService, MailService, JwtService, ModuleService, NotificationService, PusherService],
 })
 export class PlatformModule {}

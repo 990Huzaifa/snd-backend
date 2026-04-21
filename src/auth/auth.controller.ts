@@ -6,20 +6,13 @@ import { SigninDto } from './dto/user/signin.dto';
 import { RegisterCustomerDto } from './dto/customer/register-customer.dto';
 import { LoginCustomerDto } from './dto/customer/login-customer.dto';
 import { UpdateCustomerDto } from './dto/customer/update-customer.dto';
-import Pusher from 'pusher';
+import { PusherService } from 'src/common/pusher/pusher.service';
 
 @Controller('platform/')
 export class AuthController {
-  private pusher = new Pusher({
-    appId: process.env.PUSHER_APP_ID!,
-    key: process.env.PUSHER_KEY!,
-    secret: process.env.PUSHER_SECRET!,
-    cluster: process.env.PUSHER_CLUSTER!,
-    useTLS: true,
-  });
-
   constructor(
     private readonly authService: AuthService,
+    private readonly pusherService: PusherService,
   ) { }
 
   @Post('auth/signin')
@@ -31,12 +24,11 @@ export class AuthController {
   @Get('me')
   async me(@CurrentPlatformUser() user: any) {
     delete user.passwordHash;
-    await this.pusher.trigger(
+    await this.pusherService.trigger(
       `private-platform-user-${user.id}`,
       'notification.new',
       {
         message: 'Hello, world! by pusher',
-        user: user,
       }
     );
     return user;
@@ -90,7 +82,7 @@ export class AuthController {
       return res.status(403).json({ message: 'Unauthorized'});
     }
 
-    const auth = this.pusher.authorizeChannel(socketId, channel);
+    const auth = this.pusherService.authorizeChannel(socketId, channel);
     return res.status(200).json(auth);
   }
 }

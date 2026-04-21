@@ -20,6 +20,7 @@ import { PlatformRole } from 'src/master-db/entities/platform-role.entity';
 import { TenantGeoPolicy } from 'src/master-db/entities/tenant-geo-policy.entity';
 import { Plan } from 'src/master-db/entities/plan.entity';
 import { Status, BillingCycle, BillingModel, PaymentMode, CollectionType, Subscription } from 'src/master-db/entities/subscription.entity';
+import { NotificationService } from './services/notification.service';
 
 @Injectable()
 export class PlatformService {
@@ -46,12 +47,13 @@ export class PlatformService {
     private readonly platformRoleRepo: Repository<PlatformRole>,
     @InjectRepository(Subscription)
     private readonly subscriptionRepo: Repository<Subscription>,
-
+    
     @InjectRepository(Plan)
     private readonly planRepo: Repository<Plan>,
 
     private readonly provisioningAdminService: ProvisioningAdminService,
     private readonly tenantDatabaseService: TenantDatabaseService,
+    private readonly notificationService: NotificationService,
   ) { }
 
   private async generateUniqueCode(): Promise<string> {
@@ -157,7 +159,7 @@ export class PlatformService {
   }
 
 
-  async createTenant(dto: CreateTenantDto,) {
+  async createTenant(dto: CreateTenantDto,user: any) {
     // 1️⃣ Subdomain uniqueness check
     const nameExists = await this.tenantRepo.findOne({
       where: { name: dto.name },
@@ -200,11 +202,17 @@ export class PlatformService {
 
       await this.subscriptionRepo.save(subscription);
     }
-
-
+    // get platform user id by auth token
+    
+    
     // 🔥 AUTO provisioning trigger
     await this.startProvisioningSkeleton(tenant.id);
-
+    await this.notificationService.createNotification({
+      userId: user.id,
+      title:  `Tenant ${tenant.name} is created successfully`,
+      message: `Tenant ${tenant.name} is created and provisioning has started`,
+      type: 'success',
+    });
     return tenant;
   }
 

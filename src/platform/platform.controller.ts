@@ -10,6 +10,7 @@ import { UpdateTenantThemeDto } from './dto/update-tenant-theme.dto';
 import { RequirePermissions } from 'src/auth/require-permission.decorator';
 import { PermissionGuard } from 'src/auth/permission.guard';
 import { FileUploadService } from './services/file-upload.service';
+import { CurrentPlatformUser } from 'src/auth/current-platform-user.decorator';
 
 @Controller('platform/tenant')
 export class PlatformController {
@@ -35,8 +36,8 @@ export class PlatformController {
   @RequirePermissions('TENANT_CREATE')
   @UseGuards(JwtAuthGuard, PermissionGuard)
   @Post()
-  async createTenant(@Body() dto: CreateTenantDto) {
-    const tenant = await this.platformService.createTenant(dto);
+  async createTenant(@Body() dto: CreateTenantDto,@CurrentPlatformUser() user: any) {
+    const tenant = await this.platformService.createTenant(dto,user);
 
     return {
       tenantName: tenant.name,
