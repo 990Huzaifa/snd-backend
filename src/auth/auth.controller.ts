@@ -79,7 +79,7 @@ export class AuthController {
 
     // Optional: restrict channels
     if (!channel.includes(`private-platform-user-${user.id}`)) {
-      return res.status(403).json({ message: 'Unauthorized' });
+      return res.status(403).json({ message: 'Unauthorized',user: user });
     }
 
     const auth = this.pusher.authorizeChannel(socketId, channel);
