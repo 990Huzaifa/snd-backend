@@ -6,6 +6,8 @@ import { CreateAnnouncementDto } from "../dto/announcement/create-announcement.d
 import { Auth } from "src/auth/entities/auth.entity";
 import { AuthService } from "src/auth/auth.service";
 import { UpdateAnnouncementDto } from "../dto/announcement/update-announcement.dto";
+import { ActivityLogService } from "./activity-log.service";
+import { ActivityLogActorType } from "src/master-db/entities/activity-log.entity";
 
 @Injectable()
 export class AnnouncementService {
@@ -16,12 +18,23 @@ export class AnnouncementService {
         @InjectRepository(AnnouncementPlan)
         private readonly announcementPlanRepo: Repository<AnnouncementPlan>,
         @InjectRepository(AnnouncementTenant)
-        private readonly announcementTenantRepo: Repository<AnnouncementTenant>    
+        private readonly announcementTenantRepo: Repository<AnnouncementTenant>,
+        private readonly activityLogService: ActivityLogService,
     ) {
 
     }
 
-    async getAnnouncements(page = 1, limit = 10) {
+    private async recordAction(action: string, description: string, actorId:string, metadata?: Record<string, any>) {
+        await this.activityLogService.recordActivityLog({
+            actorType: ActivityLogActorType.PLATFORM_USER,
+            actorId: actorId,
+            action,
+            description,
+            metadata: metadata ?? null,
+        });
+    }
+
+    async getAnnouncements(page = 1, limit = 10, user: any) {
 
         const skip = (page - 1) * limit;
         const [announcements, total] = await this.announcementRepo.findAndCount({
@@ -51,6 +64,7 @@ export class AnnouncementService {
             },
         });
 
+        await this.recordAction('ANNOUNCEMENT_LIST', 'Announcement list fetched', user.id, { page, limit, total });
         return {
             data: announcements,
             meta: {
@@ -62,7 +76,7 @@ export class AnnouncementService {
         };
     }
 
-    async showAnnouncement(id: string) {
+    async showAnnouncement(id: string, user: any) {
         const announcement = await this.announcementRepo.findOne({
             where: { id: id },
             relations: ['createdBy', 'announcement_plans', 'announcement_tenants'],
@@ -91,6 +105,7 @@ export class AnnouncementService {
         if (!announcement) {
             throw new NotFoundException('Announcement not found');
         }
+        await this.recordAction('ANNOUNCEMENT_SHOW', 'Announcement details fetched', user.id, { announcementId: id });
         return announcement;
     }
 
@@ -147,6 +162,7 @@ export class AnnouncementService {
 
         // ===== SAVE (cascade will handle children) =====
         const saved = await this.announcementRepo.save(announcement);
+        await this.recordAction('ANNOUNCEMENT_CREATE', 'Announcement created', user.id, { announcementId: saved.id, targetScope: saved.targetScope });
 
         return await this.announcementRepo.findOne({
             where: { id: saved.id },
@@ -233,6 +249,7 @@ export class AnnouncementService {
         announcement.createdBy = user;
 
         const saved = await this.announcementRepo.save(announcement);
+        await this.recordAction('ANNOUNCEMENT_UPDATE', 'Announcement updated', user.id, { announcementId: saved.id, targetScope: saved.targetScope });
 
         return await this.announcementRepo.findOne({
             where: { id: saved.id },
@@ -261,9 +278,10 @@ export class AnnouncementService {
 
     }
 
-    async updateAnnouncementStatus(id: string, is_active: boolean) {
+    async updateAnnouncementStatus(id: string, is_active: boolean, user: any) {
         await this.announcementRepo.update(id, { isActive: is_active });
         const announcement = await this.announcementRepo.findOne({ where: { id: id } });
+        await this.recordAction('ANNOUNCEMENT_STATUS_UPDATE', 'Announcement status updated', user.id, { announcementId: id, isActive: is_active });
         return announcement;
     }
 }

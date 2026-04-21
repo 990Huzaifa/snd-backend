@@ -17,17 +17,17 @@ export class PlanService {
         private readonly activityLogService: ActivityLogService,
     ) { }
 
-    private async recordAction(action: string, description: string, metadata?: Record<string, any>) {
+    private async recordAction(action: string, description: string, actorId:string, metadata?: Record<string, any>) {
         await this.activityLogService.recordActivityLog({
-            actorType: ActivityLogActorType.SYSTEM,
-            actorId: null,
+            actorType: ActivityLogActorType.PLATFORM_USER,
+            actorId: actorId,
             action,
             description,
             metadata: metadata ?? null,
         });
     }
 
-    async getPlans(page = 1, limit = 10) {
+    async getPlans(page = 1, limit = 10, user: any) {
         const skip = (page - 1) * limit;
         const plans = await this.planRepo.find({
             skip: skip,
@@ -35,6 +35,7 @@ export class PlanService {
             order: { createdAt: 'ASC' },
             relations: ['plan_limits'] 
         });
+        await this.recordAction('PLAN_LIST', 'Plan list fetched', user.id, { page, limit, count: plans.length });
         return {
             data: plans,
             meta: {
@@ -44,7 +45,7 @@ export class PlanService {
         };
     }
 
-    async showPlan(id: string) {
+    async showPlan(id: string, user: any) {
         console.log('Fetching plan with id:', id);
         const plan = await this.planRepo.findOne({ 
             where: { id: id },
@@ -53,11 +54,11 @@ export class PlanService {
         if (!plan) {
             throw new NotFoundException('Plan not found');
         }
-        await this.recordAction('PLAN_SHOW', 'Plan details fetched', { planId: id });
+        await this.recordAction('PLAN_SHOW', 'Plan details fetched', user.id, { planId: id });
         return plan;
     }
 
-    async createPlan(createPlanDto: CreatePlanDto) {
+    async createPlan(createPlanDto: CreatePlanDto, user: any) {
         const planExists = await this.planRepo.findOne({ where: { slug: createPlanDto.slug } });
         if (planExists) {
             throw new ConflictException('Plan already exists');
@@ -93,11 +94,11 @@ export class PlanService {
             // If limits is not an array, handle the error case
             throw new BadRequestException('Limits should be an array');
         }
-        await this.recordAction('PLAN_CREATE', 'Plan created', { planId: plan.id, slug: plan.slug });
+        await this.recordAction('PLAN_CREATE', 'Plan created', user.id, { planId: plan.id, slug: plan.slug });
         return plan;
     }
 
-    async updatePlan(id: string, updatePlanDto: UpdatePlanDto) {
+    async updatePlan(id: string, updatePlanDto: UpdatePlanDto, user: any) {
         // Find the existing plan along with its limits
         const plan = await this.planRepo.findOne({ where: { id: id }, relations: ['plan_limits'] });
 
@@ -144,19 +145,19 @@ export class PlanService {
 
         // Save the updated plan
         await this.planRepo.save(plan);
-        await this.recordAction('PLAN_UPDATE', 'Plan updated', { planId: id });
+        await this.recordAction('PLAN_UPDATE', 'Plan updated', user.id, { planId: id });
 
         return plan;
     }
 
-    async updatePlanStatus(id: string, is_active: boolean) {
+    async updatePlanStatus(id: string, is_active: boolean, user: any) {
         const plan = await this.planRepo.findOne({ where: { id: id } });
         if (!plan) {
             throw new NotFoundException('Plan not found');
         }
         plan.is_active = is_active;
         await this.planRepo.update({ id: id }, plan);
-        await this.recordAction('PLAN_STATUS_UPDATE', 'Plan status updated', { planId: id, isActive: is_active });
+        await this.recordAction('PLAN_STATUS_UPDATE', 'Plan status updated', user.id, { planId: id, isActive: is_active });
         return plan;
     }
 }

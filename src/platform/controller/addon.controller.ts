@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Put, Query } from "@nestjs/common";
+import { Body, Controller, Get, Param, Post, Put, Query, Req } from "@nestjs/common";
 import { AddonService } from "../services/addon.service";
 import { CreateAddonDto } from "../dto/addon/create-addon.dto";
 import { UpdateAddonDto } from "../dto/addon/update-addon.dto";
@@ -10,29 +10,29 @@ export class AddonController {
     ) {}
 
     @Get('/')
-    async getAddons(@Query('page') page: number = 1, @Query('limit') limit: number = 10) {
-        return this.addonService.getAddons(page, limit);
+    async getAddons(@Query('page') page: number = 1, @Query('limit') limit: number = 10, @Req() req: any) {
+        return this.addonService.getAddons(page, limit, req.user);
     }
     @Get('/:id')
-    async getAddonById(@Param('id') id: number) {
-        return this.addonService.getAddonById(id);
+    async getAddonById(@Param('id') id: number, @Req() req: any) {
+        return this.addonService.getAddonById(id, req.user);
     }
 
     @Post("/")
-    async createAddon(@Body() data: CreateAddonDto) {
+    async createAddon(@Body() data: CreateAddonDto, @Req() req: any) {
         // Implementation for creating an addon
-        return this.addonService.createAddon(data);
+        return this.addonService.createAddon(data, req.user);
     }
 
     @Put('/:id')
-    async updateAddon(@Param('id') id: number, @Body() data: UpdateAddonDto) {
+    async updateAddon(@Param('id') id: number, @Body() data: UpdateAddonDto, @Req() req: any) {
         // Implementation for updating an addon
-        return this.addonService.updateAddon(id, data);
+        return this.addonService.updateAddon(id, data, req.user);
     }
 
     @Put('/:id/status')
-    async updateAddonStatus(@Param('id') id: number, @Query('is_active') isActive: boolean) {
+    async updateAddonStatus(@Param('id') id: number, @Query('is_active') isActive: boolean, @Req() req: any) {
         // Implementation for updating addon status
-        return this.addonService.updateAddonStatus(id, isActive);
+        return this.addonService.updateAddonStatus(id, isActive, req.user);
     }
 }

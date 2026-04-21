@@ -14,14 +14,14 @@ export class AnnouncementController {
 
     @Get('/')
     @RequirePermissions('ANNOUNCEMENT_LIST')
-    async getAnnouncements(@Query('page') page: number, @Query('limit') limit: number) {
-        return this.announcementService.getAnnouncements(page, limit);
+    async getAnnouncements(@Query('page') page: number, @Query('limit') limit: number, @Req() req: any) {
+        return this.announcementService.getAnnouncements(page, limit, req.user);
     }
 
     @Get('/:id')
     @RequirePermissions('ANNOUNCEMENT_VIEW')
-    async showAnnouncement(@Param('id') id: string) {
-        return this.announcementService.showAnnouncement(id);
+    async showAnnouncement(@Param('id') id: string,@Req() req: any) {
+        return this.announcementService.showAnnouncement(id, req.user);
     }
 
     @Post('/')
@@ -38,8 +38,8 @@ export class AnnouncementController {
 
     @Put('/:id/status')
     @RequirePermissions('ANNOUNCEMENT_UPDATE')
-    async updateAnnouncementStatus(@Query('is_active') is_active: boolean, @Param('id') id: string) {
-        return this.announcementService.updateAnnouncementStatus(id, is_active);
+    async updateAnnouncementStatus(@Query('is_active') is_active: boolean, @Param('id') id: string, @Req() req: any) {
+        return this.announcementService.updateAnnouncementStatus(id, is_active, req.user);
     }
 
 }

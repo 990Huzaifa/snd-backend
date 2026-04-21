@@ -11,31 +11,31 @@ export class PlanController {
     
     @RequirePermissions('PLAN_LIST')
     @Get('/')
-    async getPlans(@Query('page') page: number, @Query('limit') limit: number) {
-        return this.planService.getPlans(page, limit);
+    async getPlans(@Query('page') page: number, @Query('limit') limit: number, @Req() req: any) {
+        return this.planService.getPlans(page, limit, req.user);
     }
 
     @RequirePermissions('PLAN_VIEW')
     @Get('/:id')
-    async showPlan(@Param('id') id: string) {
-        return this.planService.showPlan(id);
+    async showPlan(@Param('id') id: string, @Req() req: any) {
+        return this.planService.showPlan(id, req.user);
     }
 
     @RequirePermissions('PLAN_CREATE')
     @Post('/')
-    async createPlan(@Body() createPlanDto: any) {
-        return this.planService.createPlan(createPlanDto);
+    async createPlan(@Body() createPlanDto: any, @Req() req: any) {
+        return this.planService.createPlan(createPlanDto, req.user);
     }
 
     @RequirePermissions('PLAN_UPDATE')
     @Post('/:id')
-    async updatePlan(@Body() updatePlanDto: any, @Param('id') id: string) {
-        return this.planService.updatePlan(id, updatePlanDto);
+    async updatePlan(@Body() updatePlanDto: any, @Param('id') id: string, @Req() req: any) {
+        return this.planService.updatePlan(id, updatePlanDto, req.user);
     }
 
     @RequirePermissions('PLAN_UPDATE')
     @Put('/:id/status')
-    async updatePlanStatus(@Query('is_active') is_active: boolean, @Param('id') id: string) {
-        return this.planService.updatePlanStatus(id, is_active);
+    async updatePlanStatus(@Query('is_active') is_active: boolean, @Param('id') id: string, @Req() req: any) {
+        return this.planService.updatePlanStatus(id, is_active, req.user);
     }
 }
