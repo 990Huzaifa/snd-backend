@@ -6,6 +6,7 @@ import { CreatePlatformUserDto } from "../dto/create-platform-user.dto";
 import { PermissionGuard } from "src/auth/permission.guard";
 import { JwtAuthGuard } from "src/auth/jwt-auth.guard";
 import { RequirePermissions } from "src/auth/require-permission.decorator";
+import { CurrentPlatformUser } from "src/auth/current-platform-user.decorator";
 
 @Controller('platform')
 @UseGuards(JwtAuthGuard, PermissionGuard)
@@ -17,39 +18,39 @@ export class PlatformUserController {
 
     // PERMISSIONS
     @Get('permissions')
-    async getPermissionList(){
-        return this.platformUserService.getPlatformPermissionList();
+    async getPermissionList(@CurrentPlatformUser() user: any){
+        return this.platformUserService.getPlatformPermissionList(user);
     }
 
     @Post('permissions/create')
-    async createPermission(@Body() perData: any){
-        return this.platformUserService.createPlatformPermission(perData);
+    async createPermission(@Body() perData: any, @CurrentPlatformUser() user: any){
+        return this.platformUserService.createPlatformPermission(perData, user);
     }
 
 
     // ROlES
     @RequirePermissions('ROLE_LIST')
     @Get('roles')
-    async getRoleList(){
-        return this.platformUserService.getPlatformRoleList();
+    async getRoleList(@CurrentPlatformUser() user: any){
+        return this.platformUserService.getPlatformRoleList(user);
     }
 
     @RequirePermissions('ROLE_VIEW')
     @Get('roles/:id')
-    async getRoleById(@Param('id') id: string){
-        return this.platformUserService.getPlatformRole(id);
+    async getRoleById(@Param('id') id: string, @CurrentPlatformUser() user: any){
+        return this.platformUserService.getPlatformRole(id, user);
     }
 
     @RequirePermissions('ROLE_CREATE')
     @Post('roles/create')
-    async createRole(@Body() roleData: CreateRoleDto){
-        return this.platformUserService.createPlatformRole(roleData);
+    async createRole(@Body() roleData: CreateRoleDto, @CurrentPlatformUser() user: any){
+        return this.platformUserService.createPlatformRole(roleData, user);
     }
 
     // @RequirePermissions('ROLE_UPDATE')
     @Post('roles/update/:id')
-    async updateRole(@Param('id') id: string,@Body() roleData: UpdateRoleDto){
-        return this.platformUserService.updatePlatformRole(id, {...roleData});
+    async updateRole(@Param('id') id: string,@Body() roleData: UpdateRoleDto, @CurrentPlatformUser() user: any){
+        return this.platformUserService.updatePlatformRole(id, {...roleData}, user);
     }
 
 
@@ -57,19 +58,19 @@ export class PlatformUserController {
 
     @RequirePermissions('USER_LIST')
     @Get('users')
-    async getUserList(){
-        return this.platformUserService.getPlatformUserList();
+    async getUserList(@CurrentPlatformUser() user: any){
+        return this.platformUserService.getPlatformUserList(user);
     }
 
     @RequirePermissions('USER_VIEW')
     @Get('users/:id')
-    async getUserById(@Param('id') id: string){
-        return this.platformUserService.getPlatformUser(id);
+    async getUserById(@Param('id') id: string, @CurrentPlatformUser() user: any){
+        return this.platformUserService.getPlatformUser(id, user);
     }
 
     @RequirePermissions('USER_CREATE')
     @Post('users/create')
-    async createUser(@Body() userData: CreatePlatformUserDto){
-        return this.platformUserService.createPlatformUser(userData);
+    async createUser(@Body() userData: CreatePlatformUserDto, @CurrentPlatformUser() user: any){
+        return this.platformUserService.createPlatformUser(userData, user);
     }
 }
