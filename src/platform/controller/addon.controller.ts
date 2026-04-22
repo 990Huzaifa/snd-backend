@@ -1,9 +1,12 @@
-import { Body, Controller, Get, Param, Post, Put, Query, Req } from "@nestjs/common";
+import { Body, Controller, Get, Param, Post, Put, Query, Req, UseGuards } from "@nestjs/common";
 import { AddonService } from "../services/addon.service";
 import { CreateAddonDto } from "../dto/addon/create-addon.dto";
 import { UpdateAddonDto } from "../dto/addon/update-addon.dto";
+import { PermissionGuard } from "src/auth/permission.guard";
+import { JwtAuthGuard } from "src/auth/jwt-auth.guard";
 
 @Controller('platform/addon')
+@UseGuards(JwtAuthGuard, PermissionGuard)
 export class AddonController {
     constructor(
         private readonly addonService: AddonService,
