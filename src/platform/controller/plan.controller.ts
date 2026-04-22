@@ -28,7 +28,7 @@ export class PlanController {
     }
 
     @RequirePermissions('PLAN_UPDATE')
-    @Post('/:id')
+    @Put('/:id')
     async updatePlan(@Body() updatePlanDto: any, @Param('id') id: string, @Req() req: any) {
         return this.planService.updatePlan(id, updatePlanDto, req.user);
     }
