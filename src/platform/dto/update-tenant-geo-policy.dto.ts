@@ -7,11 +7,9 @@ export class UpdateTenantGeoPolicyDto {
     scope_type?: GeoScopeType;
 
     @IsOptional()
-    @IsUUID()
     country_id?: string | null;
 
     @IsOptional()
-    @IsUUID()
     state_id?: string | null;
 
     @IsOptional()

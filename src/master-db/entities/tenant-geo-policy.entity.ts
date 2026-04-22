@@ -41,13 +41,13 @@ export class TenantGeoPolicy {
     /**
      * Logical reference to countries.id (Master DB)
      */
-    @Column('uuid', { nullable: true })
+    @Column({ nullable: true })
     country_id: string | null;
 
     /**
      * Logical reference to states.id (Master DB)
      */
-    @Column('uuid', { nullable: true })
+    @Column({ nullable: true })
     state_id: string | null;
 
     @Column({ default: true })

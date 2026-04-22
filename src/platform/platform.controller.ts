@@ -12,6 +12,7 @@ import { PermissionGuard } from 'src/auth/permission.guard';
 import { FileUploadService } from './services/file-upload.service';
 import { CurrentPlatformUser } from 'src/auth/current-platform-user.decorator';
 import { Req } from '@nestjs/common';
+import { UpdateTenantGeoPolicyDto } from './dto/update-tenant-geo-policy.dto';
 
 @Controller('platform/tenant')
 export class PlatformController {
@@ -123,6 +124,16 @@ export class PlatformController {
     return this.platformService.updateTenantLogo(id, logo, req.user);
   }
 
+  @UseGuards(JwtAuthGuard)
+  @Get(':id/geo-policy')
+  async getGeoPolicy(@Param('id') id: string, @Req() req: any) {
+    return this.platformService.getTenantGeoPolicy(id, req.user);
+  }
 
+  @UseGuards(JwtAuthGuard)
+  @Put(':id/geo-policy')
+  async updateGeoPolicy(@Param('id') id: string, @Body() dto: UpdateTenantGeoPolicyDto, @Req() req: any) {
+    return this.platformService.updateTenantGeoPolicy(id, dto, req.user);
+  }
 
 }

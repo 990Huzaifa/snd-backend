@@ -20,32 +20,32 @@ export async function geoDataSeeder(dataSource: DataSource) {
     console.log(`📊 Loaded ${statesData.length} States`);
 
     // Insert countries (batch insert)
-    // for (const Country of countriesData) {
-    //     // Check if the country already exists in the database based on the 'iso_code'
-    //     const existingCountry = await countryRepo.findOne({ where: { iso_code: Country.iso3 } });
+    for (const Country of countriesData) {
+        // Check if the country already exists in the database based on the 'iso_code'
+        const existingCountry = await countryRepo.findOne({ where: { iso_code: Country.iso3 } });
 
-    //     if (existingCountry) {
-    //         // If country exists, update its name and code
-    //         existingCountry.id = Country.id; // Ensure we also update the ID if it has changed
+        if (existingCountry) {
+            // If country exists, update its name and code
+            existingCountry.id = Country.id; // Ensure we also update the ID if it has changed
 
-    //         // Save the updated country
-    //         await countryRepo.save(existingCountry);
-    //         console.log(`✅ Country with ID ${existingCountry.id} updated.`);
-    //     } else {
+            // Save the updated country
+            await countryRepo.save(existingCountry);
+            console.log(`✅ Country with ID ${existingCountry.id} updated.`);
+        } else {
 
-    //         // If country doesn't exist, create a new one
-    //         const newCountry = countryRepo.create({
-    //             // id: Country.id, // Ensure we set the ID
-    //             name: Country.name,
-    //             iso_code: Country.iso3
-    //         });
+            // If country doesn't exist, create a new one
+            const newCountry = countryRepo.create({
+                // id: Country.id, // Ensure we set the ID
+                name: Country.name,
+                iso_code: Country.iso3
+            });
 
-    //         // Insert the new country
-    //         await countryRepo.save(newCountry);
-    //         console.log(`✅ New country with ID ${newCountry.id} inserted.`);
-    //     }
-    // }
-    // console.log('✅ Countries seeded.');
+            // Insert the new country
+            await countryRepo.save(newCountry);
+            console.log(`✅ New country with ID ${newCountry.id} inserted.`);
+        }
+    }
+    console.log('✅ Countries seeded.');
 
     // Insert states (batch insert)
     for (const state of statesData) {
