@@ -219,11 +219,17 @@ export class PlatformService {
 
       await this.subscriptionRepo.save(subscription);
     }
-    // get platform user id by auth token
-    
+
+    // contact info 
+    const contactInfo = {
+      name: dto.displayName,
+      email: dto.email,
+      phone: dto.phone,
+      address: dto.address,
+    };
     
     // 🔥 AUTO provisioning trigger
-    await this.startProvisioningSkeleton(tenant.id);
+    await this.startProvisioningSkeleton(tenant.id, contactInfo);
     await this.notificationService.createNotification({
       userId: user.id,
       title:  `Tenant ${tenant.name} is created successfully`,
@@ -297,14 +303,10 @@ export class PlatformService {
     };
   }
 
-  async startProvisioningSkeleton(tenantId: string) {
+  async startProvisioningSkeleton(tenantId: string, contactInfo: any = null) {
 
     const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } });
     if (!tenant) return;
-
-    // Move tenant to PROVISIONING
-    tenant.status = TenantStatus.PROVISIONING;
-    await this.tenantRepo.save(tenant);
 
     // Create job
     const job = await this.jobRepo.save(
@@ -313,6 +315,10 @@ export class PlatformService {
         status: 'RUNNING',
       }),
     );
+
+    // Move tenant to PROVISIONING
+    tenant.status = TenantStatus.PROVISIONING;
+    await this.tenantRepo.save(tenant);
 
     // Log
     await this.logRepo.save({
@@ -402,9 +408,7 @@ export class PlatformService {
       // 🔹 STEP 1: Create tenant settings
       // ===============================
       await this.createDefaultSettingsIfNotExists(tenant);
-      // throw new Error('Simulated provisioning failure'); // test fail line
 
-      // 🔹 Log: settings created
       await this.logRepo.save({
         job,
         level: 'INFO',
@@ -414,7 +418,7 @@ export class PlatformService {
       // ===============================
       // 🔹 STEP 2: Create tenant profile
       // ===============================
-      await this.createDefaultProfileIfNotExists(tenant);
+      await this.createDefaultProfileIfNotExists(tenant, contactInfo);
 
       await this.logRepo.save({
         job,
@@ -435,18 +439,18 @@ export class PlatformService {
 
 
       // ===============================
-      // 🔹 STEP 1: Create tenant Geo Policy
+      // 🔹 STEP 4: Create tenant Geo Policy
       // ===============================
       await this.createDefaultGeoPolicyIfNotExists(tenant);
-      // throw new Error('Simulated provisioning failure'); // test fail line
 
-      // 🔹 Log: settings created
       await this.logRepo.save({
         job,
         level: 'INFO',
         message: 'Tenant default geo policy created',
       });
-      // 🚧 STOP HERE — (future steps plug below) 
+      // 🚧 STOP HERE — (future steps plug below)
+
+
 
       // 🔥 FINALIZE provisioning (CURRENT SCOPE)
       await this.markProvisioningSuccess(tenant, job);
@@ -620,7 +624,7 @@ export class PlatformService {
     return { created: false };
   }
 
-  private async createDefaultProfileIfNotExists(tenant: Tenant) {
+  private async createDefaultProfileIfNotExists(tenant: Tenant, contactInfo: any) {
     const existing = await this.profilesRepo.findOne({
       where: { tenant: { id: tenant.id } },
     });
@@ -629,14 +633,13 @@ export class PlatformService {
       await this.profilesRepo.save(
         this.profilesRepo.create({
           tenant,
-          displayName: tenant.name
+          displayName: contactInfo.name || null,
+          supportEmail: contactInfo.email || null,
+          phone: contactInfo.phone || null,
+          address: contactInfo.address || null,
         }),
       );
-
-      return { created: true };
     }
-
-    return { created: false };
   }
 
   private async createDefaultThemeIfNotExists(tenant: Tenant) {
@@ -744,7 +747,6 @@ export class PlatformService {
     return theme;
   }
 
-
   async updateTenantThemes(tenantId: string, dto: UpdateTenantThemeDto, user: any) {
     const theme = await this.themesRepo.findOne({
       where: { tenant: { id: tenantId } },
@@ -764,6 +766,7 @@ export class PlatformService {
       theme,
     };
   }
+
   async updateTenantLogo(
     tenantId: string,
     logo: Express.Multer.File,

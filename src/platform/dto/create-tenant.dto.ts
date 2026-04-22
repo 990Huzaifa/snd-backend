@@ -25,4 +25,16 @@ export class CreateTenantDto {
 
     @IsEnum(BillingCycle)
     billingCycle: BillingCycle;
+
+    @IsOptional()
+    @IsString()
+    displayName?: string;
+
+    @IsOptional()
+    @IsString()
+    phone?: string;
+
+    @IsOptional()
+    @IsString()
+    address?: string;
 }
