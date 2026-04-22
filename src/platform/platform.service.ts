@@ -10,6 +10,7 @@ import { TenantProfile } from 'src/master-db/entities/tenant-profile.entity';
 import { UpdateTenantProfileDto } from './dto/update-tenant-profile.dto';
 import { UpdateTenantSettingsDto } from './dto/update-tenant-settings.dto';
 import { UpdateTenantThemeDto } from './dto/update-tenant-theme.dto';
+import { UpdateTenantGeoPolicyDto } from './dto/update-tenant-geo-policy.dto';
 import { TenantTheme } from 'src/master-db/entities/tenant-themes.entity';
 import { ProvisioningAdminService } from './services/provisioning-admin.service';
 import { TenantDbConfig } from 'src/master-db/entities/tenant-db-config.entity';
@@ -59,10 +60,10 @@ export class PlatformService {
     private readonly activityLogService: ActivityLogService,
   ) { }
 
-  private async recordAction(action: string, description: string, metadata?: Record<string, any>) {
+  private async recordAction(action: string, description: string, actorId:string, actorType:ActivityLogActorType, metadata?: Record<string, any>) {
     await this.activityLogService.recordActivityLog({
-      actorType: ActivityLogActorType.SYSTEM,
-      actorId: null,
+      actorType: actorType,
+      actorId: actorId,
       action,
       description,
       metadata: metadata ?? null,
@@ -82,6 +83,7 @@ export class PlatformService {
       }
     }
   }
+
   async resolveTenant(code: string) {
     const tenant = await this.tenantRepo.findOne({
       where: { code, isActive: true },
@@ -90,11 +92,10 @@ export class PlatformService {
     if (!tenant) {
       return null
     }
-    await this.recordAction('TENANT_RESOLVE', 'Tenant resolved by code', { code, tenantId: tenant.id });
     return tenant
   }
 
-  async getProvisioningList() {
+  async getProvisioningList(user: any) {
     // 1️⃣ Fetch tenants
     const tenants = await this.tenantRepo.find({
       select: ['id', 'name', 'status', 'updatedAt'],
@@ -121,11 +122,11 @@ export class PlatformService {
       }),
     );
 
-    await this.recordAction('TENANT_PROVISIONING_LIST', 'Fetched tenant provisioning list', { total: results.length });
+    await this.recordAction('TENANT_PROVISIONING_LIST', 'Fetched tenant provisioning list', user.id, ActivityLogActorType.PLATFORM_USER, { total: results.length });
     return results;
   }
 
-  async getProvisioningDetails(tenantId: string) {
+  async getProvisioningDetails(tenantId: string, user: any) {
     const tenant = await this.tenantRepo.findOne({
       where: { id: tenantId },
     });
@@ -163,7 +164,7 @@ export class PlatformService {
       }),
     );
 
-    await this.recordAction('TENANT_PROVISIONING_DETAILS', 'Fetched tenant provisioning details', { tenantId, jobsCount: jobsWithLogs.length });
+    await this.recordAction('TENANT_PROVISIONING_DETAILS', 'Fetched tenant provisioning details', user.id, ActivityLogActorType.PLATFORM_USER, { tenantId, jobsCount: jobsWithLogs.length });
     return {
       tenant: {
         id: tenant.id,
@@ -229,7 +230,7 @@ export class PlatformService {
       message: `Tenant ${tenant.name} is created and provisioning has started`,
       type: 'success',
     });
-    await this.recordAction('TENANT_CREATE', 'Tenant created and provisioning started', {
+    await this.recordAction('TENANT_CREATE', 'Tenant created and provisioning started', user.id, ActivityLogActorType.PLATFORM_USER, {
       tenantId: tenant.id,
       tenantName: tenant.name,
       userId: user?.id ?? null,
@@ -253,7 +254,7 @@ export class PlatformService {
 
     tenant.status = TenantStatus.PROVISIONING;
     await this.tenantRepo.save(tenant);
-    await this.recordAction('TENANT_PROVISIONING_START', 'Tenant provisioning started', { tenantId });
+    await this.recordAction('TENANT_PROVISIONING_START', 'Tenant provisioning started', null, ActivityLogActorType.SYSTEM, { tenantId });
 
     return {
       message: 'Provisioning started',
@@ -261,7 +262,7 @@ export class PlatformService {
     };
   }
 
-  async retryProvisioning(tenantId: string) {
+  async retryProvisioning(tenantId: string, user: any) {
     const tenant = await this.tenantRepo.findOne({
       where: { id: tenantId },
     });
@@ -289,7 +290,7 @@ export class PlatformService {
 
     // 🔁 Start provisioning again
     await this.startProvisioningSkeleton(tenant.id);
-    await this.recordAction('TENANT_PROVISIONING_RETRY', 'Tenant provisioning retry started', { tenantId });
+    await this.recordAction('TENANT_PROVISIONING_RETRY', 'Tenant provisioning retry started', user.id, ActivityLogActorType.PLATFORM_USER, { tenantId });
 
     return {
       message: 'Provisioning retry started',
@@ -473,6 +474,9 @@ export class PlatformService {
       level: 'INFO',
       message: 'Provisioning completed successfully',
     });
+
+    // trigger notification
+
   }
 
   private async markProvisioningFailed(
@@ -499,7 +503,7 @@ export class PlatformService {
     });
   }
   
-  async suspendTenant(tenantId: string) {
+  async suspendTenant(tenantId: string, user: any) {
     const tenant = await this.tenantRepo.findOne({
       where: { id: tenantId },
     });
@@ -514,7 +518,7 @@ export class PlatformService {
 
     tenant.status = TenantStatus.SUSPENDED;
     await this.tenantRepo.save(tenant);
-    await this.recordAction('TENANT_SUSPEND', 'Tenant suspended', { tenantId });
+    await this.recordAction('TENANT_SUSPEND', 'Tenant suspended', user.id, ActivityLogActorType.PLATFORM_USER, { tenantId });
 
     return {
       message: 'Tenant suspended successfully',
@@ -523,7 +527,7 @@ export class PlatformService {
     };
   }
 
-  async resumeTenant(tenantId: string) {
+  async resumeTenant(tenantId: string, user: any) {
     const tenant = await this.tenantRepo.findOne({
       where: { id: tenantId },
     });
@@ -540,7 +544,7 @@ export class PlatformService {
 
     tenant.status = TenantStatus.PROVISIONED;
     await this.tenantRepo.save(tenant);
-    await this.recordAction('TENANT_RESUME', 'Tenant resumed', { tenantId });
+    await this.recordAction('TENANT_RESUME', 'Tenant resumed', user.id, ActivityLogActorType.PLATFORM_USER, { tenantId });
 
     return {
       message: 'Tenant resumed successfully',
@@ -657,7 +661,7 @@ export class PlatformService {
 
   // tenant profile service
 
-  async getTenantProfile(tenantId: string) {
+  async getTenantProfile(tenantId: string, user: any) {
     const profile = await this.profilesRepo.findOne({
       where: { tenant: { id: tenantId } },
     });
@@ -666,11 +670,11 @@ export class PlatformService {
       throw new NotFoundException('Tenant profile not found');
     }
 
-    await this.recordAction('TENANT_PROFILE_GET', 'Tenant profile fetched', { tenantId });
+    await this.recordAction('TENANT_PROFILE_GET', 'Tenant profile fetched', user.id, ActivityLogActorType.PLATFORM_USER, { tenantId });
     return profile;
   }
 
-  async updateTenantProfile(tenantId: string, dto: UpdateTenantProfileDto) {
+  async updateTenantProfile(tenantId: string, dto: UpdateTenantProfileDto, user: any) {
     const profile = await this.profilesRepo.findOne({
       where: { tenant: { id: tenantId } },
     });
@@ -682,7 +686,7 @@ export class PlatformService {
     Object.assign(profile, dto);
 
     await this.profilesRepo.save(profile);
-    await this.recordAction('TENANT_PROFILE_UPDATE', 'Tenant profile updated', { tenantId });
+    await this.recordAction('TENANT_PROFILE_UPDATE', 'Tenant profile updated', user.id, ActivityLogActorType.PLATFORM_USER, { tenantId });
 
     return {
       message: 'Tenant profile updated successfully',
@@ -692,7 +696,7 @@ export class PlatformService {
 
   // tenant settings service
 
-  async getTenantSettings(tenantId: string) {
+  async getTenantSettings(tenantId: string, user: any) {
     const settings = await this.settingsRepo.findOne({
       where: { tenant: { id: tenantId } },
     });
@@ -701,11 +705,11 @@ export class PlatformService {
       throw new NotFoundException('Tenant settings not found');
     }
 
-    await this.recordAction('TENANT_SETTINGS_GET', 'Tenant settings fetched', { tenantId });
+    await this.recordAction('TENANT_SETTINGS_GET', 'Tenant settings fetched', user.id, ActivityLogActorType.PLATFORM_USER, { tenantId });
     return settings;
   }
 
-  async updateTenantSettings(tenantId: string, dto: UpdateTenantSettingsDto) {
+  async updateTenantSettings(tenantId: string, dto: UpdateTenantSettingsDto, user: any) {
     const settings = await this.settingsRepo.findOne({
       where: { tenant: { id: tenantId } },
     });
@@ -717,7 +721,7 @@ export class PlatformService {
     Object.assign(settings, dto);
 
     await this.settingsRepo.save(settings);
-    await this.recordAction('TENANT_SETTINGS_UPDATE', 'Tenant settings updated', { tenantId });
+    await this.recordAction('TENANT_SETTINGS_UPDATE', 'Tenant settings updated', user.id, ActivityLogActorType.PLATFORM_USER, { tenantId });
 
     return {
       message: 'Tenant settings updated successfully',
@@ -727,7 +731,7 @@ export class PlatformService {
 
   // tenant theme service
 
-  async getTenantThemes(tenantId: string) {
+  async getTenantThemes(tenantId: string, user: any) {
     const theme = await this.themesRepo.findOne({
       where: { tenant: { id: tenantId } },
     });
@@ -736,12 +740,12 @@ export class PlatformService {
       throw new NotFoundException('Tenant theme not found');
     }
 
-    await this.recordAction('TENANT_THEME_GET', 'Tenant theme fetched', { tenantId });
+    await this.recordAction('TENANT_THEME_GET', 'Tenant theme fetched', user.id, ActivityLogActorType.PLATFORM_USER, { tenantId });
     return theme;
   }
 
 
-  async updateTenantThemes(tenantId: string, dto: UpdateTenantThemeDto) {
+  async updateTenantThemes(tenantId: string, dto: UpdateTenantThemeDto, user: any) {
     const theme = await this.themesRepo.findOne({
       where: { tenant: { id: tenantId } },
     });
@@ -753,7 +757,7 @@ export class PlatformService {
     Object.assign(theme, dto);
 
     await this.themesRepo.save(theme);
-    await this.recordAction('TENANT_THEME_UPDATE', 'Tenant theme updated', { tenantId });
+    await this.recordAction('TENANT_THEME_UPDATE', 'Tenant theme updated', user.id, ActivityLogActorType.PLATFORM_USER, { tenantId });
 
     return {
       message: 'Tenant theme updated successfully',
@@ -763,6 +767,7 @@ export class PlatformService {
   async updateTenantLogo(
     tenantId: string,
     logo: Express.Multer.File,
+    user: any,
   ) {
     if (!logo) {
       throw new BadRequestException('Logo file is required');
@@ -784,11 +789,39 @@ export class PlatformService {
     profile.logoUrl = `/uploads/logos/${filename}`;
 
     await this.profilesRepo.save(profile);
-    await this.recordAction('TENANT_LOGO_UPDATE', 'Tenant logo updated', { tenantId, logoUrl: profile.logoUrl });
+    await this.recordAction('TENANT_LOGO_UPDATE', 'Tenant logo updated', user.id, ActivityLogActorType.PLATFORM_USER, { tenantId, logoUrl: profile.logoUrl });
 
     return {
       message: 'Tenant logo updated successfully',
       logoUrl: profile.logoUrl,
+    };
+  }
+
+  // get tenant geo policy
+
+  async getTenantGeoPolicy(tenantId: string, user: any) {
+    const geoPolicy = await this.geoPolicyRepo.findOne({
+      where: { tenant: { id: tenantId } },
+    });
+    if (!geoPolicy) {
+      throw new NotFoundException('Tenant geo policy not found');
+    }
+    await this.recordAction('TENANT_GEO_POLICY_GET', 'Tenant geo policy fetched', user.id, ActivityLogActorType.PLATFORM_USER, { tenantId });
+    return geoPolicy;
+  } 
+  async updateTenantGeoPolicy(tenantId: string, dto: UpdateTenantGeoPolicyDto, user: any) {
+    const geoPolicy = await this.geoPolicyRepo.findOne({
+      where: { tenant: { id: tenantId } },
+    });
+    if (!geoPolicy) {
+      throw new NotFoundException('Tenant geo policy not found');
+    }
+    Object.assign(geoPolicy, dto);
+    await this.geoPolicyRepo.save(geoPolicy);
+    await this.recordAction('TENANT_GEO_POLICY_UPDATE', 'Tenant geo policy updated', user.id, ActivityLogActorType.PLATFORM_USER, { tenantId });
+    return {
+      message: 'Tenant geo policy updated successfully',
+      geoPolicy,
     };
   }
 
@@ -805,7 +838,6 @@ export class PlatformService {
   }
 
 
-  // user, role CRUD
 
 
 }

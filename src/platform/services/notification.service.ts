@@ -55,6 +55,28 @@ export class NotificationService {
         return this.notificationRepo.save(notification);
     }
 
+    async generateNotification(payload: CreateNotificationDto) {
+        // to all platform users
+        const users = await this.platformUserRepo.find();
+        for (const user of users) {
+            await this.createNotification({
+                userId: user.id,
+                title: payload.title,
+                message: payload.message,
+                type: payload.type,
+            });
+
+            // trigger notification to user
+            await this.pusherService.trigger(
+                `platform-user`,
+                'notification.new',
+                {
+                    message: `New notification: ${payload.title}`,
+                }
+            );
+        }
+    }
+
     async markAsRead(id: string) {
         const notification = await this.notificationRepo.findOne({
             where: { id },

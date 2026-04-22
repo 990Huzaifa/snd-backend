@@ -11,6 +11,7 @@ import { RequirePermissions } from 'src/auth/require-permission.decorator';
 import { PermissionGuard } from 'src/auth/permission.guard';
 import { FileUploadService } from './services/file-upload.service';
 import { CurrentPlatformUser } from 'src/auth/current-platform-user.decorator';
+import { Req } from '@nestjs/common';
 
 @Controller('platform/tenant')
 export class PlatformController {
@@ -49,77 +50,77 @@ export class PlatformController {
 
   @UseGuards(JwtAuthGuard)
   @Post(':id/retry-provisioning')
-  async retryTenantProvisioning(@Param('id') tenantId: string) {
-    return this.platformService.retryProvisioning(tenantId);
+  async retryTenantProvisioning(@Param('id') tenantId: string, @Req() req: any) {
+    return this.platformService.retryProvisioning(tenantId, req.user);
   }
 
   @RequirePermissions('TENANT_VIEW')
   @UseGuards(JwtAuthGuard, PermissionGuard)
   @Get('/provisioning')
-  async provisioning() {
-    return this.platformService.getProvisioningList();
+  async provisioning(@Req() req: any) {
+    return this.platformService.getProvisioningList(req.user);
   }
 
   @UseGuards(JwtAuthGuard)
   @Get('/provisioning/:id')
-  async provisioningDetails(@Param('id') id: string) {
-    return this.platformService.getProvisioningDetails(id);
+  async provisioningDetails(@Param('id') id: string, @Req() req: any) {
+    return this.platformService.getProvisioningDetails(id, req.user);
   }
 
   @UseGuards(JwtAuthGuard)
   @Post(':id/suspend')
-  async suspend(@Param('id') id: string) {
-    return this.platformService.suspendTenant(id);
+  async suspend(@Param('id') id: string, @Req() req: any) {
+    return this.platformService.suspendTenant(id, req.user);
   }
 
   @UseGuards(JwtAuthGuard)
   @Post(':id/resume')
-  async resume(@Param('id') id: string) {
-    return this.platformService.resumeTenant(id);
+  async resume(@Param('id') id: string, @Req() req: any) {
+    return this.platformService.resumeTenant(id, req.user);
   }
 
 
   @UseGuards(JwtAuthGuard)
   @Get(':id/profile')
-  async getProfile(@Param('id') id: string) {
-    return this.platformService.getTenantProfile(id);
+  async getProfile(@Param('id') id: string, @Req() req: any) {
+    return this.platformService.getTenantProfile(id, req.user );
   }
 
   @UseGuards(JwtAuthGuard)
   @Put(':id/profile')
-  async updateProfile(@Param('id') id: string, @Body() dto: UpdateTenantProfileDto) {
-    return this.platformService.updateTenantProfile(id, dto);
+  async updateProfile(@Param('id') id: string, @Body() dto: UpdateTenantProfileDto, @Req() req: any) {
+    return this.platformService.updateTenantProfile(id, dto, req.user);
   }
 
   @UseGuards(JwtAuthGuard)
   @Get(':id/settings')
-  async getSettings(@Param('id') id: string) {
-    return this.platformService.getTenantSettings(id);
+  async getSettings(@Param('id') id: string, @Req() req: any) {
+    return this.platformService.getTenantSettings(id, req.user);
   }
 
   @UseGuards(JwtAuthGuard)
   @Put(':id/settings')
-  async updateSettings(@Param('id') id: string, @Body() dto: UpdateTenantSettingsDto) {
-    return this.platformService.updateTenantSettings(id, dto);
+  async updateSettings(@Param('id') id: string, @Body() dto: UpdateTenantSettingsDto, @Req() req: any) {
+    return this.platformService.updateTenantSettings(id, dto, req.user);
   }
 
   @UseGuards(JwtAuthGuard)
   @Get(':id/themes')
-  async getThemes(@Param('id') id: string) {
-    return this.platformService.getTenantThemes(id);
+  async getThemes(@Param('id') id: string, @Req() req: any) {
+    return this.platformService.getTenantThemes(id, req.user);
   }
 
   @UseGuards(JwtAuthGuard)
   @Put(':id/themes')
-  async getTheme(@Param('id') id: string, @Body() dto: UpdateTenantThemeDto) {
-    return this.platformService.updateTenantThemes(id, dto);
+  async getTheme(@Param('id') id: string, @Body() dto: UpdateTenantThemeDto, @Req() req: any) {
+    return this.platformService.updateTenantThemes(id, dto, req.user);
   }
 
   @UseGuards(JwtAuthGuard)
   @Post(':id/profile/logo')
   @UseInterceptors(FileInterceptor('logo', FileUploadService.prototype.multerConfig))
-  async uploadLogo(@Param('id') id: string, @UploadedFile() logo: Express.Multer.File) {
-    return this.platformService.updateTenantLogo(id, logo);
+  async uploadLogo(@Param('id') id: string, @UploadedFile() logo: Express.Multer.File, @Req() req: any) {
+    return this.platformService.updateTenantLogo(id, logo, req.user);
   }
 
 
