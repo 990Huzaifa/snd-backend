@@ -8,6 +8,8 @@ import { AuthService } from "src/auth/auth.service";
 import { UpdateAnnouncementDto } from "../dto/announcement/update-announcement.dto";
 import { ActivityLogService } from "./activity-log.service";
 import { ActivityLogActorType } from "src/master-db/entities/activity-log.entity";
+import { Tenant, TenantStatus } from "src/master-db/entities/tenant.entity";
+import { Plan } from "src/master-db/entities/plan.entity";
 
 @Injectable()
 export class AnnouncementService {
@@ -19,6 +21,10 @@ export class AnnouncementService {
         private readonly announcementPlanRepo: Repository<AnnouncementPlan>,
         @InjectRepository(AnnouncementTenant)
         private readonly announcementTenantRepo: Repository<AnnouncementTenant>,
+        @InjectRepository(Tenant)
+        private readonly tenantRepo: Repository<Tenant>,
+        @InjectRepository(Plan)
+        private readonly planRepo: Repository<Plan>,
         private readonly activityLogService: ActivityLogService,
     ) {
 
@@ -134,6 +140,17 @@ export class AnnouncementService {
                 throw new BadRequestException('Plan IDs are required for PLAN scope');
             }
 
+            // check if plan exists
+            for (const plan of announcement_plans) {
+                const planEntity = await this.planRepo.findOne({ where: { id: plan.id } });
+                if (!planEntity) {
+                    throw new BadRequestException('Plan not found');
+                }
+                if (planEntity.is_active === false) {
+                    throw new BadRequestException('Plan is not active');
+                }
+            }
+
             announcement.announcement_plans = announcement_plans.map((p) =>
                 this.announcementPlanRepo.create({
                     plan_id: p.plan_id,
@@ -146,6 +163,17 @@ export class AnnouncementService {
         if (createAnnouncementDto.targetScope === 'TENANT') {
             if (!Array.isArray(announcement_tenants) || announcement_tenants.length === 0) {
                 throw new BadRequestException('Tenant IDs are required for TENANT scope');
+            }
+
+            // check if tenant exists
+            for (const tenant of announcement_tenants) {
+                const tenantEntity = await this.tenantRepo.findOne({ where: { id: tenant.tenant_id } });
+                if (!tenantEntity) {
+                    throw new BadRequestException('Tenant not found');
+                }
+                if (tenantEntity.status !== TenantStatus.PROVISIONED) {
+                    throw new BadRequestException('Tenant is not provisioned');
+                }
             }
 
             announcement.announcement_tenants = announcement_tenants.map((t) =>

@@ -10,6 +10,8 @@ import {
 } from 'typeorm';
 
 import { PlatformUser } from './platform-user.entity';
+import { Plan } from './plan.entity';
+import { Tenant } from './tenant.entity';
 
 
 // ================= ENUMS =================
@@ -112,6 +114,10 @@ export class AnnouncementPlan {
 
     @Column({ type: 'int', nullable: true }) // nullable for GLOBAL
     plan_id: number | null;
+
+    @ManyToOne(() => Plan, { nullable: true, eager: true, onDelete: 'SET NULL' })
+    @JoinColumn({ name: 'plan_id' })
+    plan: Plan | null;
 }
 
 
@@ -131,4 +137,8 @@ export class AnnouncementTenant {
 
     @Column({ type: 'uuid', nullable: true }) // nullable for GLOBAL
     tenant_id: string | null;
+
+    @ManyToOne(() => Tenant, { nullable: true, eager: true, onDelete: 'SET NULL' })
+    @JoinColumn({ name: 'tenant_id' })
+    tenant: Tenant | null;
 }
