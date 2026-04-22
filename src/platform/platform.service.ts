@@ -182,8 +182,12 @@ export class PlatformService {
       where: { name: dto.name },
     });
 
-    if (nameExists) {
-      throw new ConflictException('Tenant name already exists');
+    const emailExists = await this.tenantRepo.findOne({
+      where: { email: dto.email },
+    });
+
+    if (nameExists || emailExists) {
+      throw new BadRequestException('Tenant name or email already exists');
     }
 
     // 2️⃣ Generate unique code
