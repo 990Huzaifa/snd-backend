@@ -2,9 +2,13 @@ import {
     Column,
     CreateDateColumn,
     Entity,
+    JoinColumn,
+    ManyToOne,
     PrimaryGeneratedColumn,
     UpdateDateColumn,
 } from 'typeorm';
+import { PlatformUser } from './platform-user.entity';
+import { Tenant } from './tenant.entity';
 
 export enum ActivityLogActorType {
     PLATFORM_USER = 'PLATFORM_USER',
@@ -22,11 +26,19 @@ export class ActivityLog {
     })
     actorType: ActivityLogActorType;
 
-    @Column({nullable: true })
+    @Column({ type: 'uuid', nullable: true })
     actorId: string | null;
 
-    @Column({nullable: true })
+    @ManyToOne(() => PlatformUser, { nullable: true, onDelete: 'SET NULL' })
+    @JoinColumn({ name: 'actorId' })
+    actor: PlatformUser | null;
+
+    @Column({ type: 'uuid', nullable: true })
     tenantId: string | null;
+
+    @ManyToOne(() => Tenant, { nullable: true, onDelete: 'SET NULL' })
+    @JoinColumn({ name: 'tenantId' })
+    tenant: Tenant | null;
 
     @Column()
     action: string;

@@ -49,6 +49,7 @@ import { NotificationController } from './controller/notification.controller';
 import { PusherService } from 'src/common/pusher/pusher.service';
 import { ActivityLog } from 'src/master-db/entities/activity-log.entity';
 import { ActivityLogService } from './services/activity-log.service';
+import { ActivityLogController } from './controller/activity-log.controller';
 
 @Module({
   imports: [
@@ -82,7 +83,7 @@ import { ActivityLogService } from './services/activity-log.service';
       City
     ]),
   ],
-  controllers: [PlatformController, PlatformUserController, CustomerController, PlanController, AddonController, ModuleController, SubscriptionController, AnnouncementController, UtilityController, NotificationController],
+  controllers: [PlatformController, PlatformUserController, CustomerController, PlanController, AddonController, ModuleController, SubscriptionController, AnnouncementController, UtilityController, NotificationController, ActivityLogController],
   providers: [PlatformService, ProvisioningAdminService, TenantDatabaseService, CustomerService, PlatformUserService, PlanService, AddonService, SubscriptionService, AnnouncementService, UtilityService, MailService, JwtService, ModuleService, NotificationService, PusherService, ActivityLogService],
 })
 export class PlatformModule {}

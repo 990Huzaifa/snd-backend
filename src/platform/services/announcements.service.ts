@@ -142,7 +142,7 @@ export class AnnouncementService {
 
             // check if plan exists
             for (const plan of announcement_plans) {
-                const planEntity = await this.planRepo.findOne({ where: { id: plan.id } });
+                const planEntity = await this.planRepo.findOne({ where: { id: plan.plan_id.toString() } });
                 if (!planEntity) {
                     throw new BadRequestException('Plan not found');
                 }
