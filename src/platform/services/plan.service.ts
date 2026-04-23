@@ -130,28 +130,27 @@ export class PlanService {
         // Update the plan properties
         Object.assign(plan, updatePlanDto);
 
-        // Handle limits update (adding new limits or updating existing ones)
+        // Handle limits update by replacing with the exact provided list.
+        // This allows multiple rows per plan, including repeated limitKey values.
         if (Array.isArray(updatePlanDto.plan_limits)) {
-            for (const limit of updatePlanDto.plan_limits) {
-                // Check if the limit already exists for the given plan
-                const existingLimit = plan.plan_limits.find(
-                    (pl) => pl.limitKey === limit.limitKey
-                );
+            if (plan.plan_limits?.length) {
+                await this.planLimitRepo.remove(plan.plan_limits);
+            }
 
-                if (existingLimit) {
-                    // If the limit exists, update it
-                    existingLimit.limitValue = limit.limitValue;
-                    await this.planLimitRepo.save(existingLimit);
-                } else {
-                    // If the limit does not exist, create a new one
-                    const planLimit = this.planLimitRepo.create({
-                        plan: plan,  // Use the current plan
+            if (updatePlanDto.plan_limits.length) {
+                const limits = updatePlanDto.plan_limits.map((limit) =>
+                    this.planLimitRepo.create({
+                        plan,
                         limitKey: limit.limitKey,
                         limitValue: limit.limitValue,
-                    });
-                    await this.planLimitRepo.save(planLimit);
-                }
+                    }),
+                );
+                await this.planLimitRepo.save(limits);
             }
+
+            plan.plan_limits = await this.planLimitRepo.find({
+                where: { plan: { id: plan.id } },
+            });
         }
 
         // Save the updated plan
