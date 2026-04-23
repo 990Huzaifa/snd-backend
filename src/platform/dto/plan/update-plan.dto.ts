@@ -1,5 +1,5 @@
 import { IsBoolean, IsOptional, IsString } from 'class-validator';
-import { PlanLimit } from 'src/master-db/entities/plan.entity';
+import { BillingCycle, PlanLimit } from 'src/master-db/entities/plan.entity';
 
 export class UpdatePlanDto {
     
@@ -29,11 +29,11 @@ export class UpdatePlanDto {
 
     @IsString()
     @IsOptional()
-    monthly_price?: number;
+    price?: string;
 
     @IsString()
     @IsOptional()
-    yearly_price?: number;
+    billing_cycle?: BillingCycle;
 
     @IsBoolean()
     @IsOptional()

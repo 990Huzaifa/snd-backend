@@ -24,7 +24,7 @@ export class CreatePlanDto {
     currency?: string;
 
     @IsNumber()
-    price: number;
+    price: string;
 
     @IsEnum(BillingCycle)
     billing_cycle: BillingCycle;

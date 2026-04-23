@@ -38,7 +38,7 @@ export class Plan {
     currency: string;
 
     @Column()
-    price: number;
+    price: string;
 
     @Column()
     billing_cycle: BillingCycle;
