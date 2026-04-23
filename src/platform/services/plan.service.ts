@@ -17,7 +17,7 @@ export class PlanService {
         private readonly activityLogService: ActivityLogService,
     ) { }
 
-    private async recordAction(action: string, description: string, actorId:string, metadata?: Record<string, any>) {
+    private async recordAction(action: string, description: string, actorId: string, metadata?: Record<string, any>) {
         await this.activityLogService.recordActivityLog({
             actorType: ActivityLogActorType.PLATFORM_USER,
             actorId: actorId,
@@ -33,7 +33,7 @@ export class PlanService {
             skip: skip,
             take: limit,
             order: { createdAt: 'ASC' },
-            relations: ['plan_limits'] 
+            relations: ['plan_limits']
         });
         await this.recordAction('PLAN_LIST', 'Plan list fetched', user.id, { page, limit, count: plans.length });
         return {
@@ -47,7 +47,7 @@ export class PlanService {
 
     async showPlan(id: string, user: any) {
         console.log('Fetching plan with id:', id);
-        const plan = await this.planRepo.findOne({ 
+        const plan = await this.planRepo.findOne({
             where: { id: id },
             relations: ['plan_limits']
         });
@@ -59,50 +59,43 @@ export class PlanService {
     }
 
     async createPlan(createPlanDto: CreatePlanDto, user: any) {
-        try {
-            const planExists = await this.planRepo.findOne({ where: { slug: createPlanDto.slug } });
-            if (planExists) {
-                throw new ConflictException('Plan already exists');
-            }
-
-            const plan = await this.planRepo.save(
-                this.planRepo.create({
-                    title: createPlanDto.title,
-                    slug: createPlanDto.slug,
-                    stripe_price_id: createPlanDto.stripe_price_id || null,
-                    payfast_price_id: createPlanDto.payfast_price_id || null,
-                    description: createPlanDto.description,
-                    currency: createPlanDto.currency,
-                    price: createPlanDto.price,
-                    billing_cycle: createPlanDto.billing_cycle,
-                    is_active: createPlanDto.is_active,
-                    is_display: createPlanDto.is_display,
-                }),
-            );
-
-            // Check if 'limits' is an array before proceeding
-            if (Array.isArray(createPlanDto.plan_limits)) {
-                // Use for...of to properly await async operations
-                for (const limit of createPlanDto.plan_limits) {
-                    const planLimit = this.planLimitRepo.create({
-                        plan: plan,  // Use the created plan directly
-                        limitKey: limit.limitKey,
-                        limitValue: limit.limitValue,
-                    });
-                    await this.planLimitRepo.save(planLimit);
-                }
-            } else if (createPlanDto.plan_limits) {
-                // If limits is not an array, handle the error case
-                throw new BadRequestException('Limits should be an array');
-            }
-            await this.recordAction('PLAN_CREATE', 'Plan created', user.id, { planId: plan.id, slug: plan.slug });
-            return plan;
-        } catch (error) {
-            return {
-                message: 'Plan creation failed',
-                error: error.message,
-            };
+        const planExists = await this.planRepo.findOne({ where: { slug: createPlanDto.slug } });
+        if (planExists) {
+            throw new ConflictException('Plan already exists');
         }
+
+        const plan = await this.planRepo.save(
+            this.planRepo.create({
+                title: createPlanDto.title,
+                slug: createPlanDto.slug,
+                stripe_price_id: createPlanDto.stripe_price_id || null,
+                payfast_price_id: createPlanDto.payfast_price_id || null,
+                description: createPlanDto.description,
+                currency: createPlanDto.currency,
+                price: createPlanDto.price,
+                billing_cycle: createPlanDto.billing_cycle,
+                is_active: createPlanDto.is_active,
+                is_display: createPlanDto.is_display,
+            }),
+        );
+
+        // Check if 'limits' is an array before proceeding
+        if (Array.isArray(createPlanDto.plan_limits)) {
+            // Use for...of to properly await async operations
+            for (const limit of createPlanDto.plan_limits) {
+                const planLimit = this.planLimitRepo.create({
+                    plan: plan,  // Use the created plan directly
+                    limitKey: limit.limitKey,
+                    limitValue: limit.limitValue,
+                });
+                await this.planLimitRepo.save(planLimit);
+            }
+        } else if (createPlanDto.plan_limits) {
+            // If limits is not an array, handle the error case
+            throw new BadRequestException('Limits should be an array');
+        }
+        await this.recordAction('PLAN_CREATE', 'Plan created', user.id, { planId: plan.id, slug: plan.slug });
+        return plan;
     }
 
     async updatePlan(id: string, updatePlanDto: UpdatePlanDto, user: any) {
@@ -131,7 +124,7 @@ export class PlanService {
             for (const limit of updatePlanDto.plan_limits) {
                 // Check if the limit already exists for the given plan
                 const existingLimit = plan.plan_limits.find(
-                    (pl) => pl.limitKey === limit.limitKey 
+                    (pl) => pl.limitKey === limit.limitKey
                 );
 
                 if (existingLimit) {
