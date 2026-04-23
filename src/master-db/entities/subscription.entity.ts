@@ -76,7 +76,7 @@ export class SubscriptionAddon {
     @JoinColumn({ name: 'subscription_id' })
     subscription: Subscription;
 
-    @ManyToOne(() => Addon, { onDelete: 'CASCADE', eager: true })
+    @ManyToOne(() => Addon, { onDelete: 'CASCADE'})
     @JoinColumn({ name: 'addon_id' })
     addon: Addon;
 
