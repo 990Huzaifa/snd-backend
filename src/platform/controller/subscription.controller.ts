@@ -41,7 +41,7 @@ export class SubscriptionController {
     }
 
     @Put('/:id/plan')
-    async updateSubscriptionPlan(@Param('id') id: number, @Body() planId: number, @Req() req: any) {
+    async updateSubscriptionPlan(@Param('id') id: number, @Query('planId') planId: number, @Req() req: any) {
         return this.subscriptionService.updateSubscriptionPlan(id, planId, req.user);
     }
 }
