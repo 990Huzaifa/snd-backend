@@ -24,6 +24,7 @@ import { Status, BillingModel, PaymentMode, CollectionType, Subscription } from 
 import { NotificationService } from './services/notification.service';
 import { ActivityLogService } from './services/activity-log.service';
 import { ActivityLogActorType } from 'src/master-db/entities/activity-log.entity';
+import { TenantModule } from 'src/master-db/entities/tenant-modules.entity';
 
 @Injectable()
 export class PlatformService {
@@ -50,7 +51,8 @@ export class PlatformService {
     private readonly platformRoleRepo: Repository<PlatformRole>,
     @InjectRepository(Subscription)
     private readonly subscriptionRepo: Repository<Subscription>,
-    
+    @InjectRepository(TenantModule)
+    private readonly tenantModuleRepo: Repository<TenantModule>,
     @InjectRepository(Plan)
     private readonly planRepo: Repository<Plan>,
 
@@ -847,6 +849,35 @@ export class PlatformService {
       geoPolicy,
     };
   }
+
+  // get tenant modules
+  async getTenantModules(tenantId: string, user: any) {
+    const modules = await this.tenantModuleRepo.find({
+      where: { tenant: { id: tenantId } },
+    });
+    await this.recordAction('TENANT_MODULES_GET', 'Tenant modules fetched', user.id, ActivityLogActorType.PLATFORM_USER, { tenantId });
+    return {
+      message: 'Tenant modules fetched successfully',
+      modules,
+    };
+  }
+
+  async updateTenantModuleStatus(tenantId: string, moduleId: string, isActive: boolean, user: any) {
+    const module = await this.tenantModuleRepo.findOne({
+      where: { tenant: { id: tenantId }, module: { id: moduleId } },
+    });
+    if (!module) {
+      throw new NotFoundException('Tenant module not found');
+    }
+    module.enabled = isActive;
+    await this.tenantModuleRepo.save(module);
+    await this.recordAction('TENANT_MODULE_STATUS_UPDATE', 'Tenant module status updated', user.id, ActivityLogActorType.PLATFORM_USER, { tenantId, moduleId, status });
+    return {
+      message: 'Tenant module status updated successfully',
+      module,
+    };
+  }
+
 
   private generateStrongPassword(length = 16): string {
     const chars =

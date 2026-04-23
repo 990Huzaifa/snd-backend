@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, NotFoundException, UseGuards, Put, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, NotFoundException, UseGuards, Put, UseInterceptors, UploadedFile, Query } from '@nestjs/common';
 import { PlatformService } from './platform.service';
 import { ResolveTenantDto } from './dto/resolve-tenant.dto';
 import { CreateTenantDto } from './dto/create-tenant.dto';
@@ -141,6 +141,18 @@ export class PlatformController {
   @Put(':id/geo-policy')
   async updateGeoPolicy(@Param('id') id: string, @Body() dto: UpdateTenantGeoPolicyDto, @Req() req: any) {
     return this.platformService.updateTenantGeoPolicy(id, dto, req.user);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get(':id/modules')
+  async getTenantModules(@Param('id') id: string, @Req() req: any) {
+    return this.platformService.getTenantModules(id, req.user);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Put(':id/modules/:moduleId/status')
+  async updateTenantModuleStatus(@Param('id') id: string, @Param('moduleId') moduleId: string, @Query('isActive') isActive: boolean, @Req() req: any) {
+    return this.platformService.updateTenantModuleStatus(id, moduleId, isActive, req.user);
   }
 
 }
