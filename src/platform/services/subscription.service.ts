@@ -133,7 +133,7 @@ export class SubscriptionService {
         }
         await this.subscriptionAddonRepo.remove(subscriptionAddon);
         await this.recordAction('SUBSCRIPTION_ADDON_REMOVE', 'Addon removed from subscription', userId, { subscriptionId, addonId });
-        return subscriptionAddon;
+        return "Addon removed from subscription";
     }
 
 
@@ -156,6 +156,10 @@ export class SubscriptionService {
         subscription.plan = plan;
         await this.subscriptionRepo.update(subscriptionId, { plan: plan });
         await this.recordAction('SUBSCRIPTION_PLAN_UPDATE', 'Subscription plan updated', user.id, { subscriptionId, planId });
-        return subscription;
+        return {
+            message: 'Subscription plan updated',
+            subscription: subscription,
+            plan: plan,
+        };
     }
 }
