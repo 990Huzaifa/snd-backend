@@ -73,7 +73,7 @@ export class SubscriptionService {
     async getSubscriptionById(id: number, userId:string) {
         const subscription = await this.subscriptionRepo.findOne({
             where: { id },
-            relations: ['plan', 'tenant', 'subscriptionAddons'],
+            relations: ['plan', 'tenant', 'subscriptionAddons', 'subscriptionAddons.addon'],
         });
         if (!subscription) {
             throw new NotFoundException('Subscription not found');
