@@ -30,7 +30,6 @@ export class SubscriptionService {
             order: { createdAt: 'DESC' },
             skip,
             take: limit,
-            relations: ['plan', 'tenant'],
         });
         await this.recordAction('SUBSCRIPTION_LIST', 'Subscription list fetched', userId, { page, limit, total });
         return {
@@ -43,14 +42,15 @@ export class SubscriptionService {
         };
     }
 
-    async getSubscriptionById(id: number) {
+    async getSubscriptionById(id: number, userId:string) {
         const subscription = await this.subscriptionRepo.findOne({
             where: { id },
-            relations: ['plan', 'tenant'],
+            relations: ['plan', 'tenant', 'subscriptionAddons'],
         });
         if (!subscription) {
             throw new NotFoundException('Subscription not found');
         }
+        await this.recordAction('SUBSCRIPTION_GET', 'Subscription fetched', userId, { subscriptionId: id });
         return subscription;
     }
 

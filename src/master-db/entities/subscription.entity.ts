@@ -1,4 +1,4 @@
-import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, OneToOne, PrimaryGeneratedColumn, UpdateDateColumn } from "typeorm";
+import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, OneToMany, OneToOne, PrimaryGeneratedColumn, UpdateDateColumn } from "typeorm";
 import { Tenant } from "./tenant.entity";
 import { Plan } from "./plan.entity";
 import { Addon } from "./addon.entity";
@@ -37,6 +37,9 @@ export class Subscription {
 
     @ManyToOne(() => Plan, { onDelete: 'CASCADE' })
     plan: Plan;
+
+    @OneToMany(() => SubscriptionAddon, (subscriptionAddon) => subscriptionAddon.subscription)
+    subscriptionAddons: SubscriptionAddon[];
 
     @Column({ type: 'enum', enum: BillingModel })
     billingModel: BillingModel;

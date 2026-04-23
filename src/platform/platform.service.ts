@@ -175,6 +175,18 @@ export class PlatformService {
     };
   }
 
+  async getTenant(tenantId: string, user: any) {
+    const tenant = await this.tenantRepo.findOne({
+      where: { id: tenantId },
+      relations: ['profile', 'modules'] 
+    });
+    if(!tenant) {
+      throw new NotFoundException('Tenant not found');
+    }
+    await this.recordAction('TENANT_GET', 'Tenant fetched', user.id, ActivityLogActorType.PLATFORM_USER, { tenantId });
+    return tenant;
+  }
+
 
   async createTenant(dto: CreateTenantDto,user: any) {
     // 1️⃣ Subdomain uniqueness check
@@ -219,7 +231,7 @@ export class PlatformService {
       subscription.status = Status.ACTIVE;
       subscription.expiresAt = expiry;
       subscription.cancelledAt = null;
-
+      // console.log(subscription);
       await this.subscriptionRepo.save(subscription);
     }
 

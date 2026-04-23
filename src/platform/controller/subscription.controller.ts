@@ -1,4 +1,4 @@
-import { Controller, Get, Query, UseGuards } from "@nestjs/common";
+import { Controller, Get, Param, Query, UseGuards } from "@nestjs/common";
 import { SubscriptionService } from "../services/subscription.service";
 import { PermissionGuard } from "src/auth/permission.guard";
 import { JwtAuthGuard } from "src/auth/jwt-auth.guard";
@@ -14,5 +14,10 @@ export class SubscriptionController {
     @Get('/')
     async getSubscriptions(@Query('page') page: number = 1, @Query('limit') limit: number = 10, @CurrentPlatformUser() user: any) {
         return this.subscriptionService.getSubscriptions(page, limit, user.id);
+    }
+
+    @Get('/:id')
+    async getSubscriptionById(@Param('id') id: number, @CurrentPlatformUser() user: any) {
+        return this.subscriptionService.getSubscriptionById(id, user.id);
     }
 }

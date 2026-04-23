@@ -62,6 +62,13 @@ export class PlatformController {
     return this.platformService.getProvisioningList(req.user);
   }
 
+  @RequirePermissions('TENANT_VIEW')
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @Get(':id')
+  async getTenant(@Param('id') id: string, @Req() req: any) {
+    return this.platformService.getTenant(id, req.user);
+  }
+
   @UseGuards(JwtAuthGuard)
   @Get('/provisioning/:id')
   async provisioningDetails(@Param('id') id: string, @Req() req: any) {

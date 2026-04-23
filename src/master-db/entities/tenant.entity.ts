@@ -5,8 +5,11 @@ import {
     CreateDateColumn,
     UpdateDateColumn,
     OneToOne,
+    OneToMany,
 } from 'typeorm';
 import { TenantDbConfig } from './tenant-db-config.entity';
+import { TenantProfile } from './tenant-profile.entity';
+import { TenantModule } from './tenant-modules.entity';
 
 export enum TenantStatus {
     REGISTERED = 'REGISTERED',
@@ -64,4 +67,10 @@ export class Tenant {
 
     @UpdateDateColumn()
     updatedAt: Date;
+
+    @OneToOne(() => TenantProfile, (profile) => profile.tenant)
+    profile: TenantProfile;
+
+    @OneToMany(() => TenantModule, (module) => module.tenant)
+    modules: TenantModule[];
 }

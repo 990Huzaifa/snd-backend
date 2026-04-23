@@ -34,7 +34,7 @@ import { Plan, PlanLimit } from 'src/master-db/entities/plan.entity';
 import { PlatformUserService } from './services/platform-user.service';
 import { PlatformUserController } from './controller/platform-user.controller';
 import { PlatformPermission } from 'src/master-db/entities/platform-premission.entity';
-import { Subscription } from 'src/master-db/entities/subscription.entity';
+import { Subscription, SubscriptionAddon } from 'src/master-db/entities/subscription.entity';
 import { SubscriptionController } from './controller/subscription.controller';
 import { SubscriptionService } from './services/subscription.service';
 import { AddonController } from './controller/addon.controller';
@@ -50,6 +50,7 @@ import { PusherService } from 'src/common/pusher/pusher.service';
 import { ActivityLog } from 'src/master-db/entities/activity-log.entity';
 import { ActivityLogService } from './services/activity-log.service';
 import { ActivityLogController } from './controller/activity-log.controller';
+import { TenantModule } from 'src/master-db/entities/tenant-modules.entity';
 
 @Module({
   imports: [
@@ -61,6 +62,7 @@ import { ActivityLogController } from './controller/activity-log.controller';
       TenantSettings,
       TenantProfile,
       TenantGeoPolicy,
+      TenantModule,
       TenantTheme,
       TenantDbConfig,
       PlatformPermission,
@@ -75,6 +77,7 @@ import { ActivityLogController } from './controller/activity-log.controller';
       ModuleEntity,
       PlanLimit,
       Subscription,
+      SubscriptionAddon,
       Notification,
       ActivityLog,
       Announcement,
