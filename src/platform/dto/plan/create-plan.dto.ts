@@ -1,5 +1,7 @@
-import { IsBoolean, IsEnum, IsNumber, IsOptional, IsString } from 'class-validator';
-import { BillingCycle, PlanLimit } from 'src/master-db/entities/plan.entity';
+import { Type } from 'class-transformer';
+import { IsArray, IsBoolean, IsEnum, IsNumber, IsOptional, IsString, ValidateNested } from 'class-validator';
+import { BillingCycle } from 'src/master-db/entities/plan.entity';
+import { PlanLimitDto } from './plan-limit.dto';
 
 export class CreatePlanDto {
     
@@ -36,7 +38,9 @@ export class CreatePlanDto {
     is_display?: boolean;
 
     @IsOptional()
-    @IsString({ each: true })
-    plan_limits?: PlanLimit[];
+    @IsArray()
+    @ValidateNested({ each: true })
+    @Type(() => PlanLimitDto)
+    plan_limits?: PlanLimitDto[];
 
 }
