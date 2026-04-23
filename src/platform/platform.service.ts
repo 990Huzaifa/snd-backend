@@ -233,7 +233,7 @@ export class PlatformService {
       subscription.plan = plan;
       subscription.billingModel = BillingModel.SELF_SERVE;
       subscription.paymentMode = PaymentMode.OFFLINE;
-      subscription.collectionType = CollectionType.MANUAL;
+      subscription.collectionType = CollectionType.AUTO;
 
       subscription.status = Status.ACTIVE;
       subscription.expiresAt = expiry;

@@ -1,4 +1,4 @@
-import { Column, CreateDateColumn, Entity, JoinColumn, OneToOne, PrimaryGeneratedColumn, UpdateDateColumn } from "typeorm";
+import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn } from "typeorm";
 import { Tenant } from "./tenant.entity";
 import { Subscription } from "./subscription.entity";
 
@@ -15,11 +15,11 @@ export class Invoice {
     @PrimaryGeneratedColumn()
     id: number;
 
-    @OneToOne(() => Tenant, { onDelete: 'CASCADE' })
+    @ManyToOne(() => Tenant, { onDelete: 'CASCADE' })
     @JoinColumn({ name: 'tenant_id' })
     tenant: Tenant
 
-    @OneToOne(() => Subscription, { onDelete: 'CASCADE' })
+    @ManyToOne(() => Subscription, { onDelete: 'CASCADE' })
     @JoinColumn({ name: 'subscription_id' })
     subscription: Subscription;
 
@@ -55,7 +55,7 @@ export class InvoiceItem {
     @PrimaryGeneratedColumn()
     id: number;
 
-    @OneToOne(() => Invoice, { onDelete: 'CASCADE' })
+    @ManyToOne(() => Invoice, { onDelete: 'CASCADE' })
     @JoinColumn({ name: 'invoice_id' })
     invoice: Invoice;
 

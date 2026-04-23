@@ -49,7 +49,7 @@ export class InvoiceService {
   }
 
   // Test cron: runs every minute only when INVOICE_TEST_CRON_ENABLED=true.
-  @Cron(CronExpression.EVERY_10_HOURS)
+  @Cron(CronExpression.EVERY_MINUTE)
   async testInvoiceCronJob() {
     if (process.env.INVOICE_TEST_CRON_ENABLED !== 'true') {
       return;
@@ -76,6 +76,7 @@ export class InvoiceService {
       const dueSubscriptions = await this.subscriptionRepo.find({
         where: {
           status: SubscriptionStatus.ACTIVE,
+          collectionType: CollectionType.AUTO,
           expiresAt: LessThanOrEqual(now),
         },
         relations: ['tenant', 'plan', 'subscriptionAddons', 'subscriptionAddons.addon'],
@@ -101,12 +102,8 @@ export class InvoiceService {
   }
 
   private async createRenewalInvoice(subscription: Subscription) {
-    const existingInvoice = await this.invoiceRepo.findOne({
-      where: { subscription: { id: subscription.id } },
-      relations: ['subscription'],
-    });
-
-    const subTotalAmount = this.calculateSubtotal(subscription.plan, subscription.subscriptionAddons ?? []);
+    const lineItems = this.buildInvoiceLineItems(subscription);
+    const subTotalAmount = lineItems.reduce((sum, item) => sum + item.totalAmount, 0);
     const taxAmount = 0;
     const totalAmount = subTotalAmount + taxAmount;
 
@@ -114,7 +111,6 @@ export class InvoiceService {
     const dueDate = this.addDays(issueDate, 7);
 
     const invoice = await this.invoiceRepo.save({
-      id: existingInvoice?.id,
       tenant: subscription.tenant,
       subscription,
       status: InvoiceStatus.ISSUE,
@@ -125,35 +121,44 @@ export class InvoiceService {
       totalAmount,
     });
 
-    const addonsCount = (subscription.subscriptionAddons ?? []).length;
-    const itemName = addonsCount > 0
-      ? `${subscription.plan.title} + ${addonsCount} addon(s)`
-      : subscription.plan.title;
-
-    const existingInvoiceItem = await this.invoiceItemRepo.findOne({
-      where: { invoice: { id: invoice.id } },
-      relations: ['invoice'],
-    });
-
-    await this.invoiceItemRepo.save({
-      id: existingInvoiceItem?.id,
-      invoice,
-      name: itemName,
-      quantity: 1,
-      unitPrice: totalAmount,
-      totalAmount,
-    });
+    await this.invoiceItemRepo.save(
+      lineItems.map((item) =>
+        this.invoiceItemRepo.create({
+          invoice,
+          name: item.name,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          totalAmount: item.totalAmount,
+        }),
+      ),
+    );
 
     subscription.expiresAt = this.nextRenewalDate(subscription.expiresAt, subscription.plan);
     await this.subscriptionRepo.save(subscription);
   }
 
-  private calculateSubtotal(plan: Plan, addons: Subscription['subscriptionAddons']) {
-    const planAmount = this.toAmount(plan.price);
-    const addonsTotal = addons.reduce((sum, addon) => {
-      return sum + this.toAmount(addon.addon.price) * addon.quantity;
-    }, 0);
-    return planAmount + addonsTotal;
+  private buildInvoiceLineItems(subscription: Subscription) {
+    const items = [
+      {
+        name: subscription.plan.title,
+        quantity: 1,
+        unitPrice: this.toAmount(subscription.plan.price),
+        totalAmount: this.toAmount(subscription.plan.price),
+      },
+    ];
+
+    for (const addon of subscription.subscriptionAddons ?? []) {
+      const quantity = addon.quantity > 0 ? addon.quantity : 1;
+      const unitPrice = this.toAmount(addon.addon.price);
+      items.push({
+        name: addon.addon.name,
+        quantity,
+        unitPrice,
+        totalAmount: unitPrice * quantity,
+      });
+    }
+
+    return items;
   }
 
   private toAmount(value: string) {
