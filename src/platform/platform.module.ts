@@ -51,6 +51,9 @@ import { ActivityLog } from 'src/master-db/entities/activity-log.entity';
 import { ActivityLogService } from './services/activity-log.service';
 import { ActivityLogController } from './controller/activity-log.controller';
 import { TenantModule } from 'src/master-db/entities/tenant-modules.entity';
+import { Invoice, InvoiceItem } from 'src/master-db/entities/invoice.entity';
+import { InvoiceController } from './controller/invoice.controller';
+import { InvoiceService } from './services/invoice.service';
 
 @Module({
   imports: [
@@ -80,13 +83,15 @@ import { TenantModule } from 'src/master-db/entities/tenant-modules.entity';
       SubscriptionAddon,
       Notification,
       ActivityLog,
+      Invoice,
+      InvoiceItem,
       Announcement,
       Country,
       State,
       City
     ]),
   ],
-  controllers: [PlatformController, PlatformUserController, CustomerController, PlanController, AddonController, ModuleController, SubscriptionController, AnnouncementController, UtilityController, NotificationController, ActivityLogController],
-  providers: [PlatformService, ProvisioningAdminService, TenantDatabaseService, CustomerService, PlatformUserService, PlanService, AddonService, SubscriptionService, AnnouncementService, UtilityService, MailService, JwtService, ModuleService, NotificationService, PusherService, ActivityLogService],
+  controllers: [PlatformController, PlatformUserController, CustomerController, PlanController, AddonController, ModuleController, SubscriptionController, AnnouncementController, UtilityController, NotificationController, ActivityLogController, InvoiceController],
+  providers: [PlatformService, ProvisioningAdminService, TenantDatabaseService, CustomerService, PlatformUserService, PlanService, AddonService, SubscriptionService, AnnouncementService, UtilityService, MailService, JwtService, ModuleService, NotificationService, PusherService, ActivityLogService, InvoiceService],
 })
 export class PlatformModule {}
