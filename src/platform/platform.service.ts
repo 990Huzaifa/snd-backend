@@ -118,6 +118,11 @@ export class PlatformService {
           lastJobStatus: lastJob?.status ?? null,
           lastError: lastJob?.errorMessage ?? null,
           lastUpdatedAt: lastJob?.finishedAt ?? tenant.updatedAt,
+          tenantDisplayName: tenant.profile.displayName,
+          tenantPhone: tenant.profile.phone,
+          tenantAddress: tenant.profile.address,
+          tenantSupportEmail: tenant.profile.supportEmail,
+          tenantIndustryType: tenant.industryType,
         };
       }),
     );

@@ -6,6 +6,7 @@ import {
     UpdateDateColumn,
     OneToOne,
     OneToMany,
+    JoinColumn,
 } from 'typeorm';
 import { TenantDbConfig } from './tenant-db-config.entity';
 import { TenantProfile } from './tenant-profile.entity';
@@ -68,7 +69,9 @@ export class Tenant {
     @UpdateDateColumn()
     updatedAt: Date;
 
-    @OneToOne(() => TenantProfile, (profile) => profile.tenant)
+    @OneToOne(() => TenantProfile, (profile) => profile.tenant, {
+        eager: true,
+    })
     profile: TenantProfile;
 
     @OneToMany(() => TenantModule, (module) => module.tenant)
