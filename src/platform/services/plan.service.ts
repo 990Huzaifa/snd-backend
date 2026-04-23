@@ -127,34 +127,34 @@ export class PlanService {
             }
         }
 
-        // Update the plan properties
-        Object.assign(plan, updatePlanDto);
+        const { plan_limits, ...planFields } = updatePlanDto;
 
-        // Handle limits update by replacing with the exact provided list.
-        // This allows multiple rows per plan, including repeated limitKey values.
-        if (Array.isArray(updatePlanDto.plan_limits)) {
-            if (plan.plan_limits?.length) {
-                await this.planLimitRepo.remove(plan.plan_limits);
+        // Save plan + replace limits atomically.
+        await this.planRepo.manager.transaction(async (manager) => {
+            Object.assign(plan, planFields);
+            await manager.save(Plan, plan);
+
+            // Replace limits by plan ID to avoid stale relation state issues.
+            if (Array.isArray(plan_limits)) {
+                await manager.delete(PlanLimit, { plan: { id: plan.id } });
+
+                if (plan_limits.length) {
+                    const limits = plan_limits.map((limit) =>
+                        manager.create(PlanLimit, {
+                            plan: { id: plan.id } as Plan,
+                            limitKey: limit.limitKey,
+                            limitValue: limit.limitValue,
+                        }),
+                    );
+                    await manager.save(PlanLimit, limits);
+                }
             }
+        });
 
-            if (updatePlanDto.plan_limits.length) {
-                const limits = updatePlanDto.plan_limits.map((limit) =>
-                    this.planLimitRepo.create({
-                        plan,
-                        limitKey: limit.limitKey,
-                        limitValue: limit.limitValue,
-                    }),
-                );
-                await this.planLimitRepo.save(limits);
-            }
+        plan.plan_limits = await this.planLimitRepo.find({
+            where: { plan: { id: plan.id } },
+        });
 
-            plan.plan_limits = await this.planLimitRepo.find({
-                where: { plan: { id: plan.id } },
-            });
-        }
-
-        // Save the updated plan
-        await this.planRepo.save(plan);
         await this.recordAction('PLAN_UPDATE', 'Plan updated', user.id, { planId: id });
 
         return plan;
