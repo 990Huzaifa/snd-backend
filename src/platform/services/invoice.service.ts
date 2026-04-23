@@ -76,7 +76,7 @@ export class InvoiceService {
       const dueSubscriptions = await this.subscriptionRepo.find({
         where: {
           status: SubscriptionStatus.ACTIVE,
-          // expiresAt: LessThanOrEqual(now),
+          expiresAt: LessThanOrEqual(now),
         },
         relations: ['tenant', 'plan', 'subscriptionAddons', 'subscriptionAddons.addon'],
       });
