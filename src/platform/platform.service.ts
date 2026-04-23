@@ -20,7 +20,7 @@ import { PlatformUser } from 'src/master-db/entities/platform-user.entity';
 import { PlatformRole } from 'src/master-db/entities/platform-role.entity';
 import { TenantGeoPolicy } from 'src/master-db/entities/tenant-geo-policy.entity';
 import { Plan } from 'src/master-db/entities/plan.entity';
-import { Status, BillingCycle, BillingModel, PaymentMode, CollectionType, Subscription } from 'src/master-db/entities/subscription.entity';
+import { Status, BillingModel, PaymentMode, CollectionType, Subscription } from 'src/master-db/entities/subscription.entity';
 import { NotificationService } from './services/notification.service';
 import { ActivityLogService } from './services/activity-log.service';
 import { ActivityLogActorType } from 'src/master-db/entities/activity-log.entity';
@@ -208,11 +208,10 @@ export class PlatformService {
     const plan = await this.planRepo.findOne({ where: { id: dto.planId } });
 
     if(plan) {
-      const expiry = plan.monthly_price > 0 ? new Date(new Date().setMonth(new Date().getMonth() + 1)) : new Date(new Date().setFullYear(new Date().getFullYear() + 1))
+      const expiry = plan.billing_cycle === "MONTHLY" ? new Date(new Date().setMonth(new Date().getMonth() + 1)) : new Date(new Date().setFullYear(new Date().getFullYear() + 1))
       const subscription = new Subscription();
       subscription.tenant = tenant;
       subscription.plan = plan;
-      subscription.billingCycle = dto.billingCycle;
       subscription.billingModel = BillingModel.SELF_SERVE;
       subscription.paymentMode = PaymentMode.OFFLINE;
       subscription.collectionType = CollectionType.MANUAL;

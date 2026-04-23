@@ -1,5 +1,5 @@
-import { IsBoolean, IsOptional, IsString } from 'class-validator';
-import { PlanLimit } from 'src/master-db/entities/plan.entity';
+import { IsBoolean, IsEnum, IsNumber, IsOptional, IsString } from 'class-validator';
+import { BillingCycle, PlanLimit } from 'src/master-db/entities/plan.entity';
 
 export class CreatePlanDto {
     
@@ -23,13 +23,11 @@ export class CreatePlanDto {
     @IsString()
     currency?: string;
 
-    @IsString()
-    @IsOptional()
-    monthly_price?: number;
+    @IsNumber()
+    price: number;
 
-    @IsString()
-    @IsOptional()
-    yearly_price?: number;
+    @IsEnum(BillingCycle)
+    billing_cycle: BillingCycle;
 
     @IsBoolean()
     is_active?: boolean;

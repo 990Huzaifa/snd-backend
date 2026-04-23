@@ -7,7 +7,6 @@ import {
 } from 'class-validator';
 
 import {
-    BillingCycle,
     BillingModel,
     PaymentMode,
     CollectionType,
@@ -22,9 +21,6 @@ export class CreateSubscriptionDto {
 
     @IsNotEmpty()
     tenant_id: string;
-
-    @IsEnum(BillingCycle)
-    billingCycle: BillingCycle;
 
     @IsEnum(BillingModel)
     billingModel: BillingModel;

@@ -9,10 +9,6 @@ export enum Status {
     SUSPENDED = 'SUSPENDED',
     EXPIRED = 'EXPIRED',
 }
-export enum BillingCycle {
-    MONTHLY = 'MONTHLY',
-    YEARLY = 'YEARLY',
-}
 
 export enum BillingModel {
     SELF_SERVE = 'SELF_SERVE',
@@ -41,9 +37,6 @@ export class Subscription {
 
     @ManyToOne(() => Plan, { onDelete: 'CASCADE' })
     plan: Plan;
-
-    @Column({ type: 'enum', enum: BillingCycle })
-    billingCycle: BillingCycle;
 
     @Column({ type: 'enum', enum: BillingModel })
     billingModel: BillingModel;

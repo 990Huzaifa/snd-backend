@@ -5,6 +5,10 @@ export enum LIMIT_KEY {
     STORAGE = 'STORAGE',
 }
 
+export enum BillingCycle {
+    MONTHLY = 'MONTHLY',
+    YEARLY = 'YEARLY',
+}
 
 @Entity({ name: 'plans' })
 export class Plan {
@@ -34,10 +38,10 @@ export class Plan {
     currency: string;
 
     @Column()
-    monthly_price: number;
+    price: number;
 
     @Column()
-    yearly_price: number;
+    billing_cycle: BillingCycle;
 
     @Column()
     is_active: boolean;
