@@ -140,6 +140,7 @@ export class SubscriptionService {
     // for plan
 
     async updateSubscriptionPlan(subscriptionId: number, planId: any, user: any) {
+        planId = planId.toString();
         const subscription = await this.subscriptionRepo.findOne({
             where: { id: subscriptionId },
             relations: ['plan'],
