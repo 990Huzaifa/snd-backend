@@ -1,11 +1,5 @@
 import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn } from "typeorm";
 
-
-export enum BillingCycle {
-    MONTHLY = 'MONTHLY',
-    YEARLY = 'YEARLY',
-}
-
 @Entity({ name: 'addons' })
 export class Addon {
 
@@ -31,16 +25,10 @@ export class Addon {
     price: string;
 
     @Column()
-    billing_cycle: BillingCycle;
-
-    @Column()
     limitKey: string;
 
     @Column()
     limitValue: number;
-
-    @Column()
-    currency: string;
 
     @Column()
     is_active: boolean;

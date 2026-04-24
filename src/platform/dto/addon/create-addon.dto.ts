@@ -4,9 +4,7 @@ import {
     IsOptional,
     IsNumber,
     IsBoolean,
-    IsEnum,
 } from 'class-validator';
-import { BillingCycle } from 'src/master-db/entities/addon.entity';
 
 export class CreateAddonDto {
 
@@ -33,19 +31,12 @@ export class CreateAddonDto {
     @IsNumber()
     price: string;
 
-    @IsEnum(BillingCycle)
-    billing_cycle: BillingCycle;
-
     @IsString()
     @IsNotEmpty()
     limitKey: string;
 
     @IsNumber()
     limitValue: number;
-
-    @IsString()
-    @IsNotEmpty()
-    currency: string;
 
     @IsBoolean()
     is_active: boolean;
