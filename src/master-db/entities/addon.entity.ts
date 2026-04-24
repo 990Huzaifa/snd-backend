@@ -1,5 +1,6 @@
 import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn } from "typeorm";
 
+
 @Entity({ name: 'addons' })
 export class Addon {
 
@@ -30,7 +31,10 @@ export class Addon {
     @Column()
     limitValue: number;
 
-    @Column()
+    @Column({default: 'PKR'})
+    currency: string;
+
+    @Column({default: true})
     is_active: boolean;
 
     @CreateDateColumn()

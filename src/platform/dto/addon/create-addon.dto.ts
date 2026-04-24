@@ -38,6 +38,10 @@ export class CreateAddonDto {
     @IsNumber()
     limitValue: number;
 
+    @IsString()
+    @IsNotEmpty()
+    currency: string;
+
     @IsBoolean()
     is_active: boolean;
 }
