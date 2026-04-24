@@ -1,4 +1,4 @@
-import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn } from "typeorm";
+import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn } from "typeorm";
 import { Tenant } from "./tenant.entity";
 import { Subscription } from "./subscription.entity";
 
@@ -46,6 +46,9 @@ export class Invoice {
 
     @UpdateDateColumn()
     updatedAt: Date;
+
+    @OneToMany(() => InvoiceItem, (invoiceItem) => invoiceItem.invoice)
+    invoiceItems: InvoiceItem[];
 
 }
 

@@ -1,10 +1,12 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
+import { ActivityLogActorType } from 'src/master-db/entities/activity-log.entity';
 import { Invoice, InvoiceItem, Status as InvoiceStatus } from 'src/master-db/entities/invoice.entity';
 import { BillingCycle, Plan } from 'src/master-db/entities/plan.entity';
 import { CollectionType, Status as SubscriptionStatus, Subscription } from 'src/master-db/entities/subscription.entity';
 import { LessThanOrEqual, Repository } from 'typeorm';
+import { ActivityLogService } from './activity-log.service';
 
 @Injectable()
 export class InvoiceService {
@@ -18,9 +20,22 @@ export class InvoiceService {
     private readonly invoiceItemRepo: Repository<InvoiceItem>,
     @InjectRepository(Subscription)
     private readonly subscriptionRepo: Repository<Subscription>,
+    private readonly activityLogService: ActivityLogService,
   ) {}
 
-  async getInvoices(page = 1, limit = 10) {
+
+  private async recordAction(action: string, description: string, actorId:string , metadata?: Record<string, any> ) {
+    await this.activityLogService.recordActivityLog({
+        actorType: ActivityLogActorType.PLATFORM_USER,
+        actorId: actorId,
+        action,
+        description,
+        metadata: metadata ?? null,
+    });
+}
+
+
+  async getInvoices(page = 1, limit = 10, user: any) {
     const safePage = Number(page) > 0 ? Number(page) : 1;
     const safeLimit = Number(limit) > 0 ? Number(limit) : 10;
     const skip = (safePage - 1) * safeLimit;
@@ -32,6 +47,8 @@ export class InvoiceService {
       take: safeLimit,
     });
 
+    await this.recordAction('INVOICE_LIST', 'Invoice list fetched', user.id, { page, limit, total });
+
     return {
       data: invoices,
       meta: {
@@ -39,6 +56,21 @@ export class InvoiceService {
         page: safePage,
         limit: safeLimit,
       },
+    };
+  }
+
+  async getInvoiceById(id: number, user: any) {
+    const invoice = await this.invoiceRepo.findOne({
+      where: { id },
+      relations: ['tenant', 'invoiceItems'],
+    });
+    if (!invoice) {
+      throw new NotFoundException('Invoice not found');
+    }
+    await this.recordAction('INVOICE_SHOW', 'Invoice details fetched', user.id, { invoiceId: id });
+    return {
+      message: 'Invoice details fetched',
+      invoice: invoice,
     };
   }
 

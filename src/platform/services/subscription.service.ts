@@ -158,8 +158,7 @@ export class SubscriptionService {
         await this.recordAction('SUBSCRIPTION_PLAN_UPDATE', 'Subscription plan updated', user.id, { subscriptionId, planId });
         return {
             message: 'Subscription plan updated',
-            subscription: subscription,
-            plan: plan,
+            subscription: subscription
         };
     }
 }
