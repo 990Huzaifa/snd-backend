@@ -4,7 +4,12 @@ import {
     Column,
     CreateDateColumn,
     UpdateDateColumn,
+    JoinTable,
+    ManyToMany,
+    OneToMany,
 } from 'typeorm';
+import { Permission } from './premission.entity';
+import { User } from './user.entity';
 
 @Entity({ name: 'roles' })
 export class Role {
@@ -13,6 +18,27 @@ export class Role {
 
     @Column({ unique: true })
     name: string; // ADMIN, USER etc
+
+    // ✅ One Role → Many Users
+    @OneToMany(() => User, (user) => user.role)
+    users: User[];
+
+    // ✅ One Role → Many Permissions
+    @ManyToMany(() => Permission, (permission) => permission.roles, {
+        eager: true, // auto load permissions
+    })
+    @JoinTable({
+        name: 'rolePermissions',
+        joinColumn: {
+            name: 'roleId',
+            referencedColumnName: 'id',
+        },
+        inverseJoinColumn: {
+            name: 'permissionId',
+            referencedColumnName: 'id',
+        },
+    })
+    permissions: Permission[];
 
     @CreateDateColumn()
     createdAt: Date;

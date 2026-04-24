@@ -10,17 +10,17 @@ import {
 import { Area } from './area.entity';
 
 @Entity({ name: 'regions' })
-@Index(['city_id', 'name'], { unique: true })
+@Index(['city', 'name'], { unique: true })
 export class Region {
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
     /**
-     * Logical reference to Master DB cities.id
+     * Logical reference to Master DB city
      * No FK constraint (cross-database relation)
      */
-    @Column('uuid')
-    city_id: string;
+    @Column()
+    city: string;
 
     @Column({ length: 150 })
     name: string;
@@ -29,14 +29,14 @@ export class Region {
     code: string;
 
     @Column({ default: true })
-    is_active: boolean;
+    isActive: boolean;
 
     @OneToMany(() => Area, (area) => area.region)
     areas: Area[];
 
     @CreateDateColumn()
-    created_at: Date;
+    createdAt: Date;
 
     @UpdateDateColumn()
-    updated_at: Date;
+    updatedAt: Date;
 }

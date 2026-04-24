@@ -17,7 +17,7 @@ export class Area {
     @ManyToOne(() => Region, (region) => region.areas, {
         onDelete: 'CASCADE',
     })
-    @JoinColumn({ name: 'region_id' })
+    @JoinColumn({ name: 'regionId' })
     region: Region;
 
     @Column()
