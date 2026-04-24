@@ -140,7 +140,6 @@ export class SubscriptionService {
     // for plan
 
     async updateSubscriptionPlan(subscriptionId: number, planId: any, user: any) {
-        planId = planId.toString();
         const subscription = await this.subscriptionRepo.findOne({
             where: { id: subscriptionId },
             relations: ['plan'],
@@ -148,15 +147,16 @@ export class SubscriptionService {
         if (!subscription) {
             throw new NotFoundException('Subscription not found');
         }
+        let planIdString = planId.toString();
         const plan = await this.planRepo.findOne({
-            where: { id: planId },
+            where: { id: planIdString },
         });
         if (!plan) {
             throw new NotFoundException('Plan not found');
         }
         subscription.plan = plan;
         await this.subscriptionRepo.update(subscriptionId, { plan: plan });
-        await this.recordAction('SUBSCRIPTION_PLAN_UPDATE', 'Subscription plan updated', user.id, { subscriptionId, planId });
+        await this.recordAction('SUBSCRIPTION_PLAN_UPDATE', 'Subscription plan updated', user.id, { subscriptionId, planIdString });
         return {
             message: 'Subscription plan updated',
             subscription: subscription
