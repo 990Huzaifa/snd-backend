@@ -102,6 +102,7 @@ export class PlatformService {
     const tenants = await this.tenantRepo.find({
       select: ['id', 'name', 'status', 'updatedAt'],
       order: { updatedAt: 'DESC' },
+      relations: ['profile'],
     });
 
     // 2️⃣ For each tenant, get latest job
@@ -120,11 +121,6 @@ export class PlatformService {
           lastJobStatus: lastJob?.status ?? null,
           lastError: lastJob?.errorMessage ?? null,
           lastUpdatedAt: lastJob?.finishedAt ?? tenant.updatedAt,
-          tenantDisplayName: tenant.profile.displayName,
-          tenantPhone: tenant.profile.phone,
-          tenantAddress: tenant.profile.address,
-          tenantSupportEmail: tenant.profile.supportEmail,
-          tenantIndustryType: tenant.industryType,
         };
       }),
     );
@@ -293,6 +289,7 @@ export class PlatformService {
   async retryProvisioning(tenantId: string, user: any) {
     const tenant = await this.tenantRepo.findOne({
       where: { id: tenantId },
+      relations: ['profile'],
     });
 
     if (!tenant) {
@@ -646,19 +643,18 @@ export class PlatformService {
     return { created: false };
   }
 
-  private async createDefaultProfileIfNotExists(tenant: Tenant, contactInfo: any) {
+  private async createDefaultProfileIfNotExists(tenant: Tenant, contactInfo: any = null) {
     const existing = await this.profilesRepo.findOne({
       where: { tenant: { id: tenant.id } },
     });
-
     if (!existing) {
       await this.profilesRepo.save(
         this.profilesRepo.create({
           tenant,
-          displayName: contactInfo.name || null,
-          supportEmail: contactInfo.email || null,
-          phone: contactInfo.phone || null,
-          address: contactInfo.address || null,
+          displayName: contactInfo?.name || null,
+          supportEmail: contactInfo?.email || null,
+          phone: contactInfo?.phone || null,
+          address: contactInfo?.address || null,
         }),
       );
     }

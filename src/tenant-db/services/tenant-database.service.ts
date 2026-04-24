@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { createTenantDataSource } from '../tenant-datasource.factory';
+import { TenantDataSource } from '../tenant-datasource.factory';
 
 @Injectable()
 export class TenantDatabaseService {
@@ -10,7 +10,7 @@ export class TenantDatabaseService {
         password: string,
         database: string,
     ) {
-        const dataSource = createTenantDataSource(
+        const dataSource = TenantDataSource(
             host,
             port,
             username,

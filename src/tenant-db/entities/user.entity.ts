@@ -12,6 +12,36 @@ import { Role } from './role.entity';
 import { Notification } from './notification.entity';
 import { Distributor } from './distributor.entity';
 
+
+@Entity('designations')
+export class Designation {
+    @PrimaryGeneratedColumn()
+    id: number;
+
+    @Column()
+    name: string;
+
+    @Column()
+    slug: string;
+
+    @Column({nullable: true})
+    description: string;
+
+    @Column({ default: true })
+    isActive: boolean;
+
+    @OneToMany(() => User, (user) => user.designation)
+    users: User[];
+
+    @CreateDateColumn()
+    createdAt: Date;
+
+    @UpdateDateColumn()
+    updatedAt: Date;
+
+}
+
+
 @Entity('users')
 export class User {
     @PrimaryGeneratedColumn('uuid')
@@ -93,34 +123,6 @@ export class User {
 
     @Column({nullable: true})
     fcmToken: string;
-
-    @CreateDateColumn()
-    createdAt: Date;
-
-    @UpdateDateColumn()
-    updatedAt: Date;
-
-}
-
-@Entity('designations')
-export class Designation {
-    @PrimaryGeneratedColumn()
-    id: number;
-
-    @Column()
-    name: string;
-
-    @Column()
-    slug: string;
-
-    @Column({nullable: true})
-    description: string;
-
-    @Column({ default: true })
-    isActive: boolean;
-
-    @OneToMany(() => User, (user) => user.designation)
-    users: User[];
 
     @CreateDateColumn()
     createdAt: Date;

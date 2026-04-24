@@ -86,7 +86,7 @@ export class Product {
     @Column()
     name: string;
 
-    @Column({ type: 'longtext', nullable: true })
+    @Column({nullable: true })
     description: string;
 
     @Column({nullable: true })
@@ -96,8 +96,8 @@ export class Product {
     @JoinColumn({ name: 'brandId' })
     brand: ProductBrand | null;
 
-    @Column({ type: 'longtext', nullable: true })
-    image: string;
+    @Column({nullable: true })
+    image: string | null;
 
     @Column({ default: true })
     isActive: boolean;
@@ -163,14 +163,14 @@ export class ProductPricing {
     @JoinColumn()
     uom: Uom;
 
-    @Column({ type: 'double' })
-    tradePrice: number;
-
-    @Column({ type: 'double' })
-    retailPrice: number;
+    @Column()
+    tradePrice: string;
 
     @Column()
-    quantity: string;
+    retailPrice: string;
+
+    @Column()
+    quantity: number;
 
     @CreateDateColumn()
     createdAt: Date;

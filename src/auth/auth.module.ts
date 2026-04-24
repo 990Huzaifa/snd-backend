@@ -14,11 +14,17 @@ import { Customer } from 'src/master-db/entities/customer.entity';
 import { MailService } from 'src/common/mail/mail.service';
 import { HttpModule } from '@nestjs/axios';
 import { PusherService } from 'src/common/pusher/pusher.service';
+import { TenantRuntimeModule } from 'src/tenant-db/tenant-runtime.module';
+import { CustomerJwtAuthGuard } from './customer-jwt-auth.guard';
+import { TenantJwtGuard } from 'src/common/guards/tenant-jwt.guard';
+import { TenantConnectionGuard } from 'src/common/guards/tenant-connection.guard';
+import { Tenant } from 'src/master-db/entities/tenant.entity';
 
 @Module({
     imports: [
         HttpModule,
-        TypeOrmModule.forFeature([PlatformUser, PlatformRole,Customer]),
+        TenantRuntimeModule,
+        TypeOrmModule.forFeature([PlatformUser, PlatformRole, Customer, Tenant]),
         ConfigModule,
         PassportModule,
         JwtModule.registerAsync({
@@ -31,7 +37,16 @@ import { PusherService } from 'src/common/pusher/pusher.service';
             }),
         })
     ],
-    providers: [AuthService,JwtStrategy, CustomerJwtStrategy, MailService, PusherService],
+    providers: [
+        AuthService,
+        JwtStrategy,
+        CustomerJwtStrategy,
+        CustomerJwtAuthGuard,
+        TenantJwtGuard,
+        TenantConnectionGuard,
+        MailService,
+        PusherService,
+    ],
     controllers: [AuthController],
 })
 export class AuthModule {}

@@ -8,7 +8,7 @@ import {
     ManyToMany,
     OneToMany,
 } from 'typeorm';
-import { Permission } from './premission.entity';
+import { Permission } from './permission.entity';
 import { User } from './user.entity';
 
 @Entity({ name: 'roles' })
