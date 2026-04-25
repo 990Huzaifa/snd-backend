@@ -60,4 +60,4 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
 
 # for dev
-/src/tenant/*
+# /src/tenant/*
