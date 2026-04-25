@@ -10,11 +10,11 @@ import * as bcrypt from 'bcrypt';
 import { Tenant, TenantStatus } from 'src/master-db/entities/tenant.entity';
 import { TenantConnectionManager } from 'src/tenant-db/services/tenant-connection-manager.service';
 import { User } from 'src/tenant-db/entities/user.entity';
-import { TenantLoginDto } from './dto/tenant-login.dto';
+import { TenantLoginDto } from '../dto/tenant-login.dto';
 
 /**
  * First label of host is treated as tenantCode unless it is `api` or `www`.
- * Examples: acme.salesvince.com → acme; api.salesvince.com → none (use body).
+ * Examples: acme.salesvince.com -> acme; api.salesvince.com -> none (use body).
  */
 export function extractTenantCodeFromHost(hostHeader: string | undefined): string | undefined {
   if (!hostHeader) {
@@ -44,7 +44,7 @@ export class TenantAuthService {
   async login(
     dto: TenantLoginDto,
     hostHeader: string | undefined,
-  ): Promise<{ access_token: string }> {
+  ): Promise<{ access_token: string; user: User }> {
     const fromHost = extractTenantCodeFromHost(hostHeader);
     const tenantCode = (fromHost ?? dto.tenantCode)?.trim();
     if (!tenantCode) {
@@ -105,8 +105,11 @@ export class TenantAuthService {
       tenantCode: tenant.code,
     };
 
+    delete user.password;
+
     return {
       access_token: this.jwtService.sign(payload),
+      user: user,
     };
   }
 }

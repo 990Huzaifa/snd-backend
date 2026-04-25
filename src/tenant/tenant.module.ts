@@ -1,10 +1,20 @@
 import { Module } from '@nestjs/common';
 import { HttpModule } from '@nestjs/axios';
-import { UserManagementModule } from './user-management/user-management.module';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { Tenant } from 'src/master-db/entities/tenant.entity';
+import { AuthModule } from 'src/auth/auth.module';
+import { TenantRuntimeModule } from 'src/tenant-db/tenant-runtime.module';
+import { TenantAuthController } from './controller/tenant-auth.controller';
+import { TenantAuthService } from './service/tenant-auth.service';
 
 @Module({
-    imports: [HttpModule, UserManagementModule],
-    controllers: [],
-    providers: [],
+  imports: [
+    HttpModule,
+    AuthModule,
+    TenantRuntimeModule,
+    TypeOrmModule.forFeature([Tenant]),
+  ],
+  controllers: [TenantAuthController],
+  providers: [TenantAuthService],
 })
 export class TenantModule { }

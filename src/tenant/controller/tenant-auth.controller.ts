@@ -1,6 +1,6 @@
 import { Body, Controller, Headers, Post } from '@nestjs/common';
-import { TenantAuthService } from './tenant-auth.service';
-import { TenantLoginDto } from './dto/tenant-login.dto';
+import { TenantAuthService } from '../service/tenant-auth.service';
+import { TenantLoginDto } from '../dto/tenant-login.dto';
 
 @Controller('tenant/auth')
 export class TenantAuthController {
