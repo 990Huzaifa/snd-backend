@@ -106,7 +106,7 @@ export class InvoiceService {
   }
 
   // Runs hourly to generate renewal invoices for due subscriptions.
-  @Cron(CronExpression.EVERY_10_SECONDS)
+  @Cron(CronExpression.EVERY_10_HOURS)
   async scheduleRenewalInvoices() {
     await this.processRenewalInvoices('hourly-cron');
   }
@@ -140,7 +140,7 @@ export class InvoiceService {
         where: {
           status: SubscriptionStatus.ACTIVE,
           collectionType: CollectionType.AUTO,
-          // expiresAt: LessThanOrEqual(now),
+          expiresAt: LessThanOrEqual(now),
         },
         relations: ['tenant', 'plan', 'subscriptionAddons', 'subscriptionAddons.addon'],
       });
