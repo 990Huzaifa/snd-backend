@@ -14,6 +14,9 @@ declare global {
                 role?: string;
                 type?: string;
                 tenantId?: string;
+                userId?: string;
+                tenantCode?: string;
+                tenantStatus?: string;
                 [key: string]: unknown;
             };
         }

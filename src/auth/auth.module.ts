@@ -18,13 +18,14 @@ import { TenantRuntimeModule } from 'src/tenant-db/tenant-runtime.module';
 import { CustomerJwtAuthGuard } from './customer-jwt-auth.guard';
 import { TenantJwtGuard } from 'src/common/guards/tenant-jwt.guard';
 import { TenantConnectionGuard } from 'src/common/guards/tenant-connection.guard';
-import { Tenant } from 'src/master-db/entities/tenant.entity';
+import { TenantJwtStrategy } from './tenant-jwt.strategy';
+import { TenantJwtAuthGuard } from './tenant-jwt-auth.guard';
 
 @Module({
     imports: [
         HttpModule,
         TenantRuntimeModule,
-        TypeOrmModule.forFeature([PlatformUser, PlatformRole, Customer, Tenant]),
+        TypeOrmModule.forFeature([PlatformUser, PlatformRole, Customer]),
         ConfigModule,
         PassportModule,
         JwtModule.registerAsync({
@@ -42,10 +43,20 @@ import { Tenant } from 'src/master-db/entities/tenant.entity';
         JwtStrategy,
         CustomerJwtStrategy,
         CustomerJwtAuthGuard,
+        TenantJwtStrategy,
+        TenantJwtAuthGuard,
         TenantJwtGuard,
         TenantConnectionGuard,
         MailService,
         PusherService,
+    ],
+    exports: [
+        JwtModule,
+        PassportModule,
+        TenantJwtAuthGuard,
+        TenantJwtGuard,
+        TenantConnectionGuard,
+        TenantRuntimeModule,
     ],
     controllers: [AuthController],
 })
