@@ -21,6 +21,8 @@ export class InvoiceService {
     private readonly invoiceItemRepo: Repository<InvoiceItem>,
     @InjectRepository(Subscription)
     private readonly subscriptionRepo: Repository<Subscription>,
+    @InjectRepository(Plan)
+    private readonly planRepo: Repository<Plan>,
     private readonly activityLogService: ActivityLogService,
     @InjectRepository(Tenant)
     private readonly tenantRepo: Repository<Tenant>,
@@ -104,7 +106,7 @@ export class InvoiceService {
   }
 
   // Runs hourly to generate renewal invoices for due subscriptions.
-  @Cron(CronExpression.EVERY_10_HOURS)
+  @Cron(CronExpression.EVERY_10_SECONDS)
   async scheduleRenewalInvoices() {
     await this.processRenewalInvoices('hourly-cron');
   }
@@ -138,7 +140,7 @@ export class InvoiceService {
         where: {
           status: SubscriptionStatus.ACTIVE,
           collectionType: CollectionType.AUTO,
-          expiresAt: LessThanOrEqual(now),
+          // expiresAt: LessThanOrEqual(now),
         },
         relations: ['tenant', 'plan', 'subscriptionAddons', 'subscriptionAddons.addon'],
       });
@@ -163,7 +165,17 @@ export class InvoiceService {
   }
 
   private async createRenewalInvoice(subscription: Subscription) {
-    const lineItems = this.buildInvoiceLineItems(subscription);
+    const planId = subscription.plan?.id;
+    if (!planId) {
+      throw new NotFoundException(`Plan not found for subscription ${subscription.id}`);
+    }
+
+    const plan = await this.planRepo.findOne({ where: { id: planId } });
+    if (!plan) {
+      throw new NotFoundException(`Plan ${planId} not found for subscription ${subscription.id}`);
+    }
+
+    const lineItems = this.buildInvoiceLineItems(subscription, plan);
     const subTotalAmount = lineItems.reduce((sum, item) => sum + item.totalAmount, 0);
     const taxAmount = 0;
     const totalAmount = subTotalAmount + taxAmount;
@@ -194,23 +206,25 @@ export class InvoiceService {
       ),
     );
 
-    subscription.expiresAt = this.nextRenewalDate(subscription.expiresAt, subscription.plan);
+    subscription.expiresAt = this.nextRenewalDate(subscription.expiresAt, plan);
+    subscription.plan = plan;
     await this.subscriptionRepo.save(subscription);
   }
 
-  private buildInvoiceLineItems(subscription: Subscription) {
+  private buildInvoiceLineItems(subscription: Subscription, plan: Plan) {
+    const addonBillingMultiplier = plan.billing_cycle === BillingCycle.YEARLY ? 12 : 1;
     const items = [
       {
-        name: subscription.plan.title,
+        name: plan.title,
         quantity: 1,
-        unitPrice: this.toAmount(subscription.plan.price),
-        totalAmount: this.toAmount(subscription.plan.price),
+        unitPrice: this.toAmount(plan.price),
+        totalAmount: this.toAmount(plan.price),
       },
     ];
 
     for (const addon of subscription.subscriptionAddons ?? []) {
       const quantity = addon.quantity > 0 ? addon.quantity : 1;
-      const unitPrice = this.toAmount(addon.addon.price);
+      const unitPrice = this.toAmount(addon.addon.price) * addonBillingMultiplier;
       items.push({
         name: addon.addon.name,
         quantity,
