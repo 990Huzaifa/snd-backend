@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Tenant, TenantStatus } from '../master-db/entities/tenant.entity';
 import { Repository } from 'typeorm';
@@ -28,6 +28,8 @@ import { TenantModule } from 'src/master-db/entities/tenant-modules.entity';
 
 @Injectable()
 export class PlatformService {
+  private readonly logger = new Logger(PlatformService.name);
+
   constructor(
     @InjectRepository(Tenant)
     private readonly tenantRepo: Repository<Tenant>,
@@ -246,12 +248,16 @@ export class PlatformService {
       address: dto.address,
     };
     
-    // 🔥 AUTO provisioning trigger
-    await this.startProvisioningSkeleton(tenant.id, contactInfo);
+    // 🔥 AUTO provisioning trigger (run in background, do not block API response)
+    void this.startProvisioningSkeleton(tenant.id, contactInfo, user?.id).catch((error) => {
+      this.logger.error(
+        `Background provisioning failed to execute for tenant ${tenant.id}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    });
     await this.notificationService.createNotification({
       userId: user.id,
-      title:  `Tenant ${tenant.name} is created successfully`,
-      message: `Tenant ${tenant.name} is created and provisioning has started`,
+      title:  `Tenant ${tenant.name} has been created`,
+      message: `Tenant ${tenant.name} is created. Provisioning is running in the background.`,
       type: 'success',
     });
     await this.recordAction('TENANT_CREATE', 'Tenant created and provisioning started', user.id, ActivityLogActorType.PLATFORM_USER, {
@@ -314,7 +320,7 @@ export class PlatformService {
     }
 
     // 🔁 Start provisioning again
-    await this.startProvisioningSkeleton(tenant.id);
+    await this.startProvisioningSkeleton(tenant.id, null, user?.id);
     await this.recordAction('TENANT_PROVISIONING_RETRY', 'Tenant provisioning retry started', user.id, ActivityLogActorType.PLATFORM_USER, { tenantId });
 
     return {
@@ -322,7 +328,7 @@ export class PlatformService {
     };
   }
 
-  async startProvisioningSkeleton(tenantId: string, contactInfo: any = null) {
+  async startProvisioningSkeleton(tenantId: string, contactInfo: any = null, notifyUserId?: string) {
 
     const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } });
     if (!tenant) return;
@@ -484,15 +490,16 @@ export class PlatformService {
 
 
       // 🔥 FINALIZE provisioning (CURRENT SCOPE)
-      await this.markProvisioningSuccess(tenant, job);
+      await this.markProvisioningSuccess(tenant, job, notifyUserId);
     } catch (e) {
-      await this.markProvisioningFailed(tenant, job, e);
+      await this.markProvisioningFailed(tenant, job, e, notifyUserId);
     }
   }
 
   private async markProvisioningSuccess(
     tenant: Tenant,
     job: TenantProvisioningJob,
+    notifyUserId?: string,
   ) {
     // Tenant status update
     tenant.status = TenantStatus.PROVISIONED;
@@ -510,7 +517,15 @@ export class PlatformService {
       message: 'Provisioning completed successfully',
     });
 
-    // trigger notification
+    // trigger notification for requester when provisioning finishes
+    if (notifyUserId) {
+      await this.notificationService.createNotification({
+        userId: notifyUserId,
+        title: `Tenant ${tenant.name} provisioning completed`,
+        message: `Tenant ${tenant.name} is fully provisioned and ready to use.`,
+        type: 'success',
+      });
+    }
 
   }
 
@@ -518,6 +533,7 @@ export class PlatformService {
     tenant,
     job,
     error,
+    notifyUserId?: string,
   ) {
     const message = error instanceof Error ? error.message : 'Unknown provisioning error';
     // 1️⃣ Update tenant status
@@ -536,6 +552,15 @@ export class PlatformService {
       level: 'ERROR',
       message: `Provisioning failed: ${message}`,
     });
+
+    if (notifyUserId) {
+      await this.notificationService.createNotification({
+        userId: notifyUserId,
+        title: `Tenant ${tenant.name} provisioning failed`,
+        message: `Provisioning failed for tenant ${tenant.name}: ${message}`,
+        type: 'error',
+      });
+    }
   }
   
   async suspendTenant(tenantId: string, user: any) {
