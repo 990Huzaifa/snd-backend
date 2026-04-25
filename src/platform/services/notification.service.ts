@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Notification } from "src/master-db/entities/notification.entity";
 import { PlatformUser } from "src/master-db/entities/platform-user.entity";
@@ -8,6 +8,8 @@ import { PusherService } from "src/common/pusher/pusher.service";
 
 @Injectable()
 export class NotificationService {
+    private readonly logger = new Logger(NotificationService.name);
+
     constructor(
         @InjectRepository(Notification)
         private readonly notificationRepo: Repository<Notification>,
@@ -44,15 +46,21 @@ export class NotificationService {
             isRead: payload.isRead ?? false,
         });
 
-        await this.pusherService.trigger(
-            `private-platform-user-${user.id}`,
-            'notification.new',
-            {
-                message: notification,
-            }
-        );
+        const saved = await this.notificationRepo.save(notification);
 
-        return this.notificationRepo.save(notification);
+        try {
+            await this.pusherService.trigger(
+                `private-platform-user-${user.id}`,
+                'notification.new',
+                { message: saved },
+            );
+        } catch (err) {
+            this.logger.warn(
+                `Pusher trigger failed for user ${user.id}; notification persisted. ${err instanceof Error ? err.message : String(err)}`,
+            );
+        }
+
+        return saved;
     }
 
     async generateNotification(payload: CreateNotificationDto) {
@@ -66,14 +74,15 @@ export class NotificationService {
                 type: payload.type,
             });
 
-            // trigger notification to user
-            await this.pusherService.trigger(
-                `platform-user`,
-                'notification.new',
-                {
+            try {
+                await this.pusherService.trigger(`platform-user`, 'notification.new', {
                     message: `New notification: ${payload.title}`,
-                }
-            );
+                });
+            } catch (err) {
+                this.logger.warn(
+                    `Pusher broadcast failed (platform-user). ${err instanceof Error ? err.message : String(err)}`,
+                );
+            }
         }
     }
 

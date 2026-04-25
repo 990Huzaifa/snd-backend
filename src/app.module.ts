@@ -7,6 +7,7 @@ import { CommonModule } from './common/common.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ScheduleModule } from '@nestjs/schedule';
+import { TenantModule } from './tenant/tenant.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { ScheduleModule } from '@nestjs/schedule';
     CommonModule,
     AuthModule,
     PlatformModule,
+    TenantModule,
   ],
   controllers: [AppController],
   providers: [AppService],

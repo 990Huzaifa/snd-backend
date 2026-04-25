@@ -420,8 +420,20 @@ export class PlatformService {
         message: 'Tenant DB migrations executed',
       });
 
-      
+      // seed data
+      await this.tenantDatabaseService.runTenantSeeders(
+        String(process.env.PROVISION_DB_HOST),
+        Number(process.env.PROVISION_DB_PORT),
+        dbUser,
+        dbPass,
+        dbName,
+      );
 
+      await this.logRepo.save({
+        job,
+        level: 'INFO',
+        message: 'Tenant DB core seed completed',
+      });
 
       // ===============================
       // 🔹 STEP 1: Create tenant settings
