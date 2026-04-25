@@ -17,7 +17,13 @@ export class Role {
     id: string;
 
     @Column({ unique: true })
-    name: string; // ADMIN, USER etc
+    code: string; // SUPER_ADMIN, SUPPORT, etc.
+
+    @Column()
+    name: string;
+
+    @Column({ default: true })
+    isActive: boolean;
 
     // ✅ One Role → Many Users
     @OneToMany(() => User, (user) => user.role)

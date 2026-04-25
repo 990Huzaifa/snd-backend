@@ -4,7 +4,9 @@ import { Role } from '../entities/role.entity';
 
 export const TENANT_ROLES = [
     {
+        code: 'SUPER_ADMIN',
         name: 'Super Admin',
+        isActive: true,
     },
 ];
 
@@ -20,16 +22,21 @@ export async function seedTenantRoles(dataSource: DataSource) {
             continue;
         }
 
+        const roleCode = roleData.code.trim().toUpperCase();
         const existing = await roleRepo.findOne({
-            where: { name: roleName },
+            where: { code: roleCode },
         });
 
         if (!existing) {
-            const role = roleRepo.create({ name: roleName });
+            const role = roleRepo.create({
+                code: roleCode,
+                name: roleName,
+                isActive: roleData.isActive ?? true,
+            });
             await roleRepo.save(role);
-            console.log(`✅ Role created: ${roleName}`);
+            console.log(`✅ Role created: ${roleName} (${roleCode})`);
         } else {
-            console.log(`⏭ Role already exists: ${roleName}`);
+            console.log(`⏭ Role already exists: ${roleName} (${roleCode})`);
         }
     }
 
