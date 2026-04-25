@@ -7,6 +7,7 @@ import { BillingCycle, Plan } from 'src/master-db/entities/plan.entity';
 import { CollectionType, Status as SubscriptionStatus, Subscription } from 'src/master-db/entities/subscription.entity';
 import { LessThanOrEqual, Repository } from 'typeorm';
 import { ActivityLogService } from './activity-log.service';
+import { Tenant } from 'src/master-db/entities/tenant.entity';
 
 @Injectable()
 export class InvoiceService {
@@ -21,6 +22,8 @@ export class InvoiceService {
     @InjectRepository(Subscription)
     private readonly subscriptionRepo: Repository<Subscription>,
     private readonly activityLogService: ActivityLogService,
+    @InjectRepository(Tenant)
+    private readonly tenantRepo: Repository<Tenant>,
   ) {}
 
 
@@ -62,20 +65,46 @@ export class InvoiceService {
   async getInvoiceById(id: number, user: any) {
     const invoice = await this.invoiceRepo.findOne({
       where: { id },
-      relations: ['tenant', 'invoiceItems'],
+      relations: {
+        tenant: {
+          profile: true,
+        },
+        invoiceItems: true,
+        subscription: {
+          plan: true,
+        },
+      },
     });
+
     if (!invoice) {
       throw new NotFoundException('Invoice not found');
     }
     await this.recordAction('INVOICE_SHOW', 'Invoice details fetched', user.id, { invoiceId: id });
+
+    const subscription = invoice.subscription
+      ? {
+          ...invoice.subscription,
+          plan: invoice.subscription.plan
+            ? {
+                id: invoice.subscription.plan.id,
+                title: invoice.subscription.plan.title,
+                billing_cycle: invoice.subscription.plan.billing_cycle,
+              }
+            : null,
+        }
+      : null;
+
     return {
       message: 'Invoice details fetched',
-      invoice: invoice,
+      invoice: {
+        ...invoice,
+        subscription,
+      },
     };
   }
 
   // Runs hourly to generate renewal invoices for due subscriptions.
-  @Cron(CronExpression.EVERY_12_HOURS)
+  @Cron(CronExpression.EVERY_10_HOURS)
   async scheduleRenewalInvoices() {
     await this.processRenewalInvoices('hourly-cron');
   }

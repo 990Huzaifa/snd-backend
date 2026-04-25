@@ -14,7 +14,7 @@ export class TenantProfile {
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
-    @OneToOne(() => Tenant, { onDelete: 'CASCADE' })
+    @OneToOne(() => Tenant, (tenant) => tenant.profile, { onDelete: 'CASCADE' })
     @JoinColumn({ name: 'tenant_id' })
     tenant: Tenant;
 

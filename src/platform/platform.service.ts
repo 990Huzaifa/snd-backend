@@ -183,7 +183,7 @@ export class PlatformService {
   async getTenant(tenantId: string, user: any) {
     const tenant = await this.tenantRepo.findOne({
       where: { id: tenantId },
-      relations: ['profile', 'modules'] 
+      relations: ['modules'] 
     });
     if(!tenant) {
       throw new NotFoundException('Tenant not found');
@@ -240,16 +240,17 @@ export class PlatformService {
       await this.subscriptionRepo.save(subscription);
     }
 
-    // contact info 
-    const contactInfo = {
-      name: dto.displayName,
-      email: dto.email,
-      phone: dto.phone,
-      address: dto.address,
-    };
+    // create tenant profile
+    const profile = new TenantProfile();
+    profile.tenant = tenant;
+    profile.displayName = dto.displayName;
+    profile.supportEmail = dto.email;
+    profile.phone = dto.phone;
+    profile.address = dto.address;
+    await this.profilesRepo.save(profile);
     
     // 🔥 AUTO provisioning trigger (run in background, do not block API response)
-    void this.startProvisioningSkeleton(tenant.id, contactInfo, user?.id).catch((error) => {
+    void this.startProvisioningSkeleton(tenant.id, user?.id).catch((error) => {
       this.logger.error(
         `Background provisioning failed to execute for tenant ${tenant.id}: ${error instanceof Error ? error.message : String(error)}`,
       );
@@ -320,7 +321,7 @@ export class PlatformService {
     }
 
     // 🔁 Start provisioning again
-    await this.startProvisioningSkeleton(tenant.id, null, user?.id);
+    await this.startProvisioningSkeleton(tenant.id, user?.id);
     await this.recordAction('TENANT_PROVISIONING_RETRY', 'Tenant provisioning retry started', user.id, ActivityLogActorType.PLATFORM_USER, { tenantId });
 
     return {
@@ -328,7 +329,7 @@ export class PlatformService {
     };
   }
 
-  async startProvisioningSkeleton(tenantId: string, contactInfo: any = null, notifyUserId?: string) {
+  async startProvisioningSkeleton(tenantId: string, notifyUserId?: string) {
 
     const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } });
     if (!tenant) return;
@@ -452,19 +453,9 @@ export class PlatformService {
         message: 'Tenant default settings created',
       });
 
-      // ===============================
-      // 🔹 STEP 2: Create tenant profile
-      // ===============================
-      await this.createDefaultProfileIfNotExists(tenant, contactInfo);
-
-      await this.logRepo.save({
-        job,
-        level: 'INFO',
-        message: 'Tenant default profile created',
-      });
 
       // ===============================
-      // 🔹 STEP 3: Create tenant theme
+      // 🔹 STEP 2: Create tenant theme
       // ===============================
       await this.createDefaultThemeIfNotExists(tenant);
 
@@ -476,7 +467,7 @@ export class PlatformService {
 
 
       // ===============================
-      // 🔹 STEP 4: Create tenant Geo Policy
+      // 🔹 STEP 3: Create tenant Geo Policy
       // ===============================
       await this.createDefaultGeoPolicyIfNotExists(tenant);
 
@@ -678,23 +669,6 @@ export class PlatformService {
     }
 
     return { created: false };
-  }
-
-  private async createDefaultProfileIfNotExists(tenant: Tenant, contactInfo: any = null) {
-    const existing = await this.profilesRepo.findOne({
-      where: { tenant: { id: tenant.id } },
-    });
-    if (!existing) {
-      await this.profilesRepo.save(
-        this.profilesRepo.create({
-          tenant,
-          displayName: contactInfo?.name || null,
-          supportEmail: contactInfo?.email || null,
-          phone: contactInfo?.phone || null,
-          address: contactInfo?.address || null,
-        }),
-      );
-    }
   }
 
   private async createDefaultThemeIfNotExists(tenant: Tenant) {
