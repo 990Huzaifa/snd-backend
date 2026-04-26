@@ -31,4 +31,9 @@ export class UtilityController {
     async getCurrencies() {
         return this.UtilityService.getCurrencies();
     }
+
+    @Get('check-domain-availability/:domain')
+    async checkDomainAvailability(@Param('domain') domain: string) {
+        return this.UtilityService.checkDomainAvailability(domain);
+    }
 }

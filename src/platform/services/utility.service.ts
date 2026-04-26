@@ -4,6 +4,7 @@ import { City } from 'src/master-db/entities/city.entity';
 import { Country } from 'src/master-db/entities/country.entity';
 import { State } from 'src/master-db/entities/state.entity';
 import { DataSource, Like, Repository } from 'typeorm';
+import { Tenant } from 'src/master-db/entities/tenant.entity';
 
 @Injectable()
 export class UtilityService {
@@ -14,6 +15,8 @@ export class UtilityService {
         private readonly stateRepo: Repository<State>,
         @InjectRepository(City)
         private readonly cityRepo: Repository<City>,
+        @InjectRepository(Tenant)
+        private readonly tenantRepo: Repository<Tenant>,
     ) {}
 
     // here we make public apis like countrys, states, cities etc
@@ -70,5 +73,13 @@ export class UtilityService {
             'AED',
             'PKR',
         ];
+    }
+
+    async checkDomainAvailability(domain: string) {
+        const checkDomain = await this.tenantRepo.findOne({ where: { name: domain } });
+        if (checkDomain) {
+            return false;
+        }
+        return true;
     }
 }

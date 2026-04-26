@@ -25,6 +25,7 @@ import { NotificationService } from './services/notification.service';
 import { ActivityLogService } from './services/activity-log.service';
 import { ActivityLogActorType } from 'src/master-db/entities/activity-log.entity';
 import { TenantModule } from 'src/master-db/entities/tenant-modules.entity';
+import { Module } from 'src/master-db/entities/module.entity';
 
 @Injectable()
 export class PlatformService {
@@ -55,6 +56,8 @@ export class PlatformService {
     private readonly subscriptionRepo: Repository<Subscription>,
     @InjectRepository(TenantModule)
     private readonly tenantModuleRepo: Repository<TenantModule>,
+    @InjectRepository(Module)
+    private readonly moduleRepo: Repository<Module>,
     @InjectRepository(Plan)
     private readonly planRepo: Repository<Plan>,
 
@@ -442,6 +445,15 @@ export class PlatformService {
         message: 'Tenant DB core seed completed',
       });
 
+      // sync tenant modules from master modules repo
+      await this.createDefaultTenantModulesIfNotExists(tenant);
+
+      await this.logRepo.save({
+        job,
+        level: 'INFO',
+        message: 'Tenant modules initialized',
+      });
+
       // ===============================
       // 🔹 STEP 1: Create tenant settings
       // ===============================
@@ -687,6 +699,45 @@ export class PlatformService {
     }
 
     return { created: false };
+  }
+
+  private async createDefaultTenantModulesIfNotExists(tenant: Tenant) {
+    const activeModules = await this.moduleRepo.find({
+      where: { isActive: true },
+    });
+
+    if (!activeModules.length) {
+      return { created: 0 };
+    }
+
+    const existingTenantModules = await this.tenantModuleRepo.find({
+      where: { tenant: { id: tenant.id } },
+      relations: ['module'],
+    });
+
+    const existingModuleIds = new Set(
+      existingTenantModules.map((tenantModule) => tenantModule.module?.id),
+    );
+
+    const missingModules = activeModules.filter(
+      (module) => !existingModuleIds.has(module.id),
+    );
+
+    if (!missingModules.length) {
+      return { created: 0 };
+    }
+
+    await this.tenantModuleRepo.save(
+      missingModules.map((module) =>
+        this.tenantModuleRepo.create({
+          tenant,
+          module,
+          enabled: true,
+        }),
+      ),
+    );
+
+    return { created: missingModules.length };
   }
 
 
