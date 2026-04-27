@@ -119,4 +119,19 @@ export class TenantRoleService {
     await tenantDb.getRepository(Role).save(role);
     return role;
   }
+
+  async permissionsList(tenantDb: DataSource) {
+    const permissions = await tenantDb.getRepository(Permission).find({
+      where: { isActive: true },
+    });
+
+    // map the permissions to the following format
+    const mappedPermissions = permissions.map((permission) => ({
+      id: permission.id,
+      code: permission.code,
+      name: permission.name,
+    }));
+
+    return { result: mappedPermissions };
+  }
 }
