@@ -54,4 +54,14 @@ export class MailService {
     renderResetPasswordTemplate(data: { logoUrl: string; name: string; otp: string; year: number }) {
         return this.renderTemplate('reset-password-email', data);
     }
+
+    renderTenantUserInviteTemplate(data: {
+        logoUrl: string;
+        invitedByName: string;
+        tenantName: string;
+        setupUrl: string;
+        year: number;
+    }) {
+        return this.renderTemplate('tenant-user-invite', data);
+    }
 }
