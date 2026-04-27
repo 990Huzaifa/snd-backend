@@ -78,8 +78,14 @@ export class UtilityService {
     async checkDomainAvailability(domain: string) {
         const checkDomain = await this.tenantRepo.findOne({ where: { name: domain } });
         if (checkDomain) {
-            return false;
+            return {
+                available: false,
+                message: 'Domain is already taken',
+            };
         }
-        return true;
+        return {
+            available: true,
+            message: 'Domain is available',
+        };
     }
 }

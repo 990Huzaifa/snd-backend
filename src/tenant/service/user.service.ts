@@ -30,14 +30,21 @@ export class UserService {
     }
   }
 
-  private buildUserSetupUrl(userCode: string, token: string, tenantCode?: string) {
-    const baseUrl = process.env.TENANT_SETUP_BASE_URL;
+  private buildUserSetupUrl(
+    userCode: string,
+    token: string,
+    tenantCode?: string,
+    requestBaseUrl?: string,
+  ) {
+    const baseUrl =
+      (requestBaseUrl || process.env.TENANT_SETUP_BASE_URL || '')
+        .replace(/\/+$/, '');
     const query = new URLSearchParams();
     query.set('token', token);
     if (tenantCode) {
       query.set('tenantCode', tenantCode);
     }
-    return `${baseUrl}/tenant/user/${userCode}/setup?${query.toString()}`;
+    return `${baseUrl}/user/${userCode}/setup?${query.toString()}`;
   }
 
   async listUsers(tenantDb: DataSource, page: number, limit: number, search: string, sort: string, sortDirection: string, roleId: string, designationId: string) {
@@ -56,9 +63,9 @@ export class UserService {
       skip: (page - 1) * limit,
       take: limit,
     });
-    // users.forEach(user => {
-    //   delete user.password;
-    // });
+    users.forEach(user => {
+      delete user.password;
+    });
     return {
       result: users,
       meta: {
@@ -141,6 +148,7 @@ export class UserService {
     dto: InviteTenantUserDto,
     tenantCode?: string,
     tenantName?: string,
+    requestBaseUrl?: string,
   ) {
     const userRepo = tenantDb.getRepository(User);
     const roleRepo = tenantDb.getRepository(Role);
@@ -203,6 +211,7 @@ export class UserService {
       savedUser.code,
       token,
       tenantCode,
+      requestBaseUrl,
     );
     const emailHtml = this.mailService.renderTenantUserInviteTemplate({
       logoUrl: process.env.APP_LOGO_URL || 'https://snd.com/logo.png',
