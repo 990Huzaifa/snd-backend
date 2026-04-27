@@ -10,7 +10,7 @@ import { TenantAuthService } from './service/tenant-auth.service';
 import { TenantRoleService } from './service/tenant-role.service';
 import { TenantPermissionGuard } from 'src/auth/tenant-permission.guard';
 import { TenantPermissionController } from './controller/tenant-permission.controller';
-import { UtilityController } from 'src/platform/controller/utility.controller';
+import { TenantUtilityController } from './controller/utility.controller';
 
 @Module({
   imports: [
@@ -19,7 +19,7 @@ import { UtilityController } from 'src/platform/controller/utility.controller';
     TenantRuntimeModule,
     TypeOrmModule.forFeature([Tenant]),
   ],
-  controllers: [TenantAuthController, TenantRoleController, TenantPermissionController, UtilityController],
+  controllers: [TenantAuthController, TenantRoleController, TenantPermissionController, TenantUtilityController],
   providers: [TenantAuthService, TenantRoleService, TenantPermissionGuard],
 })
 export class TenantModule { }
