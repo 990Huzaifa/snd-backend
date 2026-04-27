@@ -73,4 +73,9 @@ export class PlatformUserController {
     async createUser(@Body() userData: CreatePlatformUserDto, @CurrentPlatformUser() user: any){
         return this.platformUserService.createPlatformUser(userData, user);
     }
+
+    @Post('users/change-password')
+    async changePassword(@Body() data: { password: string }, @CurrentPlatformUser() user: any){
+        return this.platformUserService.changePlatformUserPassword(data.password, user);
+    }
 }

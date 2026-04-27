@@ -200,4 +200,20 @@ export class PlatformUserService {
         await this.recordAction('PLATFORM_USER_SHOW', 'Platform user details fetched', Authuser.id, { userId: id });
         return user;
     }
+
+    async changePlatformUserPassword(password: string, user: any) {
+        const platformUser = await this.platformUserRepo.findOne({
+            where: { id: user.id },
+        });
+        if (!platformUser) {
+            throw new NotFoundException('User not found');
+        }
+        platformUser.passwordHash = await bcrypt.hash(password, 10);
+        await this.platformUserRepo.save(platformUser);
+        await this.recordAction('PLATFORM_USER_PASSWORD_CHANGE', 'Platform user password changed', user.id, { userId: platformUser.id });
+        return {
+            message: 'password changed successfully',
+            user: platformUser
+        }
+    }
 }
