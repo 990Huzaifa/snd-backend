@@ -912,12 +912,10 @@ export class PlatformService {
   async getTenantModules(tenantId: string, user: any) {
     const modules = await this.tenantModuleRepo.find({
       where: { tenant: { id: tenantId } },
+      relations: ['module'],
     });
     await this.recordAction('TENANT_MODULES_GET', 'Tenant modules fetched', user.id, ActivityLogActorType.PLATFORM_USER, { tenantId });
-    return {
-      message: 'Tenant modules fetched successfully',
-      modules,
-    };
+    return modules;
   }
 
   async updateTenantModuleStatus(tenantId: string, moduleId: string, isActive: boolean, user: any) {
