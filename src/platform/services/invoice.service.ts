@@ -1,13 +1,14 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ActivityLogActorType } from 'src/master-db/entities/activity-log.entity';
-import { Invoice, InvoiceItem, Status as InvoiceStatus } from 'src/master-db/entities/invoice.entity';
+import { Invoice, InvoiceItem, InvoicePayment, Status as InvoiceStatus } from 'src/master-db/entities/invoice.entity';
 import { BillingCycle, Plan } from 'src/master-db/entities/plan.entity';
 import { CollectionType, Status as SubscriptionStatus, Subscription } from 'src/master-db/entities/subscription.entity';
 import { LessThanOrEqual, Repository } from 'typeorm';
 import { ActivityLogService } from './activity-log.service';
 import { Tenant } from 'src/master-db/entities/tenant.entity';
+import { CreateInvoicePaymentDto } from '../dto/invoice/create-invoice-payment.dto';
 
 @Injectable()
 export class InvoiceService {
@@ -19,6 +20,8 @@ export class InvoiceService {
     private readonly invoiceRepo: Repository<Invoice>,
     @InjectRepository(InvoiceItem)
     private readonly invoiceItemRepo: Repository<InvoiceItem>,
+    @InjectRepository(InvoicePayment)
+    private readonly invoicePaymentRepo: Repository<InvoicePayment>,
     @InjectRepository(Subscription)
     private readonly subscriptionRepo: Repository<Subscription>,
     @InjectRepository(Plan)
@@ -257,4 +260,66 @@ export class InvoiceService {
     next.setDate(next.getDate() + days);
     return next;
   }
+
+  async createInvoicePayment(id: number, dto: CreateInvoicePaymentDto, user: any) {
+    const invoice = await this.invoiceRepo.findOne({
+      where: { id },
+    });
+
+    if (!invoice) {
+      throw new NotFoundException('Invoice not found');
+    }
+
+    if (invoice.status === InvoiceStatus.PAID) {
+      throw new BadRequestException('Invoice is already paid');
+    }
+
+    const paymentAmount = Number(dto.amount);
+    if (!Number.isFinite(paymentAmount) || paymentAmount <= 0) {
+      throw new BadRequestException('Payment amount must be greater than 0');
+    }
+
+    const totalInvoiceAmount = Number(invoice.totalAmount);
+    const existingPayments = await this.invoicePaymentRepo.find({
+      where: { invoice: { id } },
+    });
+    const totalPaid = existingPayments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
+    const remainingAmount = totalInvoiceAmount - totalPaid;
+
+    if (paymentAmount > remainingAmount) {
+      throw new BadRequestException(`Payment amount exceeds remaining balance of ${remainingAmount}`);
+    }
+
+    const payment = await this.invoicePaymentRepo.save(
+      this.invoicePaymentRepo.create({
+        invoice,
+        paymentDate: new Date(dto.paymentDate),
+        amount: String(paymentAmount),
+        method: dto.method,
+        remarks: dto.remarks?.trim() || null,
+        reference: dto.reference?.trim() || null,
+      }),
+    );
+
+    const updatedPaidAmount = totalPaid + paymentAmount;
+    if (updatedPaidAmount >= totalInvoiceAmount) {
+      invoice.status = InvoiceStatus.PAID;
+      await this.invoiceRepo.save(invoice);
+    }
+
+    await this.recordAction('INVOICE_PAYMENT_CREATE', 'Invoice payment created', user.id, {
+      invoiceId: invoice.id,
+      paymentId: payment.id,
+      amount: paymentAmount,
+    });
+
+    return {
+      message: 'Invoice payment created',
+      payment,
+      invoiceStatus: updatedPaidAmount >= totalInvoiceAmount ? InvoiceStatus.PAID : invoice.status,
+      remainingAmount: Math.max(totalInvoiceAmount - updatedPaidAmount, 0),
+    };
+  }
+
+
 }

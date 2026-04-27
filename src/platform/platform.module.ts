@@ -51,7 +51,7 @@ import { ActivityLog } from 'src/master-db/entities/activity-log.entity';
 import { ActivityLogService } from './services/activity-log.service';
 import { ActivityLogController } from './controller/activity-log.controller';
 import { TenantModule } from 'src/master-db/entities/tenant-modules.entity';
-import { Invoice, InvoiceItem } from 'src/master-db/entities/invoice.entity';
+import { Invoice, InvoiceItem, InvoicePayment } from 'src/master-db/entities/invoice.entity';
 import { InvoiceController } from './controller/invoice.controller';
 import { InvoiceService } from './services/invoice.service';
 
@@ -85,6 +85,7 @@ import { InvoiceService } from './services/invoice.service';
       ActivityLog,
       Invoice,
       InvoiceItem,
+      InvoicePayment,
       Announcement,
       Country,
       State,

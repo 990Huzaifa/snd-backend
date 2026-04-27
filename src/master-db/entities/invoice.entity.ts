@@ -9,6 +9,14 @@ export enum Status {
     OVERDUE = 'OVERDUE',
 }
 
+export enum PaymentMethod {
+    CASH = 'CASH',
+    CHEQUE = 'CHEQUE',
+    TRANSFER = 'TRANSFER',
+    ONLINE = 'ONLINE',
+    OTHER = 'OTHER',
+}
+
 @Entity({ name: 'invoices' })
 export class Invoice {
 
@@ -73,5 +81,38 @@ export class InvoiceItem {
 
     @Column()
     totalAmount: number;
+
+}
+
+@Entity({ name: 'invoice_payments' })
+export class InvoicePayment {
+
+    @PrimaryGeneratedColumn()
+    id: number;
+
+    @ManyToOne(() => Invoice, { onDelete: 'CASCADE' })
+    @JoinColumn({ name: 'invoice_id' })
+    invoice: Invoice;
+
+    @Column()
+    paymentDate: Date;
+
+    @Column()
+    amount: string;
+
+    @Column({ type: 'enum', enum: PaymentMethod })
+    method: PaymentMethod;
+
+    @Column({nullable: true})
+    remarks?: string;
+
+    @Column({nullable: true})
+    reference?: string;
+
+    @CreateDateColumn()
+    createdAt: Date;
+
+    @UpdateDateColumn()
+    updatedAt: Date;
 
 }

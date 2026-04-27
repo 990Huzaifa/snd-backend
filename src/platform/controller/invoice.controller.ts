@@ -1,7 +1,8 @@
-import { Controller, Get, Param, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseIntPipe, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { PermissionGuard } from 'src/auth/permission.guard';
 import { InvoiceService } from '../services/invoice.service';
+import { CreateInvoicePaymentDto } from '../dto/invoice/create-invoice-payment.dto';
 
 @Controller('platform/invoice')
 @UseGuards(JwtAuthGuard, PermissionGuard)
@@ -14,7 +15,16 @@ export class InvoiceController {
   }
 
   @Get('/:id')
-  async getInvoiceById(@Param('id') id: number, @Req() req: any) {
+  async getInvoiceById(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
     return this.invoiceService.getInvoiceById(id, req.user);
+  }
+
+  @Post('/:id/payment')
+  async createInvoicePayment(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: CreateInvoicePaymentDto,
+    @Req() req: any,
+  ) {
+    return this.invoiceService.createInvoicePayment(id, dto, req.user);
   }
 }
