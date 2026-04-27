@@ -927,7 +927,7 @@ export class PlatformService {
     }
     module.enabled = isActive;
     await this.tenantModuleRepo.save(module);
-    await this.recordAction('TENANT_MODULE_STATUS_UPDATE', 'Tenant module status updated', user.id, ActivityLogActorType.PLATFORM_USER, { tenantId, moduleId, status });
+    await this.recordAction('TENANT_MODULE_STATUS_UPDATE', 'Tenant module status updated', user.id, ActivityLogActorType.PLATFORM_USER, { tenantId, moduleId, isActive });
     return {
       message: 'Tenant module status updated successfully',
       module,
