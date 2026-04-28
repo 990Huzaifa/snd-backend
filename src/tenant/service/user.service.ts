@@ -72,8 +72,6 @@ export class UserService {
       relations: ['role', 'designation'],
       where: {
         name: Like(`%${search}%`),
-        email: Like(`%${search}%`),
-        cnic: Like(`%${search}%`),
         role: roleId ? await roleRepo.findOne({ where: { id: roleId } }) : undefined,
         designation: designationId ? await designationRepo.findOne({ where: { id: Number(designationId) } }) : undefined,
         isDeleted: false,
