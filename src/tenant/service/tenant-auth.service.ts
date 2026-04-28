@@ -47,15 +47,16 @@ export class TenantAuthService {
     hostHeader: string | undefined,
   ): Promise<{ access_token: string; user: User }> {
     const fromHost = extractTenantCodeFromHost(hostHeader);
-    const tenantCode = (fromHost ?? dto.tenantCode)?.trim();
-    if (!tenantCode) {
+    console.log('fromHost', fromHost);
+    const tenantName = (fromHost ?? dto.tenantName)?.trim();
+    if (!tenantName) {
       throw new BadRequestException(
         'Tenant could not be resolved: use a tenant subdomain or pass tenantCode in the body',
       );
     }
 
     const tenant = await this.tenantRepo.findOne({
-      where: [{ code: tenantCode }, { name: tenantCode }],
+      where: [{ name: tenantName }],
       select: ['id', 'code', 'name', 'isActive', 'status'],
       relations: ['profile'],
     });
