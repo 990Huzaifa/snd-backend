@@ -37,6 +37,7 @@ export class TenantRoleService {
   async getRoleById(tenantDb: DataSource, id: string, user: any) {
     const role = await tenantDb.getRepository(Role).findOne({
       where: { id },
+      relations: ['permissions'],
     });
 
     if (!role) {

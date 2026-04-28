@@ -21,18 +21,17 @@ export class TenantUtilityService {
   }
 
   async getRoles(tenantDb: DataSource) {
-    const rolesWithPermissions = await tenantDb.getRepository(Role).find({
-        where: { isActive: true },
-        select: {
-          id: true,
-          code: true,
-          name: true,
-        },
-        order: { name: 'ASC' },
-      });
-      // remove permissions array from roles
-      const roles = rolesWithPermissions.map(({ permissions, ...role }) => role);
-      return { result: roles };
+    const roles = await tenantDb.getRepository(Role).find({
+      where: { isActive: true },
+      select: {
+        id: true,
+        code: true,
+        name: true,
+      },
+      order: { name: 'ASC' },
+    });
+    // remove permissions array from roles
+    return { result: roles };
     }
 
   async getPermissions(tenantDb: DataSource) {

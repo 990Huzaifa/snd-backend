@@ -31,7 +31,7 @@ export class Role {
 
     // ✅ One Role → Many Permissions
     @ManyToMany(() => Permission, (permission) => permission.roles, {
-        eager: true, // auto load permissions
+        // eager: true, // auto load permissions
     })
     @JoinTable({
         name: 'rolePermissions',
