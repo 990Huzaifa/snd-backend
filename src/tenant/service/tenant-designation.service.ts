@@ -23,6 +23,7 @@ export class TenantDesignationService {
     const designationRepo = tenantDb.getRepository(Designation);
     const [designations, total] = await designationRepo.findAndCount({
       where: {
+        slug: Like(`%${search}%`),
         name: Like(`%${search}%`),
         isActive: true,
       },

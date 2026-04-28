@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import { TenantJwtAuthGuard } from 'src/auth/tenant-jwt-auth.guard';
 import { TenantPermissionGuard } from 'src/auth/tenant-permission.guard';
@@ -54,11 +54,25 @@ export class TenantUserController {
     return this.userService.listUsers(tenantDb, page, limit, search, sort, sortDirection, roleId, designationId);
   }
 
+  @Get(':id')
+  @RequirePermissions('VIEW_USER')
+  getById(@TenantConnection() tenantDb: DataSource, @Param('id') id: string) {
+    return this.userService.getUserById(tenantDb, id);
+  }
+
   @Post('')
   @RequirePermissions('CREATE_USER')
   create(@TenantConnection() tenantDb: DataSource, @Body() dto: CreateTenantUserDto,) {
     return this.userService.createUser(tenantDb, dto);
   }
+
+  @Put('update/:id/status')
+  @RequirePermissions('UPDATE_USER')
+  updateStatus(@TenantConnection() tenantDb: DataSource, @Param('id') id: string, @Query('status') status: boolean) {
+    return this.userService.updateUserStatus(tenantDb, id, status);
+  }
+
+  
 
   @Post('invite')
   invite(

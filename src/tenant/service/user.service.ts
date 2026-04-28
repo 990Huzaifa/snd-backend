@@ -51,10 +51,29 @@ export class UserService {
     const userRepo = tenantDb.getRepository(User);
     const roleRepo = tenantDb.getRepository(Role);
     const designationRepo = tenantDb.getRepository(Designation);
+    const totalUsers = await userRepo.count({
+      where: {
+        isDeleted: false,
+      },
+    });
+    const totalActiveUsers = await userRepo.count({
+      where: {
+        isDeleted: false,
+        isActive: true,
+      },
+    });
+    const totalInactiveUsers = await userRepo.count({
+      where: {
+        isDeleted: false,
+        isActive: false,
+      },
+    });
     const [users, total] = await userRepo.findAndCount({
       relations: ['role', 'designation'],
       where: {
         name: Like(`%${search}%`),
+        email: Like(`%${search}%`),
+        cnic: Like(`%${search}%`),
         role: roleId ? await roleRepo.findOne({ where: { id: roleId } }) : undefined,
         designation: designationId ? await designationRepo.findOne({ where: { id: Number(designationId) } }) : undefined,
         isDeleted: false,
@@ -68,6 +87,9 @@ export class UserService {
     });
     return {
       result: users,
+      totalUsers,
+      totalActiveUsers,
+      totalInactiveUsers,
       meta: {
         total,
         page,
@@ -245,6 +267,18 @@ export class UserService {
     };
   }
 
-
+  async updateUserStatus(tenantDb: DataSource, id: string, status: boolean) {
+    const userRepo = tenantDb.getRepository(User);
+    const user = await userRepo.findOne({ where: { id } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+    user.isActive = status;
+    await userRepo.save(user);
+    return {
+      message: 'User status updated successfully',
+      user,
+    };
+  }
 }
 
