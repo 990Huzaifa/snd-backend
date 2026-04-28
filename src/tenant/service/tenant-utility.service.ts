@@ -19,7 +19,12 @@ export class TenantUtilityService {
   async getRoles(tenantDb: DataSource) {
     const roles = await tenantDb.getRepository(Role).find({
       where: { isActive: true },
-      select: ['id', 'code', 'name'],
+      select: {
+        id: true,
+        code: true,
+        name: true,
+        permissions: false,
+      },
       order: { name: 'ASC' },
     });
 
