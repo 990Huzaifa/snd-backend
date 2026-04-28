@@ -47,7 +47,7 @@ export class UserService {
     return `${baseUrl}/user/${userCode}/setup?${query.toString()}`;
   }
 
-  async listUsers(tenantDb: DataSource, page: number, limit: number, search: string, sort: string, sortDirection: string, roleId: string, designationId: string) {
+  async listUsers(tenantDb: DataSource, page: number, limit: number, search: string, sort: string, sortDirection: string, roleId: string, designationId: string, authUser: any) {
     const userRepo = tenantDb.getRepository(User);
     const roleRepo = tenantDb.getRepository(Role);
     const designationRepo = tenantDb.getRepository(Designation);
@@ -83,13 +83,19 @@ export class UserService {
     users.forEach(user => {
       delete user.password;
     });
+    // remove user where role code is SUPER_ADMIN if authenticated user is not SUPER_ADMIN
+    let filteredUsers = users;
+    const authenticatedUser = await userRepo.findOne({ where: { id: authUser.id } });
+    if (authenticatedUser.role.code !== 'SUPER_ADMIN') {
+      filteredUsers = users.filter(user => user.role.code !== 'SUPER_ADMIN');
+    }
     return {
-      result: users,
+      result: filteredUsers,
       totalUsers,
       totalActiveUsers,
       totalInactiveUsers,
       meta: {
-        total,
+        total: filteredUsers.length,
         page,
         limit,
       },
