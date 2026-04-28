@@ -6,7 +6,7 @@ import { Permission } from 'src/tenant-db/entities/permission.entity';
 import { Region } from 'src/tenant-db/entities/region.entity';
 import { Area } from 'src/tenant-db/entities/area.entity';
 import { Distributor } from 'src/tenant-db/entities/distributor.entity';
-import { ProductBrand, ProductCategory, Uom } from 'src/tenant-db/entities/product.entity';
+import { Flavour, ProductBrand, ProductCategory, Uom } from 'src/tenant-db/entities/product.entity';
 
 @Injectable()
 export class TenantUtilityService {
@@ -91,6 +91,15 @@ export class TenantUtilityService {
     });
 
     return { result: productBrands };
+  }
+
+  async getFlavours(tenantDb: DataSource) {
+    const flavours = await tenantDb.getRepository(Flavour).find({
+      select: ['id', 'name'],
+      order: { name: 'ASC' },
+    });
+
+    return { result: flavours };
   }
 
   async uoms(tenantDb: DataSource) {

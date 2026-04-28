@@ -51,6 +51,11 @@ export class TenantUtilityController {
         return this.utilityService.getProductBrands(tenantDb);
     }
 
+    @Get('flavours')
+    async getFlavours(@TenantConnection() tenantDb: DataSource,) {
+        return this.utilityService.getFlavours(tenantDb);
+    }
+
     @Get('uoms')
     async uoms(@TenantConnection() tenantDb: DataSource,) {
         return this.utilityService.uoms(tenantDb);

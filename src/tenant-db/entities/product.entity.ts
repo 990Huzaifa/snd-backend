@@ -35,6 +35,25 @@ export class ProductCategory {
     createdAt: Date;
 }
 
+@Entity('flavours')
+export class Flavour {
+    @PrimaryGeneratedColumn('uuid')
+    id: string;
+
+    @Column()
+    name: string;
+
+    @OneToMany(() => ProductFlavour, (productFlavour) => productFlavour.flavour)
+    products: ProductFlavour[];
+
+    @CreateDateColumn()
+    createdAt: Date;
+
+    @UpdateDateColumn()
+    updatedAt: Date;
+
+}
+
 @Entity({ name: 'uoms' })
 export class Uom {
     @PrimaryGeneratedColumn('uuid')
@@ -134,8 +153,12 @@ export class ProductFlavour {
     @Column()
     productId: string;
 
+    @ManyToOne(() => Flavour, (flavour) => flavour.products, { onDelete: 'RESTRICT' })
+    @JoinColumn()
+    flavour: Flavour;
+
     @Column()
-    name: string;
+    flavourId: string;
 
     @CreateDateColumn()
     createdAt: Date;

@@ -12,8 +12,11 @@ import { TenantActivityLogController } from './controller/tenant-activity-log.co
 import { TenantDesignationController } from './controller/tenant-designation.controller';
 import { TenantNotificationController } from './controller/tenant-notification.controller';
 import { DistributorController } from './controller/distributor.controller';
+import { AreaController } from './controller/area.controller';
+import { FlavourController } from './controller/flavour.controller';
 import { ProductBrandController } from './controller/product-brand.controller';
 import { ProductCategoryController } from './controller/product-category.controller';
+import { RegionController } from './controller/region.controller';
 import { TenantRoleController } from './controller/tenant-role.controller';
 import { TenantUserController } from './controller/tenant-user.controller';
 import { UomController } from './controller/uom.controller';
@@ -22,8 +25,11 @@ import { ActivityLogService } from './service/activity-log.service';
 import { TenantDesignationService } from './service/tenant-designation.service';
 import { TenantNotificationService } from './service/tenant-notification.service';
 import { DistributorService } from './service/distributor.service';
+import { AreaService } from './service/area.service';
+import { FlavourService } from './service/flavour.service';
 import { ProductBrandService } from './service/product-brand.service';
 import { ProductCategoryService } from './service/product-category.service';
+import { RegionService } from './service/region.service';
 import { TenantRoleService } from './service/tenant-role.service';
 import { UomService } from './service/uom.service';
 import { UserService } from './service/user.service';
@@ -48,8 +54,11 @@ import { MasterGeoHelperService } from './service/master-geo-helper.service';
     TenantDesignationController,
     TenantNotificationController,
     DistributorController,
+    AreaController,
+    FlavourController,
     ProductBrandController,
     ProductCategoryController,
+    RegionController,
     UomController,
     TenantUtilityController,
     TenantUserController,
@@ -61,8 +70,11 @@ import { MasterGeoHelperService } from './service/master-geo-helper.service';
     TenantDesignationService,
     TenantNotificationService,
     DistributorService,
+    AreaService,
+    FlavourService,
     ProductBrandService,
     ProductCategoryService,
+    RegionService,
     UomService,
     TenantUtilityService,
     MasterGeoHelperService,
