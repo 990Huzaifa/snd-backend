@@ -50,8 +50,8 @@ export class TenantUserController {
 
   @Get('')
   @RequirePermissions('LIST_USER')
-  list(@TenantConnection() tenantDb: DataSource, @Query('page') page: number = 1, @Query('limit') limit: number = 10, @Query('search') search: string = '', @Query('sort') sort: string = 'createdAt', @Query('sortDirection') sortDirection: string = 'DESC', @Query('roleId') roleId: string = null, @Query('designationId') designationId: string = null, @Req() req: Request) {
-    return this.userService.listUsers(tenantDb, page, limit, search, sort, sortDirection, roleId, designationId, req.user);
+  list(@TenantConnection() tenantDb: DataSource, @Query('page') page: number = 1, @Query('limit') limit: number = 10, @Query('search') search: string = '', @Query('sort') sort: string = 'createdAt', @Query('sortDirection') sortDirection: string = 'DESC', @Query('roleId') roleId: string = null, @Query('designationId') designationId: string = null) {
+    return this.userService.listUsers(tenantDb, page, limit, search, sort, sortDirection, roleId, designationId);
   }
 
   @Get(':id')
