@@ -27,7 +27,7 @@ export class TenantUtilityService {
         id: true,
         code: true,
         name: true,
-        permissions: false,
+        permission: false,
       },
       order: { name: 'ASC' },
     });
