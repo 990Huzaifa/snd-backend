@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Brackets, DataSource } from 'typeorm';
+import { Brackets, DataSource, Repository } from 'typeorm';
 import { Distributor } from 'src/tenant-db/entities/distributor.entity';
 import { Area } from 'src/tenant-db/entities/area.entity';
 import { ActivityLogService } from './activity-log.service';
@@ -20,6 +20,16 @@ export class DistributorService {
 
   private normalize(value: string) {
     return value.trim();
+  }
+
+  private async generateUniqueUserCode(distributorRepo: Repository<Distributor>): Promise<string> {
+    while (true) {
+      const code = Math.floor(100000 + Math.random() * 900000).toString();
+      const existing = await distributorRepo.findOne({ where: { code }, select: ['id'] });
+      if (!existing) {
+        return code;
+      }
+    }
   }
 
   private parseBoolean(value?: string): boolean | undefined {
@@ -55,14 +65,6 @@ export class DistributorService {
   async create(tenantDb: DataSource, dto: CreateDistributorDto, user: any) {
     const distributorRepo = tenantDb.getRepository(Distributor);
     const areaRepo = tenantDb.getRepository(Area);
-    const code = this.normalize(dto.code);
-
-    const existingByCode = await distributorRepo.findOne({
-      where: { code },
-    });
-    if (existingByCode) {
-      throw new ConflictException('Distributor with this code already exists');
-    }
 
     const area = await areaRepo.findOne({
       where: { id: dto.areaId },
@@ -71,9 +73,11 @@ export class DistributorService {
       throw new NotFoundException('Area not found');
     }
 
+    const code = await this.generateUniqueUserCode(distributorRepo);
+    
     const distributor = distributorRepo.create({
-      name: this.normalize(dto.name),
       code,
+      name: this.normalize(dto.name),
       email: this.normalize(dto.email).toLowerCase(),
       phone: this.normalize(dto.phone),
       address: this.normalize(dto.address),
@@ -85,7 +89,7 @@ export class DistributorService {
       locationTitle: this.normalize(dto.locationTitle),
       latitude: dto.latitude,
       longitude: dto.longitude,
-      maxRadius: this.normalize(dto.maxRadius),
+      maxRadius: this.normalize(dto.maxRadius) ?? '0.5',
       isActive: dto.isActive ?? true,
     });
 
