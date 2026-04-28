@@ -46,6 +46,7 @@ export class TenantAuthService {
     dto: TenantLoginDto,
     hostHeader: string | undefined,
   ): Promise<{ access_token: string; user: User }> {
+    console.log('hostHeader', hostHeader);
     const fromHost = extractTenantCodeFromHost(hostHeader);
     console.log('fromHost', fromHost);
     const tenantName = (fromHost ?? dto.tenantName)?.trim();
