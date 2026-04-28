@@ -45,7 +45,6 @@ export class TenantAuthController {
     @Req() req: Request,
   ): Promise<{ access_token: string }> {
     const origin = getRequestHeader(req, ['origin', 'x-forwarded-origin']);
-    console.log('this is origin', origin);
     const referer = getRequestHeader(req, ['referer']);
     const host = getRequestHeader(req, ['x-original-host', 'x-forwarded-host', 'host']);
     return this.tenantAuthService.login(dto, resolveTenantHost(origin, referer, host));

@@ -46,9 +46,7 @@ export class TenantAuthService {
     dto: TenantLoginDto,
     origin: string | undefined,
   ): Promise<{ access_token: string; user: User }> {
-    console.log('origin', origin);
     const fromHost = extractTenantCodeFromHost(origin);
-    console.log('fromHost', fromHost);
     const tenantName = (fromHost ?? dto.tenantName)?.trim();
     if (!tenantName) {
       throw new BadRequestException(
