@@ -8,6 +8,7 @@ import { TenantAuthController } from './controller/tenant-auth.controller';
 import { TenantActivityLogController } from './controller/tenant-activity-log.controller';
 import { TenantDesignationController } from './controller/tenant-designation.controller';
 import { TenantNotificationController } from './controller/tenant-notification.controller';
+import { DistributorController } from './controller/distributor.controller';
 import { ProductBrandController } from './controller/product-brand.controller';
 import { ProductCategoryController } from './controller/product-category.controller';
 import { TenantRoleController } from './controller/tenant-role.controller';
@@ -17,6 +18,7 @@ import { TenantAuthService } from './service/tenant-auth.service';
 import { ActivityLogService } from './service/activity-log.service';
 import { TenantDesignationService } from './service/tenant-designation.service';
 import { TenantNotificationService } from './service/tenant-notification.service';
+import { DistributorService } from './service/distributor.service';
 import { ProductBrandService } from './service/product-brand.service';
 import { ProductCategoryService } from './service/product-category.service';
 import { TenantRoleService } from './service/tenant-role.service';
@@ -41,6 +43,7 @@ import { TenantUtilityService } from './service/tenant-utility.service';
     TenantRoleController,
     TenantDesignationController,
     TenantNotificationController,
+    DistributorController,
     ProductBrandController,
     ProductCategoryController,
     UomController,
@@ -53,6 +56,7 @@ import { TenantUtilityService } from './service/tenant-utility.service';
     TenantRoleService,
     TenantDesignationService,
     TenantNotificationService,
+    DistributorService,
     ProductBrandService,
     ProductCategoryService,
     UomService,
