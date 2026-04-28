@@ -2,6 +2,9 @@ import { Module } from '@nestjs/common';
 import { HttpModule } from '@nestjs/axios';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Tenant } from 'src/master-db/entities/tenant.entity';
+import { Country } from 'src/master-db/entities/country.entity';
+import { State } from 'src/master-db/entities/state.entity';
+import { City } from 'src/master-db/entities/city.entity';
 import { AuthModule } from 'src/auth/auth.module';
 import { TenantRuntimeModule } from 'src/tenant-db/tenant-runtime.module';
 import { TenantAuthController } from './controller/tenant-auth.controller';
@@ -28,6 +31,7 @@ import { TenantPermissionGuard } from 'src/auth/tenant-permission.guard';
 import { TenantUtilityController } from './controller/utility.controller';
 import { MailModule } from 'src/common/mail/mail.module';
 import { TenantUtilityService } from './service/tenant-utility.service';
+import { MasterGeoHelperService } from './service/master-geo-helper.service';
 
 @Module({
   imports: [
@@ -35,7 +39,7 @@ import { TenantUtilityService } from './service/tenant-utility.service';
     AuthModule,
     MailModule,
     TenantRuntimeModule,
-    TypeOrmModule.forFeature([Tenant]),
+    TypeOrmModule.forFeature([Tenant, Country, State, City]),
   ],
   controllers: [
     TenantAuthController,
@@ -61,6 +65,7 @@ import { TenantUtilityService } from './service/tenant-utility.service';
     ProductCategoryService,
     UomService,
     TenantUtilityService,
+    MasterGeoHelperService,
     UserService,
     TenantPermissionGuard,
   ],

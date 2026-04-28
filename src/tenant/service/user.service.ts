@@ -13,6 +13,7 @@ import { Designation } from 'src/tenant-db/entities/user.entity';
 import { CreateTenantUserDto } from '../dto/user/create-tenant-user.dto';
 import { InviteTenantUserDto } from '../dto/user/invite-tenant-user.dto';
 import { ActivityLogService } from './activity-log.service';
+import { MasterGeoHelperService } from './master-geo-helper.service';
 
 @Injectable()
 export class UserService {
@@ -20,6 +21,7 @@ export class UserService {
     private readonly mailService: MailService,
     private readonly jwtService: JwtService,
     private readonly activityLogService: ActivityLogService,
+    private readonly masterGeoHelperService: MasterGeoHelperService,
   ) {}
 
   private async generateUniqueUserCode(userRepo: Repository<User>): Promise<string> {
@@ -47,6 +49,23 @@ export class UserService {
       query.set('tenantCode', tenantCode);
     }
     return `${baseUrl}/user/${userCode}/setup?${query.toString()}`;
+  }
+
+  private async attachGeoNames<T extends { countryId?: string | null; stateId?: string | null; cityId?: string | null }>(
+    data: T,
+  ): Promise<T & { countryName: string | null; stateName: string | null; cityName: string | null }> {
+    const [countryName, stateName, cityName] = await Promise.all([
+      this.masterGeoHelperService.getCountryNameById(data.countryId),
+      this.masterGeoHelperService.getStateNameById(data.stateId),
+      this.masterGeoHelperService.getCityNameById(data.cityId),
+    ]);
+
+    return {
+      ...data,
+      countryName,
+      stateName,
+      cityName,
+    };
   }
 
   async listUsers(tenantDb: DataSource, page: number, limit: number, search: string, sort: string, sortDirection: string, roleId: string, designationId: string, user: any) {
@@ -96,8 +115,12 @@ export class UserService {
       description: `Users listed`,
       metadata: { total, page, limit },
     });
+    const usersWithGeoNames = await Promise.all(
+      filteredusers.map((listUser) => this.attachGeoNames(listUser)),
+    );
+
     return {
-      result: filteredusers,
+      result: usersWithGeoNames,
       totalUsers,
       totalActiveUsers,
       totalInactiveUsers,
