@@ -25,7 +25,6 @@ export class CreateTenantUserDto {
   @MinLength(1)
   roleId: string;
 
-  @IsOptional()
   @IsInt()
   designationId?: number;
 
