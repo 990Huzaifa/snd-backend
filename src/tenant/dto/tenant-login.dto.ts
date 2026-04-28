@@ -12,5 +12,5 @@ export class TenantLoginDto {
   @IsOptional()
   @IsString()
   @MinLength(1)
-  tenantName?: string;
+  tenantCode?: string;
 }
