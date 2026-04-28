@@ -55,7 +55,7 @@ export class TenantDesignationController {
     return this.tenantDesignationService.createDesignation(tenantDb, dto);
   }
 
-  @Post('update/:id')
+  @Put('update/:id')
   @RequirePermissions('UPDATE_DESIGNATION')
   update(
     @TenantConnection() tenantDb: DataSource,

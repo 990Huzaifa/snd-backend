@@ -13,7 +13,6 @@ import { TenantDesignationService } from './service/tenant-designation.service';
 import { TenantRoleService } from './service/tenant-role.service';
 import { UserService } from './service/user.service';
 import { TenantPermissionGuard } from 'src/auth/tenant-permission.guard';
-import { TenantPermissionController } from './controller/tenant-permission.controller';
 import { TenantUtilityController } from './controller/utility.controller';
 import { MailModule } from 'src/common/mail/mail.module';
 import { TenantUtilityService } from './service/tenant-utility.service';
@@ -30,7 +29,6 @@ import { TenantUtilityService } from './service/tenant-utility.service';
     TenantAuthController,
     TenantRoleController,
     TenantDesignationController,
-    TenantPermissionController,
     TenantUtilityController,
     TenantUserController,
   ],

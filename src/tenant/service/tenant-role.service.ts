@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { DataSource, In } from 'typeorm';
+import { DataSource, In, Like } from 'typeorm';
 import { Role } from 'src/tenant-db/entities/role.entity';
 import { Permission } from 'src/tenant-db/entities/permission.entity';
 import { CreateTenantRoleDto } from '../dto/role/create-tenant-role.dto';
@@ -11,15 +11,19 @@ import { UpdateTenantRoleDto } from '../dto/role/update-tenant-role.dto';
 
 @Injectable()
 export class TenantRoleService {
-  async listRoles(tenantDb: DataSource) {
-    const roles = await tenantDb
-      .getRepository(Role)
-      .createQueryBuilder('role')
-      .select(['role.id', 'role.code', 'role.name', 'role.isActive', 'role.updatedAt'])
-      .orderBy('role.updatedAt', 'DESC')
-      .getMany();
+  async listRoles(tenantDb: DataSource, page: number, limit: number, search: string) {
+    const roleRepo = tenantDb.getRepository(Role);
+    const [roles, total] = await roleRepo.findAndCount({
+      where: {
+        name: Like(`%${search}%`),
+        isActive: true,
+      },
+      order: { createdAt: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
+    });
 
-    return { result: roles };
+    return { result: roles, meta: { total, page, limit } };
   }
 
   async getRoleById(tenantDb: DataSource, id: string) {
@@ -120,18 +124,4 @@ export class TenantRoleService {
     return role;
   }
 
-  async permissionsList(tenantDb: DataSource) {
-    const permissions = await tenantDb.getRepository(Permission).find({
-      where: { isActive: true },
-    });
-
-    // map the permissions to the following format
-    const mappedPermissions = permissions.map((permission) => ({
-      id: permission.id,
-      code: permission.code,
-      name: permission.name,
-    }));
-
-    return { result: mappedPermissions };
-  }
 }

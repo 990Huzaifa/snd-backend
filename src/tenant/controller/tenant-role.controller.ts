@@ -4,7 +4,9 @@ import {
   Get,
   Param,
   Post,
+  Query,
   UseGuards,
+  Put,
 } from '@nestjs/common';
 import { TenantJwtAuthGuard } from 'src/auth/tenant-jwt-auth.guard';
 import { TenantPermissionGuard } from 'src/auth/tenant-permission.guard';
@@ -29,8 +31,8 @@ export class TenantRoleController {
 
   @Get()
   @RequirePermissions('LIST_ROLE')
-  list(@TenantConnection() tenantDb: DataSource) {
-    return this.tenantRoleService.listRoles(tenantDb);
+  list(@TenantConnection() tenantDb: DataSource, @Query('page') page: number = 1, @Query('limit') limit: number = 10, @Query('search') search: string = '') {
+    return this.tenantRoleService.listRoles(tenantDb, page, limit, search);
   }
 
   @Get(':id')
@@ -51,7 +53,7 @@ export class TenantRoleController {
     return this.tenantRoleService.createRole(tenantDb, dto);
   }
 
-  @Post('update/:id')
+  @Put('update/:id')
   @RequirePermissions('UPDATE_ROLE')
   update(
     @TenantConnection() tenantDb: DataSource,
