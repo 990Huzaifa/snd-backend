@@ -12,6 +12,7 @@ import { TenantConnectionManager } from 'src/tenant-db/services/tenant-connectio
 import { User } from 'src/tenant-db/entities/user.entity';
 import { TenantLoginDto } from '../dto/tenant-login.dto';
 import { SetupTenantUserPasswordDto } from '../dto/user/setup-tenant-user-password.dto';
+import { ActivityLogService } from './activity-log.service';
 
 /**
  * First label of host is treated as tenantCode unless it is `api` or `www`.
@@ -40,6 +41,7 @@ export class TenantAuthService {
     private readonly tenantRepo: Repository<Tenant>,
     private readonly tenantConnectionManager: TenantConnectionManager,
     private readonly jwtService: JwtService,
+    private readonly activityLogService: ActivityLogService,
   ) {}
 
   async login(
@@ -48,6 +50,7 @@ export class TenantAuthService {
   ): Promise<{ access_token: string; user: User }> {
     const fromHost = extractTenantCodeFromHost(origin);
     const tenantName = (fromHost ?? dto.tenantName)?.trim();
+    // console.log('tenantName', tenantName);
     if (!tenantName) {
       throw new BadRequestException(
         'Tenant could not be resolved: use a tenant subdomain or pass tenantCode in the body',
@@ -55,7 +58,7 @@ export class TenantAuthService {
     }
 
     const tenant = await this.tenantRepo.findOne({
-      where: [{ name: tenantName }],
+      where: [{ name: tenantName }, { code: tenantName }],
       select: ['id', 'code', 'name', 'isActive', 'status'],
       relations: ['profile'],
     });
@@ -109,6 +112,13 @@ export class TenantAuthService {
     };
 
     delete user.password;
+
+    await this.activityLogService.recordActivityLog(tenantDb, {
+      actorId: user.id,
+      action: 'USER_LOGIN',
+      description: `User ${user.email} logged in`,
+      metadata: { userId: user.id },
+    });
 
     return {
       access_token: this.jwtService.sign(payload),
@@ -172,6 +182,13 @@ export class TenantAuthService {
 
     user.password = await bcrypt.hash(dto.password, 10);
     await userRepo.save(user);
+
+    await this.activityLogService.recordActivityLog(tenantDb, {
+      actorId: user.id,
+      action: 'USER_PASSWORD_SETUP',
+      description: `Password setup completed for ${user.email}`,
+      metadata: { userId: user.id },
+    });
 
     return { message: 'Password setup completed successfully' };
   }

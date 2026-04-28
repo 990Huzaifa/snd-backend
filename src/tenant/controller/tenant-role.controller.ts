@@ -5,9 +5,12 @@ import {
   Param,
   Post,
   Query,
+  Req,
   UseGuards,
   Put,
+  UnauthorizedException,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import { TenantJwtAuthGuard } from 'src/auth/tenant-jwt-auth.guard';
 import { TenantPermissionGuard } from 'src/auth/tenant-permission.guard';
 import { RequirePermissions } from 'src/auth/require-permission.decorator';
@@ -31,8 +34,8 @@ export class TenantRoleController {
 
   @Get()
   @RequirePermissions('LIST_ROLE')
-  list(@TenantConnection() tenantDb: DataSource, @Query('page') page: number = 1, @Query('limit') limit: number = 10, @Query('search') search: string = '') {
-    return this.tenantRoleService.listRoles(tenantDb, page, limit, search);
+  list(@TenantConnection() tenantDb: DataSource, @Query('page') page: number = 1, @Query('limit') limit: number = 10, @Query('search') search: string = '', @Req() req: Request) {
+    return this.tenantRoleService.listRoles(tenantDb, page, limit, search, req.user);
   }
 
   @Get(':id')
@@ -40,8 +43,9 @@ export class TenantRoleController {
   getById(
     @TenantConnection() tenantDb: DataSource,
     @Param('id') id: string,
+    @Req() req: Request,
   ) {
-    return this.tenantRoleService.getRoleById(tenantDb, id);
+    return this.tenantRoleService.getRoleById(tenantDb, id, req.user);
   }
 
   @Post('create')
@@ -49,8 +53,9 @@ export class TenantRoleController {
   create(
     @TenantConnection() tenantDb: DataSource,
     @Body() dto: CreateTenantRoleDto,
+    @Req() req: Request,
   ) {
-    return this.tenantRoleService.createRole(tenantDb, dto);
+    return this.tenantRoleService.createRole(tenantDb, dto, req.user);
   }
 
   @Put('update/:id')
@@ -59,7 +64,8 @@ export class TenantRoleController {
     @TenantConnection() tenantDb: DataSource,
     @Param('id') id: string,
     @Body() dto: UpdateTenantRoleDto,
+    @Req() req: Request,
   ) {
-    return this.tenantRoleService.updateRole(tenantDb, id, dto);
+    return this.tenantRoleService.updateRole(tenantDb, id, dto, req.user);
   }
 }

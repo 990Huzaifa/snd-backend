@@ -5,11 +5,15 @@ import { Tenant } from 'src/master-db/entities/tenant.entity';
 import { AuthModule } from 'src/auth/auth.module';
 import { TenantRuntimeModule } from 'src/tenant-db/tenant-runtime.module';
 import { TenantAuthController } from './controller/tenant-auth.controller';
+import { TenantActivityLogController } from './controller/tenant-activity-log.controller';
 import { TenantDesignationController } from './controller/tenant-designation.controller';
+import { TenantNotificationController } from './controller/tenant-notification.controller';
 import { TenantRoleController } from './controller/tenant-role.controller';
 import { TenantUserController } from './controller/tenant-user.controller';
 import { TenantAuthService } from './service/tenant-auth.service';
+import { ActivityLogService } from './service/activity-log.service';
 import { TenantDesignationService } from './service/tenant-designation.service';
+import { TenantNotificationService } from './service/tenant-notification.service';
 import { TenantRoleService } from './service/tenant-role.service';
 import { UserService } from './service/user.service';
 import { TenantPermissionGuard } from 'src/auth/tenant-permission.guard';
@@ -27,15 +31,19 @@ import { TenantUtilityService } from './service/tenant-utility.service';
   ],
   controllers: [
     TenantAuthController,
+    TenantActivityLogController,
     TenantRoleController,
     TenantDesignationController,
+    TenantNotificationController,
     TenantUtilityController,
     TenantUserController,
   ],
   providers: [
     TenantAuthService,
+    ActivityLogService,
     TenantRoleService,
     TenantDesignationService,
+    TenantNotificationService,
     TenantUtilityService,
     UserService,
     TenantPermissionGuard,

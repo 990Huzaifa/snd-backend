@@ -8,9 +8,12 @@ import { DataSource, Like } from 'typeorm';
 import { Designation } from 'src/tenant-db/entities/user.entity';
 import { CreateTenantDesignationDto } from '../dto/designation/create-tenant-designation.dto';
 import { UpdateTenantDesignationDto } from '../dto/designation/update-tenant-designation.dto';
+import { ActivityLogService } from './activity-log.service';
 
 @Injectable()
 export class TenantDesignationService {
+  constructor(private readonly activityLogService: ActivityLogService) {}
+
   private toId(id: string): number {
     const parsed = Number(id);
     if (!Number.isInteger(parsed) || parsed <= 0) {
@@ -19,7 +22,7 @@ export class TenantDesignationService {
     return parsed;
   }
 
-  async listDesignations(tenantDb: DataSource, page: number, limit: number, search: string) {
+  async listDesignations(tenantDb: DataSource, page: number, limit: number, search: string, user: any) {
     const designationRepo = tenantDb.getRepository(Designation);
     const [designations, total] = await designationRepo.findAndCount({
       where: {
@@ -31,11 +34,16 @@ export class TenantDesignationService {
       skip: (page - 1) * limit,
       take: limit,
     });
-
+    await this.activityLogService.recordActivityLog(tenantDb, {
+      actorId: user.userId,
+      action: 'DESIGNATION_LISTED',
+      description: `Designations listed`,
+      metadata: { total, page, limit },
+    });
     return { result: designations, meta: { total, page, limit } };
   }
 
-  async getDesignationById(tenantDb: DataSource, id: string) {
+  async getDesignationById(tenantDb: DataSource, id: string, user: any) {
     const designationId = this.toId(id);
     const designation = await tenantDb.getRepository(Designation).findOne({
       where: { id: designationId },
@@ -44,11 +52,16 @@ export class TenantDesignationService {
     if (!designation) {
       throw new NotFoundException('Designation not found');
     }
-
+    await this.activityLogService.recordActivityLog(tenantDb, {
+      actorId: user.userId,
+      action: 'DESIGNATION_VIEWED',
+      description: `Designation ${designation.name} viewed`,
+      metadata: { designationId: designation.id },
+    });
     return designation;
   }
 
-  async createDesignation(tenantDb: DataSource, dto: CreateTenantDesignationDto) {
+  async createDesignation(tenantDb: DataSource, dto: CreateTenantDesignationDto, user: any) {
     const slug = dto.slug.trim().toLowerCase();
     const existingBySlug = await tenantDb.getRepository(Designation).findOne({
       where: { slug },
@@ -58,7 +71,7 @@ export class TenantDesignationService {
       throw new ConflictException('Designation with this slug already exists');
     }
 
-    return tenantDb.getRepository(Designation).save(
+    const createdDesignation = await tenantDb.getRepository(Designation).save(
       tenantDb.getRepository(Designation).create({
         name: dto.name.trim(),
         slug,
@@ -66,12 +79,22 @@ export class TenantDesignationService {
         isActive: dto.is_active ?? true,
       }),
     );
+
+    await this.activityLogService.recordActivityLog(tenantDb, {
+      actorId: user.userId,
+      action: 'DESIGNATION_CREATED',
+      description: `Designation ${createdDesignation.name} created`,
+      metadata: { designationId: createdDesignation.id, slug: createdDesignation.slug },
+    });
+
+    return createdDesignation;
   }
 
   async updateDesignation(
     tenantDb: DataSource,
     id: string,
     dto: UpdateTenantDesignationDto,
+    user: any,
   ) {
     const designationId = this.toId(id);
     const designation = await tenantDb.getRepository(Designation).findOne({
@@ -108,10 +131,18 @@ export class TenantDesignationService {
     }
 
     await tenantDb.getRepository(Designation).save(designation);
+
+    await this.activityLogService.recordActivityLog(tenantDb, {
+      actorId: user.userId,
+      action: 'DESIGNATION_UPDATED',
+      description: `Designation ${designation.name} updated`,
+      metadata: { designationId: designation.id, slug: designation.slug },
+    });
+
     return designation;
   }
 
-  async updateDesignationStatus(tenantDb: DataSource, id: string, status: boolean) {
+  async updateDesignationStatus(tenantDb: DataSource, id: string, status: boolean, user: any) {
     const designationId = this.toId(id);
     const designation = await tenantDb.getRepository(Designation).findOne({
       where: { id: designationId },
@@ -121,6 +152,14 @@ export class TenantDesignationService {
     }
     designation.isActive = status;
     await tenantDb.getRepository(Designation).save(designation);
+
+    await this.activityLogService.recordActivityLog(tenantDb, {
+      actorId: user.userId,
+      action: 'DESIGNATION_STATUS_UPDATED',
+      description: `Designation ${designation.name} status updated`,
+      metadata: { designationId: designation.id, isActive: designation.isActive },
+    });
+
     return {
       message: 'Designation status updated successfully',
       designation,

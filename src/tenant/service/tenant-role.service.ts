@@ -8,10 +8,13 @@ import { Role } from 'src/tenant-db/entities/role.entity';
 import { Permission } from 'src/tenant-db/entities/permission.entity';
 import { CreateTenantRoleDto } from '../dto/role/create-tenant-role.dto';
 import { UpdateTenantRoleDto } from '../dto/role/update-tenant-role.dto';
+import { ActivityLogService } from './activity-log.service';
 
 @Injectable()
 export class TenantRoleService {
-  async listRoles(tenantDb: DataSource, page: number, limit: number, search: string) {
+  constructor(private readonly activityLogService: ActivityLogService) {}
+
+  async listRoles(tenantDb: DataSource, page: number, limit: number, search: string, user: any) {
     const roleRepo = tenantDb.getRepository(Role);
     const [roles, total] = await roleRepo.findAndCount({
       where: {
@@ -22,11 +25,16 @@ export class TenantRoleService {
       skip: (page - 1) * limit,
       take: limit,
     });
-
+    await this.activityLogService.recordActivityLog(tenantDb, {
+      actorId: user.userId,
+      action: 'ROLE_LISTED',
+      description: `Roles listed`,
+      metadata: { total, page, limit },
+    });
     return { result: roles, meta: { total, page, limit } };
   }
 
-  async getRoleById(tenantDb: DataSource, id: string) {
+  async getRoleById(tenantDb: DataSource, id: string, user: any) {
     const role = await tenantDb.getRepository(Role).findOne({
       where: { id },
     });
@@ -35,10 +43,17 @@ export class TenantRoleService {
       throw new NotFoundException('Role not found');
     }
 
+    await this.activityLogService.recordActivityLog(tenantDb, {
+      actorId: user.userId,
+      action: 'ROLE_VIEWED',
+      description: `Role ${role.name} viewed`,
+      metadata: { roleId: role.id },
+    });
+
     return role;
   }
 
-  async createRole(tenantDb: DataSource, dto: CreateTenantRoleDto) {
+  async createRole(tenantDb: DataSource, dto: CreateTenantRoleDto, user: any) {
     const code = dto.code.trim().toUpperCase();
     const name = dto.name.trim();
     const codes = [
@@ -61,7 +76,7 @@ export class TenantRoleService {
       throw new NotFoundException('One or more permissions not found');
     }
 
-    return tenantDb.getRepository(Role).save(
+    const createdRole = await tenantDb.getRepository(Role).save(
       tenantDb.getRepository(Role).create({
         code,
         name,
@@ -69,12 +84,22 @@ export class TenantRoleService {
         permissions,
       }),
     );
+
+    await this.activityLogService.recordActivityLog(tenantDb, {
+      actorId: user.userId,
+      action: 'ROLE_CREATED',
+      description: `Role ${createdRole.name} created`,
+      metadata: { roleId: createdRole.id, code: createdRole.code },
+    });
+
+    return createdRole;
   }
 
   async updateRole(
     tenantDb: DataSource,
     id: string,
     dto: UpdateTenantRoleDto,
+    user: any,
   ) {
     const role = await tenantDb.getRepository(Role).findOne({
       where: { id },
@@ -121,6 +146,14 @@ export class TenantRoleService {
     }
 
     await tenantDb.getRepository(Role).save(role);
+
+    await this.activityLogService.recordActivityLog(tenantDb, {
+      actorId: user.userId,
+      action: 'ROLE_UPDATED',
+      description: `Role ${role.name} updated`,
+      metadata: { roleId: role.id, code: role.code },
+    });
+
     return role;
   }
 

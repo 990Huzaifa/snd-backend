@@ -6,8 +6,11 @@ import {
   Post,
   Put,
   Query,
+  Req,
+  UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import { TenantJwtAuthGuard } from 'src/auth/tenant-jwt-auth.guard';
 import { TenantPermissionGuard } from 'src/auth/tenant-permission.guard';
 import { RequirePermissions } from 'src/auth/require-permission.decorator';
@@ -33,8 +36,8 @@ export class TenantDesignationController {
 
   @Get()
   @RequirePermissions('LIST_DESIGNATION')
-  list(@TenantConnection() tenantDb: DataSource, @Query('page') page: number = 1, @Query('limit') limit: number = 10, @Query('search') search: string = '') {
-    return this.tenantDesignationService.listDesignations(tenantDb, page, limit, search);
+  list(@TenantConnection() tenantDb: DataSource, @Query('page') page: number = 1, @Query('limit') limit: number = 10, @Query('search') search: string = '', @Req() req: Request) {
+    return this.tenantDesignationService.listDesignations(tenantDb, page, limit, search, req.user);
   }
 
   @Get(':id')
@@ -42,8 +45,9 @@ export class TenantDesignationController {
   getById(
     @TenantConnection() tenantDb: DataSource,
     @Param('id') id: string,
+    @Req() req: Request,
   ) {
-    return this.tenantDesignationService.getDesignationById(tenantDb, id);
+    return this.tenantDesignationService.getDesignationById(tenantDb, id, req.user);
   }
 
   @Post('create')
@@ -51,8 +55,9 @@ export class TenantDesignationController {
   create(
     @TenantConnection() tenantDb: DataSource,
     @Body() dto: CreateTenantDesignationDto,
+    @Req() req: Request,
   ) {
-    return this.tenantDesignationService.createDesignation(tenantDb, dto);
+    return this.tenantDesignationService.createDesignation(tenantDb, dto, req.user);
   }
 
   @Put('update/:id')
@@ -61,8 +66,9 @@ export class TenantDesignationController {
     @TenantConnection() tenantDb: DataSource,
     @Param('id') id: string,
     @Body() dto: UpdateTenantDesignationDto,
+    @Req() req: Request,
   ) {
-    return this.tenantDesignationService.updateDesignation(tenantDb, id, dto);
+    return this.tenantDesignationService.updateDesignation(tenantDb, id, dto, req.user);
   }
 
   @Put('update/:id/status')
@@ -71,7 +77,8 @@ export class TenantDesignationController {
     @TenantConnection() tenantDb: DataSource,
     @Param('id') id: string,
     @Query('status') status: boolean,
+    @Req() req: Request,
   ) {
-    return this.tenantDesignationService.updateDesignationStatus(tenantDb, id, status);
+    return this.tenantDesignationService.updateDesignationStatus(tenantDb, id, status, req.user);
   }
 }

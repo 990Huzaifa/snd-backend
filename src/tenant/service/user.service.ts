@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { DataSource, Like, Repository } from 'typeorm';
+import { DataSource, Like, Not, Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { MailService } from 'src/common/mail/mail.service';
 import { User } from 'src/tenant-db/entities/user.entity';
@@ -12,12 +12,14 @@ import { Role } from 'src/tenant-db/entities/role.entity';
 import { Designation } from 'src/tenant-db/entities/user.entity';
 import { CreateTenantUserDto } from '../dto/user/create-tenant-user.dto';
 import { InviteTenantUserDto } from '../dto/user/invite-tenant-user.dto';
+import { ActivityLogService } from './activity-log.service';
 
 @Injectable()
 export class UserService {
   constructor(
     private readonly mailService: MailService,
     private readonly jwtService: JwtService,
+    private readonly activityLogService: ActivityLogService,
   ) {}
 
   private async generateUniqueUserCode(userRepo: Repository<User>): Promise<string> {
@@ -47,7 +49,7 @@ export class UserService {
     return `${baseUrl}/user/${userCode}/setup?${query.toString()}`;
   }
 
-  async listUsers(tenantDb: DataSource, page: number, limit: number, search: string, sort: string, sortDirection: string, roleId: string, designationId: string) {
+  async listUsers(tenantDb: DataSource, page: number, limit: number, search: string, sort: string, sortDirection: string, roleId: string, designationId: string, user: any) {
     const userRepo = tenantDb.getRepository(User);
     const roleRepo = tenantDb.getRepository(Role);
     const designationRepo = tenantDb.getRepository(Designation);
@@ -72,6 +74,7 @@ export class UserService {
       relations: ['role', 'designation'],
       where: {
         name: Like(`%${search}%`),
+        id: Not(user.userId),
         role: roleId ? await roleRepo.findOne({ where: { id: roleId } }) : undefined,
         designation: designationId ? await designationRepo.findOne({ where: { id: Number(designationId) } }) : undefined,
         isDeleted: false,
@@ -84,8 +87,17 @@ export class UserService {
       delete user.password;
     });
 
+    // remove admin role user from the list
+    const filteredusers = users.filter(user => user.role.code !== 'SUPER_ADMIN');
+    
+    await this.activityLogService.recordActivityLog(tenantDb, {
+      actorId: user.userId,
+      action: 'USER_LISTED',
+      description: `Users listed`,
+      metadata: { total, page, limit },
+    });
     return {
-      result: users,
+      result: filteredusers,
       totalUsers,
       totalActiveUsers,
       totalInactiveUsers,
@@ -97,7 +109,7 @@ export class UserService {
     };
   }
 
-  async getUserById(tenantDb: DataSource, id: string) {
+  async getUserById(tenantDb: DataSource, id: string, Authuser: any) {
     const userRepo = tenantDb.getRepository(User);
     const user = await userRepo.findOne({
       where: { id },
@@ -105,8 +117,15 @@ export class UserService {
     if (!user) {
       throw new NotFoundException('User not found');
     }
+    await this.activityLogService.recordActivityLog(tenantDb, {
+      actorId: Authuser.userId,
+      action: 'USER_VIEWED',
+      description: `User ${user.email} viewed`,
+      metadata: { userId: user.id },
+    });
+    return user;
   }
-  async createUser(tenantDb: DataSource, dto: CreateTenantUserDto) {
+  async createUser(tenantDb: DataSource, dto: CreateTenantUserDto, Authuser: any) {
     const userRepo = tenantDb.getRepository(User);
     const roleRepo = tenantDb.getRepository(Role);
     const designationRepo = tenantDb.getRepository(Designation);
@@ -168,17 +187,48 @@ export class UserService {
     });
 
     const createdUser = await userRepo.save(user);
+
+    await this.activityLogService.recordActivityLog(tenantDb, {
+      actorId: Authuser.userId,
+      action: 'USER_CREATED',
+      description: `User ${createdUser.email} created`,
+      metadata: { userId: createdUser.id, roleId: role.id },
+    });
+
     delete createdUser.password;
 
     return createdUser;
   }
 
+  async updateUserStatus(tenantDb: DataSource, id: string, status: boolean, Authuser: any) {
+    const userRepo = tenantDb.getRepository(User);
+    const user = await userRepo.findOne({ where: { id } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+    user.isActive = status;
+    await userRepo.save(user);
+
+    await this.activityLogService.recordActivityLog(tenantDb, {
+      actorId: Authuser.userId,
+      action: 'USER_STATUS_UPDATED',
+      description: `User ${user.email} status updated`,
+      metadata: { userId: user.id, isActive: user.isActive },
+    });
+
+    return {
+      message: 'User status updated successfully',
+      user,
+    };
+  }
+  
   async inviteUser(
     tenantDb: DataSource,
     dto: InviteTenantUserDto,
     tenantCode?: string,
     tenantName?: string,
     requestBaseUrl?: string,
+    Authuser?: any,
   ) {
     const userRepo = tenantDb.getRepository(User);
     const roleRepo = tenantDb.getRepository(Role);
@@ -258,25 +308,18 @@ export class UserService {
       'noreply@salesvince.com',
     );
 
+    await this.activityLogService.recordActivityLog(tenantDb, {
+      actorId: Authuser?.userId ?? null,
+      action: 'USER_INVITED',
+      description: `Invitation sent to ${savedUser.email}`,
+      metadata: { userId: savedUser.id, email: savedUser.email, roleId: role.id },
+    });
+
     return {
       message: 'Invitation sent successfully',
       userCode: savedUser.code,
       email: savedUser.email,
       setupUrl,
-    };
-  }
-
-  async updateUserStatus(tenantDb: DataSource, id: string, status: boolean) {
-    const userRepo = tenantDb.getRepository(User);
-    const user = await userRepo.findOne({ where: { id } });
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
-    user.isActive = status;
-    await userRepo.save(user);
-    return {
-      message: 'User status updated successfully',
-      user,
     };
   }
 }
