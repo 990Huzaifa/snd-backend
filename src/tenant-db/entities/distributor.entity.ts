@@ -2,11 +2,14 @@ import {
     Column,
     CreateDateColumn,
     Entity,
+    JoinColumn,
+    ManyToOne,
     OneToMany,
     PrimaryGeneratedColumn,
     UpdateDateColumn,
 } from 'typeorm';
 import { SalesmanDistributor } from './user.entity';
+import { Area } from './area.entity';
 
 @Entity('distributors')
 export class Distributor {
@@ -28,14 +31,18 @@ export class Distributor {
     @Column()
     address: string;
 
-    @Column()
-    city: string;
+    @Column({nullable: true})
+    countryId: string;
 
-    @Column()
-    state: string;
+    @Column({nullable: true})
+    stateId: string;
 
-    @Column()
-    country: string;
+    @Column({nullable: true})
+    cityId: string;
+
+    @ManyToOne(() => Area, (area) => area.distributors)
+    @JoinColumn({ name: 'areaId' })
+    area: Area;
 
     @Column()
     postalCode: string;

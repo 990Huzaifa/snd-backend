@@ -3,6 +3,9 @@ import { DataSource } from 'typeorm';
 import { Designation } from 'src/tenant-db/entities/user.entity';
 import { Role } from 'src/tenant-db/entities/role.entity';
 import { Permission } from 'src/tenant-db/entities/permission.entity';
+import { Region } from 'src/tenant-db/entities/region.entity';
+import { Area } from 'src/tenant-db/entities/area.entity';
+import { Distributor } from 'src/tenant-db/entities/distributor.entity';
 
 @Injectable()
 export class TenantUtilityService {
@@ -39,5 +42,35 @@ export class TenantUtilityService {
     });
 
     return { result: permissions };
+  }
+
+  async getRegions(tenantDb: DataSource) {
+    const regions = await tenantDb.getRepository(Region).find({
+      where: { isActive: true },
+      select: ['id', 'name', 'code'],
+      order: { name: 'ASC' },
+    });
+
+    return { result: regions };
+  }
+
+  async getAreas(tenantDb: DataSource, regionId: string) {
+    const areas = await tenantDb.getRepository(Area).find({
+      where: { region: { id: regionId }},
+      select: ['id', 'name', 'code'],
+      order: { name: 'ASC' },
+    });
+
+    return { result: areas };
+  }
+
+  async getDistributors(tenantDb: DataSource, areaId: string) {
+    const distributors = await tenantDb.getRepository(Distributor).find({
+      where: { area: { id: areaId }},
+      select: ['id', 'name', 'code'],
+      order: { name: 'ASC' },
+    });
+
+    return { result: distributors };
   }
 }
