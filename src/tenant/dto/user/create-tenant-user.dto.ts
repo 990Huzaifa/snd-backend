@@ -57,12 +57,12 @@ export class CreateTenantUserDto {
   cityId?: string;
 
   @IsOptional()
-  @IsDate()
-  joiningDate?: Date;
+  @IsString()
+  joiningDate?: string;
 
   @IsOptional()
-  @IsDate()
-  leavingDate?: Date;
+  @IsString()
+  leavingDate?: string;
 
   @IsOptional()
   @IsString()
