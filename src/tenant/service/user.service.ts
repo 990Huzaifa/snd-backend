@@ -115,12 +115,9 @@ export class UserService {
       description: `Users listed`,
       metadata: { total, page, limit },
     });
-    const usersWithGeoNames = await Promise.all(
-      filteredusers.map((listUser) => this.attachGeoNames(listUser)),
-    );
 
     return {
-      result: usersWithGeoNames,
+      result: filteredusers,
       totalUsers,
       totalActiveUsers,
       totalInactiveUsers,
@@ -140,13 +137,14 @@ export class UserService {
     if (!user) {
       throw new NotFoundException('User not found');
     }
+    const userWithGeoNames = await this.attachGeoNames(user);
     await this.activityLogService.recordActivityLog(tenantDb, {
       actorId: Authuser.userId,
       action: 'USER_VIEWED',
       description: `User ${user.email} viewed`,
       metadata: { userId: user.id },
     });
-    return user;
+    return userWithGeoNames;
   }
   async createUser(tenantDb: DataSource, dto: CreateTenantUserDto, Authuser: any) {
     const userRepo = tenantDb.getRepository(User);

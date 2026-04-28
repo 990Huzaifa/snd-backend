@@ -9,10 +9,14 @@ import { Area } from 'src/tenant-db/entities/area.entity';
 import { ActivityLogService } from './activity-log.service';
 import { CreateDistributorDto } from '../dto/distributor/create-distributor.dto';
 import { UpdateDistributorDto } from '../dto/distributor/update-distributor.dto';
+import { MasterGeoHelperService } from './master-geo-helper.service';
 
 @Injectable()
 export class DistributorService {
-  constructor(private readonly activityLogService: ActivityLogService) {}
+  constructor(
+    private readonly activityLogService: ActivityLogService,
+    private readonly masterGeoHelperService: MasterGeoHelperService,
+  ) {}
 
   private normalize(value: string) {
     return value.trim();
@@ -29,6 +33,23 @@ export class DistributorService {
       return false;
     }
     return undefined;
+  }
+
+  private async attachGeoNames<T extends { countryId?: string | null; stateId?: string | null; cityId?: string | null }>(
+    data: T,
+  ): Promise<T & { countryName: string | null; stateName: string | null; cityName: string | null }> {
+    const [countryName, stateName, cityName] = await Promise.all([
+      this.masterGeoHelperService.getCountryNameById(data.countryId),
+      this.masterGeoHelperService.getStateNameById(data.stateId),
+      this.masterGeoHelperService.getCityNameById(data.cityId),
+    ]);
+
+    return {
+      ...data,
+      countryName,
+      stateName,
+      cityName,
+    };
   }
 
   async create(tenantDb: DataSource, dto: CreateDistributorDto, user: any) {
@@ -143,6 +164,8 @@ export class DistributorService {
       throw new NotFoundException('Distributor not found');
     }
 
+    const distributorWithGeoNames = await this.attachGeoNames(distributor);
+
     await this.activityLogService.recordActivityLog(tenantDb, {
       actorId: user.userId,
       action: 'DISTRIBUTOR_VIEWED',
@@ -150,7 +173,7 @@ export class DistributorService {
       metadata: { distributorId: distributor.id },
     });
 
-    return distributor;
+    return distributorWithGeoNames;
   }
 
   async edit(tenantDb: DataSource, id: string, dto: UpdateDistributorDto, user: any) {
