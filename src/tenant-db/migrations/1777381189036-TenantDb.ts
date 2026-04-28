@@ -1,13 +1,13 @@
 import { MigrationInterface, QueryRunner } from "typeorm";
 
-export class TenantDb1777370113458 implements MigrationInterface {
-    name = 'TenantDb1777370113458'
+export class TenantDb1777381189036 implements MigrationInterface {
+    name = 'TenantDb1777381189036'
 
     public async up(queryRunner: QueryRunner): Promise<void> {
         await queryRunner.query(`CREATE TABLE "permissions" ("id" SERIAL NOT NULL, "code" character varying NOT NULL, "name" character varying NOT NULL, "isActive" boolean NOT NULL DEFAULT true, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "UQ_8dad765629e83229da6feda1c1d" UNIQUE ("code"), CONSTRAINT "PK_920331560282b8bd21bb02290df" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE TABLE "notifications" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "userId" uuid NOT NULL, "title" text NOT NULL, "message" text NOT NULL, "type" text NOT NULL, "isRead" boolean NOT NULL DEFAULT false, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_6a72c3c0f683f6462415e653c3a" PRIMARY KEY ("id"))`);
-        await queryRunner.query(`CREATE TABLE "regions" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "city" character varying NOT NULL, "name" character varying(150) NOT NULL, "code" character varying(50), "isActive" boolean NOT NULL DEFAULT true, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_4fcd12ed6a046276e2deb08801c" PRIMARY KEY ("id"))`);
-        await queryRunner.query(`CREATE UNIQUE INDEX "IDX_6bae96349f3ce06ce6b708facf" ON "regions" ("city", "name") `);
+        await queryRunner.query(`CREATE TABLE "regions" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "cityId" character varying NOT NULL, "name" character varying(150) NOT NULL, "code" character varying(50), "isActive" boolean NOT NULL DEFAULT true, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_4fcd12ed6a046276e2deb08801c" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE UNIQUE INDEX "IDX_1ab3aa79ae29d7f99f17c9a4a7" ON "regions" ("cityId", "name") `);
         await queryRunner.query(`CREATE TABLE "areas" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "name" character varying NOT NULL, "code" character varying NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "regionId" uuid, CONSTRAINT "PK_5110493f6342f34c978c084d0d6" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE TABLE "distributors" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "name" character varying NOT NULL, "code" character varying NOT NULL, "email" character varying NOT NULL, "phone" character varying NOT NULL, "address" character varying NOT NULL, "countryId" character varying, "stateId" character varying, "cityId" character varying, "postalCode" character varying NOT NULL, "locationTitle" character varying NOT NULL, "latitude" integer NOT NULL, "longitude" integer NOT NULL, "maxRadius" character varying NOT NULL, "isActive" boolean NOT NULL DEFAULT true, "isDeleted" boolean NOT NULL DEFAULT false, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "areaId" uuid, CONSTRAINT "PK_a3741291eb0af96f795b25d90b4" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE TABLE "designations" ("id" SERIAL NOT NULL, "name" character varying NOT NULL, "slug" character varying NOT NULL, "description" character varying, "isActive" boolean NOT NULL DEFAULT true, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_a0f024b99b1491a03fc421858ea" PRIMARY KEY ("id"))`);
@@ -77,7 +77,7 @@ export class TenantDb1777370113458 implements MigrationInterface {
         await queryRunner.query(`DROP TABLE "designations"`);
         await queryRunner.query(`DROP TABLE "distributors"`);
         await queryRunner.query(`DROP TABLE "areas"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_6bae96349f3ce06ce6b708facf"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_1ab3aa79ae29d7f99f17c9a4a7"`);
         await queryRunner.query(`DROP TABLE "regions"`);
         await queryRunner.query(`DROP TABLE "notifications"`);
         await queryRunner.query(`DROP TABLE "permissions"`);

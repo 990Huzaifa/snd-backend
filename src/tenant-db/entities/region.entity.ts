@@ -10,7 +10,7 @@ import {
 import { Area } from './area.entity';
 
 @Entity({ name: 'regions' })
-@Index(['city', 'name'], { unique: true })
+@Index(['cityId', 'name'], { unique: true })
 export class Region {
     @PrimaryGeneratedColumn('uuid')
     id: string;
@@ -20,7 +20,7 @@ export class Region {
      * No FK constraint (cross-database relation)
      */
     @Column()
-    city: string;
+    cityId: string;
 
     @Column({ length: 150 })
     name: string;
