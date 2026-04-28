@@ -44,10 +44,10 @@ export class TenantAuthService {
 
   async login(
     dto: TenantLoginDto,
-    hostHeader: string | undefined,
+    origin: string | undefined,
   ): Promise<{ access_token: string; user: User }> {
-    console.log('hostHeader', hostHeader);
-    const fromHost = extractTenantCodeFromHost(hostHeader);
+    console.log('origin', origin);
+    const fromHost = extractTenantCodeFromHost(origin);
     console.log('fromHost', fromHost);
     const tenantName = (fromHost ?? dto.tenantName)?.trim();
     if (!tenantName) {
