@@ -6,6 +6,7 @@ import { Permission } from 'src/tenant-db/entities/permission.entity';
 import { Region } from 'src/tenant-db/entities/region.entity';
 import { Area } from 'src/tenant-db/entities/area.entity';
 import { Distributor } from 'src/tenant-db/entities/distributor.entity';
+import { ProductBrand, ProductCategory, Uom } from 'src/tenant-db/entities/product.entity';
 
 @Injectable()
 export class TenantUtilityService {
@@ -72,5 +73,33 @@ export class TenantUtilityService {
     });
 
     return { result: distributors };
+  }
+
+  async getProductCategories(tenantDb: DataSource) {
+    const productCategories = await tenantDb.getRepository(ProductCategory).find({
+      select: ['id', 'name', 'slug'],
+      order: { name: 'ASC' },
+    });
+
+    return { result: productCategories };
+  }
+
+  async getProductBrands(tenantDb: DataSource) {
+    const productBrands = await tenantDb.getRepository(ProductBrand).find({
+      select: ['id', 'name'],
+      order: { name: 'ASC' },
+    });
+
+    return { result: productBrands };
+  }
+
+  async uoms(tenantDb: DataSource) {
+    const uoms = await tenantDb.getRepository(Uom).find({
+      select: ['id', 'name', 'isBase'],
+      where: { isBase: false },
+      order: { name: 'ASC' },
+    });
+
+    return { result: uoms };
   }
 }

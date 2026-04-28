@@ -41,4 +41,18 @@ export class TenantUtilityController {
         return this.utilityService.getDistributors(tenantDb, areaId);
     }
 
+    @Get('product-categories')
+    async getProductCategories(@TenantConnection() tenantDb: DataSource,) {
+        return this.utilityService.getProductCategories(tenantDb);
+    }
+
+    @Get('product-brands')
+    async getProductBrands(@TenantConnection() tenantDb: DataSource,) {
+        return this.utilityService.getProductBrands(tenantDb);
+    }
+
+    @Get('uoms')
+    async uoms(@TenantConnection() tenantDb: DataSource,) {
+        return this.utilityService.uoms(tenantDb);
+    }
 }
