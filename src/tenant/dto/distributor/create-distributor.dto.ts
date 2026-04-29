@@ -11,9 +11,6 @@ export class CreateDistributorDto {
   @IsString()
   name: string;
 
-  @IsString()
-  code: string;
-
   @IsEmail()
   email: string;
 
