@@ -228,4 +228,29 @@ export class DistributorService {
 
     return distributor;
   }
+
+  async updateStatus(tenantDb: DataSource, id: string, status: boolean, user: any) {
+    const distributor = await tenantDb.getRepository(Distributor).findOne({
+      where: { id, isDeleted: false },
+    });
+    if (!distributor) {
+      throw new NotFoundException('Distributor not found');
+    }
+    distributor.isActive = status;
+    await tenantDb.getRepository(Distributor).save(distributor);
+    await this.activityLogService.recordActivityLog(tenantDb, {
+      actorId: user.userId,
+      action: 'DISTRIBUTOR_STATUS_UPDATED',
+      description: `Distributor ${distributor.name} status updated to ${status}`,
+      metadata: { distributorId: distributor.id, status },
+    });
+    return {
+      message: 'Distributor status updated successfully',
+      distributor: {
+        id: distributor.id,
+        name: distributor.name,
+        status: distributor.isActive,
+      },
+    };
+  }
 }

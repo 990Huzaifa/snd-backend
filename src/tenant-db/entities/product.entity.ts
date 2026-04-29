@@ -9,6 +9,10 @@ import {
     UpdateDateColumn,
 } from 'typeorm';
 import { User } from './user.entity';
+import { PurchaseStockItem } from './purchase-stock.entity';
+import { OpeningStockItem } from './opening-stock.entity';
+import { StockBalance, StockMovement } from './stock.entity';
+import { StockTransferItem } from './stock-transfer.entity';
 
 @Entity('product_categories')
 export class ProductCategory {
@@ -139,6 +143,22 @@ export class Product {
 
     @UpdateDateColumn()
     updatedAt: Date;
+
+
+    @OneToMany(() => PurchaseStockItem, (purchaseStockItem) => purchaseStockItem.product)
+    purchaseStockItems: PurchaseStockItem[];
+
+    @OneToMany(() => OpeningStockItem, (openingStockItem) => openingStockItem.product)
+    openingStockItems: OpeningStockItem[];
+
+    @OneToMany(() => StockMovement, (stockMovement) => stockMovement.product)
+    stockMovements: StockMovement[];
+
+    @OneToMany(() => StockBalance, (stockBalance) => stockBalance.product)
+    stockBalances: StockBalance[];
+
+    @OneToMany(() => StockTransferItem, (stockTransferItem) => stockTransferItem.product)
+    stockTransferItems: StockTransferItem[];
 }
 
 @Entity('product_flavours')
@@ -165,6 +185,15 @@ export class ProductFlavour {
 
     @UpdateDateColumn()
     updatedAt: Date;
+
+    @OneToMany(() => OpeningStockItem, (openingStockItem) => openingStockItem.productFlavour)
+    openingStockItems: OpeningStockItem[];
+    @OneToMany(() => StockMovement, (stockMovement) => stockMovement.productFlavour)
+    stockMovements: StockMovement[];
+    @OneToMany(() => StockBalance, (stockBalance) => stockBalance.productFlavour)
+    stockBalances: StockBalance[];
+    @OneToMany(() => StockTransferItem, (stockTransferItem) => stockTransferItem.productFlavour)
+    stockTransferItems: StockTransferItem[];
 }
 
 @Entity('product_pricings')
@@ -200,5 +229,14 @@ export class ProductPricing {
 
     @UpdateDateColumn()
     updatedAt: Date;
+
+    @OneToMany(() => OpeningStockItem, (openingStockItem) => openingStockItem.productPricing)
+    openingStockItems: OpeningStockItem[];
+    @OneToMany(() => StockMovement, (stockMovement) => stockMovement.productPricing)
+    stockMovements: StockMovement[];
+    @OneToMany(() => StockBalance, (stockBalance) => stockBalance.productPricing)
+    stockBalances: StockBalance[];
+    @OneToMany(() => StockTransferItem, (stockTransferItem) => stockTransferItem.productPricing)
+    stockTransferItems: StockTransferItem[];
 
 }

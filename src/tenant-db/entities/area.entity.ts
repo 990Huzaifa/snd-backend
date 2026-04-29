@@ -10,6 +10,7 @@ import {
 } from 'typeorm';
 import { Region } from './region.entity';
 import { Distributor } from './distributor.entity';
+import { Route } from './route.entity';
 
 @Entity({ name: 'areas' })
 export class Area {
@@ -37,4 +38,7 @@ export class Area {
 
     @OneToMany(() => Distributor, (distributor) => distributor.area)
     distributors: Distributor[];
+
+    @OneToMany(() => Route, (route) => route.area)
+    routes: Route[];
 }

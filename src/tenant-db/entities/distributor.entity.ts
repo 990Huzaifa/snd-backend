@@ -10,6 +10,11 @@ import {
 } from 'typeorm';
 import { SalesmanDistributor } from './user.entity';
 import { Area } from './area.entity';
+import { Route } from './route.entity';
+import { PurchaseStock } from './purchase-stock.entity';
+import { OpeningStock } from './opening-stock.entity';
+import { StockTransfer } from './stock-transfer.entity';
+import { StockMovement } from './stock.entity';
 
 @Entity('distributors')
 export class Distributor {
@@ -73,4 +78,19 @@ export class Distributor {
 
     @UpdateDateColumn()
     updatedAt: Date;
+
+    @OneToMany(() => Route, (route) => route.distributor)
+    routes: Route[];
+
+    @OneToMany(() => PurchaseStock, (purchaseStock) => purchaseStock.distributor)
+    purchaseStocks: PurchaseStock[];
+
+    @OneToMany(() => OpeningStock, (openingStock) => openingStock.distributor)
+    openingStocks: OpeningStock[];
+
+    @OneToMany(() => StockTransfer, (stockTransfer) => stockTransfer.fromDistributor)
+    fromStockTransfers: StockTransfer[];
+    
+    @OneToMany(() => StockTransfer, (stockTransfer) => stockTransfer.toDistributor)
+    toStockTransfers: StockTransfer[];
 }

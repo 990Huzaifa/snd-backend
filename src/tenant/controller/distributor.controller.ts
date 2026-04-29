@@ -83,4 +83,15 @@ export class DistributorController {
   ) {
     return this.distributorService.edit(tenantDb, id, dto, req.user);
   }
+
+  @Put('update/:id/status')
+  @RequirePermissions('UPDATE_DISTRIBUTOR')
+  updateStatus(
+    @TenantConnection() tenantDb: DataSource,
+    @Param('id') id: string,
+    @Query('status') status: boolean,
+    @Req() req: Request,
+  ) {
+    return this.distributorService.updateStatus(tenantDb, id, status, req.user);
+  }
 }
