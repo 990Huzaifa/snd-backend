@@ -189,6 +189,7 @@ export class ProductService {
   
     if (search) {
       qb.andWhere('product.name LIKE :search', { search: `%${search}%` });
+      qb.orWhere('product.skuCode LIKE :search', { search: `%${search}%` });
     }
   
     qb.orderBy('product.createdAt', 'DESC')
@@ -233,6 +234,19 @@ export class ProductService {
         pricingCount: pricingCountByProductId.get(product.id) ?? 0,
       }));
     }
+
+    // total, totalActive, totalInactive, totalCategories
+    const totalActive = await tenantDb.getRepository(Product).count({
+      where: { isDelete: false, isActive: true },
+    });
+    const totalInactive = await tenantDb.getRepository(Product).count({
+      where: { isDelete: false, isActive: false },
+    });
+    const totalProducts = await tenantDb.getRepository(Product).count({
+      where: { isDelete: false },
+    });
+    const totalCategories = await tenantDb.getRepository(ProductCategory).count({
+    });
   
     await this.activityLogService.recordActivityLog(tenantDb, {
       actorId: user.userId,
@@ -241,7 +255,7 @@ export class ProductService {
       metadata: { total, page, limit },
     });
   
-    return { result, meta: { total, page, limit } };
+    return { totalActive, totalInactive, totalProducts, totalCategories, result, meta: { total, page, limit }, };
   }
 
   async view(tenantDb: DataSource, id: string, user: any) {
