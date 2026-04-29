@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Brackets, DataSource, In, Like } from 'typeorm';
+import { Brackets, DataSource, In, Like, SelectQueryBuilder } from 'typeorm';
 import {
   Flavour,
   Product,
@@ -167,26 +167,40 @@ export class ProductService {
     tenantDb: DataSource,
     page: number,
     limit: number,
-    search: string | null | undefined,
-    categoryIdParam: string | null | undefined,
-    brandIdParam: string | null | undefined,
-    flavourIdParam: string | null | undefined,
     user: any,
+    search?: string,
+    categoryIdParam?: string,
+    brandIdParam?: string,
   ) {
-    const [products, total] = await tenantDb.getRepository(Product).findAndCount({
-      relations: ['category', 'brand'],
-      where: {
-        categoryId: categoryIdParam,
-        brandId: brandIdParam,
-        name: Like(`%${search}%`),
-      },
-      order: { createdAt: 'DESC' },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
+    const qb = tenantDb
+      .getRepository(Product)
+      .createQueryBuilder('product')
+      .leftJoinAndSelect('product.category', 'category')
+      .leftJoinAndSelect('product.brand', 'brand')
+      .where('product.isDelete = :isDelete', { isDelete: false });
+  
+    if (categoryIdParam) {
+      qb.andWhere('product.categoryId = :categoryId', { categoryId: categoryIdParam });
+    }
+  
+    if (brandIdParam) {
+      qb.andWhere('product.brandId = :brandId', { brandId: brandIdParam });
+    }
+  
+    if (search) {
+      qb.andWhere('product.name LIKE :search', { search: `%${search}%` });
+    }
+  
+    qb.orderBy('product.createdAt', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit);
+  
+    const [products, total] = await qb.getManyAndCount();
+  
     const productIds = products.map((product) => product.id);
+  
     let result = products as Array<Product & { flavourCount: number; pricingCount: number }>;
-
+  
     if (productIds.length) {
       const flavourRows = await tenantDb
         .getRepository(ProductFlavour)
@@ -196,7 +210,7 @@ export class ProductService {
         .where('pf.productId IN (:...productIds)', { productIds })
         .groupBy('pf.productId')
         .getRawMany<{ productId: string; count: string }>();
-
+  
       const pricingRows = await tenantDb
         .getRepository(ProductPricing)
         .createQueryBuilder('pp')
@@ -205,32 +219,28 @@ export class ProductService {
         .where('pp.productId IN (:...productIds)', { productIds })
         .groupBy('pp.productId')
         .getRawMany<{ productId: string; count: string }>();
-
+  
       const flavourCountByProductId = new Map(
         flavourRows.map((row) => [row.productId, Number(row.count)]),
       );
       const pricingCountByProductId = new Map(
         pricingRows.map((row) => [row.productId, Number(row.count)]),
       );
-
+  
       result = products.map((product) => ({
         ...product,
         flavourCount: flavourCountByProductId.get(product.id) ?? 0,
         pricingCount: pricingCountByProductId.get(product.id) ?? 0,
       }));
     }
-
+  
     await this.activityLogService.recordActivityLog(tenantDb, {
       actorId: user.userId,
       action: 'PRODUCT_LISTED',
       description: 'Products listed',
-      metadata: {
-        total,
-        page,
-        limit,
-      },
+      metadata: { total, page, limit },
     });
-
+  
     return { result, meta: { total, page, limit } };
   }
 
