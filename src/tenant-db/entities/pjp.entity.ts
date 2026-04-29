@@ -2,6 +2,12 @@ import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, PrimaryGenerat
 import { User } from "./user.entity";
 import { Route } from "./route.entity";
 
+export enum PJPStatus {
+    PENDING = 'PENDING',
+    ACTIVE = 'ACTIVE',
+    INACTIVE = 'INACTIVE',
+}
+
 @Entity('pjp_plans')
 export class PJP {
     @PrimaryGeneratedColumn('uuid')
@@ -19,6 +25,9 @@ export class PJP {
     @ManyToOne(() => User, { onDelete: 'RESTRICT' })
     @JoinColumn({ name: 'salesmanId' })
     salesman: User;
+
+    @Column({ type: 'enum', enum: PJPStatus, default: PJPStatus.PENDING })
+    status: PJPStatus;
 
     @CreateDateColumn()
     createdAt: Date;

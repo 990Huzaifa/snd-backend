@@ -1,18 +1,16 @@
 import { MigrationInterface, QueryRunner } from "typeorm";
 
-export class TenantDb1777465335807 implements MigrationInterface {
-    name = 'TenantDb1777465335807'
+export class TenantDb1777470682875 implements MigrationInterface {
+    name = 'TenantDb1777470682875'
 
     public async up(queryRunner: QueryRunner): Promise<void> {
         await queryRunner.query(`CREATE TABLE "permissions" ("id" SERIAL NOT NULL, "code" character varying NOT NULL, "name" character varying NOT NULL, "isActive" boolean NOT NULL DEFAULT true, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "UQ_8dad765629e83229da6feda1c1d" UNIQUE ("code"), CONSTRAINT "PK_920331560282b8bd21bb02290df" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE TABLE "roles" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "code" character varying NOT NULL, "name" character varying NOT NULL, "isActive" boolean NOT NULL DEFAULT true, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "UQ_f6d54f95c31b73fb1bdd8e91d0c" UNIQUE ("code"), CONSTRAINT "PK_c1433d71a4838793a49dcad46ab" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE TABLE "notifications" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "userId" uuid NOT NULL, "title" text NOT NULL, "message" text NOT NULL, "type" text NOT NULL, "isRead" boolean NOT NULL DEFAULT false, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_6a72c3c0f683f6462415e653c3a" PRIMARY KEY ("id"))`);
-        await queryRunner.query(`CREATE TABLE "designations" ("id" SERIAL NOT NULL, "name" character varying NOT NULL, "slug" character varying NOT NULL, "description" character varying, "isActive" boolean NOT NULL DEFAULT true, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_a0f024b99b1491a03fc421858ea" PRIMARY KEY ("id"))`);
-        await queryRunner.query(`CREATE TABLE "users" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "code" character varying NOT NULL, "name" character varying NOT NULL, "email" character varying NOT NULL, "password" character varying, "phone" character varying, "cnic" character varying, "avatar" character varying, "address" character varying, "designationId" integer, "joiningDate" TIMESTAMP, "leavingDate" TIMESTAMP, "countryId" character varying, "stateId" character varying, "cityId" character varying, "isActive" boolean NOT NULL DEFAULT true, "isDeleted" boolean NOT NULL DEFAULT false, "roleId" uuid, "deviceId" character varying, "fcmToken" character varying, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "UQ_1f7a2b11e29b1422a2622beab36" UNIQUE ("code"), CONSTRAINT "UQ_97672ac88f789774dd47f7c8be3" UNIQUE ("email"), CONSTRAINT "PK_a3ffb1c0c8416b9fc6f907b7433" PRIMARY KEY ("id"))`);
-        await queryRunner.query(`CREATE TABLE "salesman_distributors" ("id" SERIAL NOT NULL, "userId" uuid, "distributorId" uuid, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_dd7553ddfbbf53b5059265e66fd" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE TABLE "regions" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "cityId" character varying NOT NULL, "name" character varying(150) NOT NULL, "code" character varying(50), "isActive" boolean NOT NULL DEFAULT true, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_4fcd12ed6a046276e2deb08801c" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE UNIQUE INDEX "IDX_1ab3aa79ae29d7f99f17c9a4a7" ON "regions" ("cityId", "name") `);
-        await queryRunner.query(`CREATE TABLE "pjp_plans" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "weekStartDate" TIMESTAMP NOT NULL, "weekEndDate" TIMESTAMP NOT NULL, "salesmanId" uuid, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_733235c53432523eb945e47c84b" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE TYPE "public"."pjp_plans_status_enum" AS ENUM('PENDING', 'ACTIVE', 'INACTIVE')`);
+        await queryRunner.query(`CREATE TABLE "pjp_plans" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "weekStartDate" TIMESTAMP NOT NULL, "weekEndDate" TIMESTAMP NOT NULL, "salesmanId" uuid, "status" "public"."pjp_plans_status_enum" NOT NULL DEFAULT 'PENDING', "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_733235c53432523eb945e47c84b" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE TABLE "pjp_routes" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "pjpId" uuid NOT NULL, "routeId" uuid NOT NULL, "visitDate" TIMESTAMP NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_5ab28cddd60fb772a8c1592fccb" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE TABLE "routes" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "areaId" uuid NOT NULL, "distributorId" uuid NOT NULL, "name" character varying NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_76100511cdfa1d013c859f01d8b" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE TABLE "route_transfer_logs" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "fromSalesmanId" uuid NOT NULL, "toSalesmanId" uuid NOT NULL, "pjpId" uuid NOT NULL, "routeId" uuid NOT NULL, "transferDate" TIMESTAMP NOT NULL, "reason" character varying NOT NULL, "remarks" character varying NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_37f64c5195a905013e85e5c4e04" PRIMARY KEY ("id"))`);
@@ -23,6 +21,8 @@ export class TenantDb1777465335807 implements MigrationInterface {
         await queryRunner.query(`CREATE TYPE "public"."stock_movements_referencetype_enum" AS ENUM('ADJUSTMENT', 'TRANSFER', 'PURCHASE', 'OPENING', 'LOAD', 'DELIVERY', 'RETURN', 'SALE')`);
         await queryRunner.query(`CREATE TABLE "stock_movements" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "productId" uuid NOT NULL, "productFlavourId" integer NOT NULL, "productPricingId" uuid NOT NULL, "quantity" integer NOT NULL, "type" "public"."stock_movements_type_enum" NOT NULL, "referenceType" "public"."stock_movements_referencetype_enum" NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_57a26b190618550d8e65fb860e7" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE TABLE "stock_balances" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "productId" uuid NOT NULL, "productFlavourId" integer NOT NULL, "productPricingId" uuid NOT NULL, "quantity" integer NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_4c0d249ce58f9a559eb7df31b23" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE TABLE "stock_transfers" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "fromDistributorId" uuid NOT NULL, "toDistributorId" uuid NOT NULL, "remarks" character varying NOT NULL, "transferDate" TIMESTAMP NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_ef738a3a4a578c7f1802c1bb50a" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE TABLE "stock_transfer_items" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "StockTransferId" uuid NOT NULL, "productId" uuid NOT NULL, "productFlavourId" integer NOT NULL, "productPricingId" uuid NOT NULL, "quantity" integer NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_8acee6121ab8a5135dc84495588" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE TABLE "product_categories" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "name" character varying NOT NULL, "slug" character varying NOT NULL, "created_by" uuid, "created_at" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_7069dac60d88408eca56fdc9e0c" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE TABLE "flavours" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "name" character varying NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_58d10322f711a67c1c70a8d0820" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE TABLE "uoms" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "name" character varying NOT NULL, "is_base" boolean NOT NULL DEFAULT false, CONSTRAINT "PK_f207a792064e3032c8fe3922b22" PRIMARY KEY ("id"))`);
@@ -33,8 +33,9 @@ export class TenantDb1777465335807 implements MigrationInterface {
         await queryRunner.query(`CREATE TABLE "purchase_stocks" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "distributorId" uuid NOT NULL, "remarks" character varying NOT NULL, "purchaseDate" TIMESTAMP NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_502fddb5cbcd4e5d0c0866de730" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE TABLE "purchase_stock_items" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "purchaseStockId" uuid NOT NULL, "productId" uuid NOT NULL, "productFlavourId" integer NOT NULL, "productPricingId" uuid NOT NULL, "quantity" integer NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_500ecef392c3d5b714b0a092ef8" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE TABLE "distributors" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "name" character varying NOT NULL, "code" character varying NOT NULL, "email" character varying NOT NULL, "phone" character varying NOT NULL, "address" character varying NOT NULL, "countryId" character varying, "stateId" character varying, "cityId" character varying, "postalCode" character varying NOT NULL, "locationTitle" character varying NOT NULL, "latitude" character varying NOT NULL, "longitude" character varying NOT NULL, "maxRadius" character varying NOT NULL, "isActive" boolean NOT NULL DEFAULT true, "isDeleted" boolean NOT NULL DEFAULT false, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "areaId" uuid, CONSTRAINT "PK_a3741291eb0af96f795b25d90b4" PRIMARY KEY ("id"))`);
-        await queryRunner.query(`CREATE TABLE "stock_transfers" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "fromDistributorId" uuid NOT NULL, "toDistributorId" uuid NOT NULL, "remarks" character varying NOT NULL, "transferDate" TIMESTAMP NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_ef738a3a4a578c7f1802c1bb50a" PRIMARY KEY ("id"))`);
-        await queryRunner.query(`CREATE TABLE "stock_transfer_items" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "StockTransferId" uuid NOT NULL, "productId" uuid NOT NULL, "productFlavourId" integer NOT NULL, "productPricingId" uuid NOT NULL, "quantity" integer NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_8acee6121ab8a5135dc84495588" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE TABLE "designations" ("id" SERIAL NOT NULL, "name" character varying NOT NULL, "slug" character varying NOT NULL, "description" character varying, "isActive" boolean NOT NULL DEFAULT true, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_a0f024b99b1491a03fc421858ea" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE TABLE "users" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "code" character varying NOT NULL, "name" character varying NOT NULL, "email" character varying NOT NULL, "password" character varying, "phone" character varying, "cnic" character varying, "avatar" character varying, "address" character varying, "designationId" integer, "joiningDate" TIMESTAMP, "leavingDate" TIMESTAMP, "countryId" character varying, "stateId" character varying, "cityId" character varying, "isActive" boolean NOT NULL DEFAULT true, "isDeleted" boolean NOT NULL DEFAULT false, "roleId" uuid, "deviceId" character varying, "fcmToken" character varying, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "UQ_1f7a2b11e29b1422a2622beab36" UNIQUE ("code"), CONSTRAINT "UQ_97672ac88f789774dd47f7c8be3" UNIQUE ("email"), CONSTRAINT "PK_a3ffb1c0c8416b9fc6f907b7433" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE TABLE "salesman_distributors" ("id" SERIAL NOT NULL, "userId" uuid, "distributorId" uuid, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_dd7553ddfbbf53b5059265e66fd" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE TABLE "retailer_categories" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "name" character varying NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_7e395337e17d0cba314dd0f0eec" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE TABLE "retailer_channels" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "name" character varying NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_393d8c324fe4965ad911b25fe37" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE TYPE "public"."retailers_class_enum" AS ENUM('A', 'B', 'C')`);
@@ -47,10 +48,6 @@ export class TenantDb1777465335807 implements MigrationInterface {
         await queryRunner.query(`CREATE INDEX "IDX_b20f4ad2fcaa0d311f92516267" ON "rolePermissions" ("roleId") `);
         await queryRunner.query(`CREATE INDEX "IDX_5cb213a16a7b5204c8aff88151" ON "rolePermissions" ("permissionId") `);
         await queryRunner.query(`ALTER TABLE "notifications" ADD CONSTRAINT "FK_692a909ee0fa9383e7859f9b406" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "users" ADD CONSTRAINT "FK_071a5e4a3131d00a0fc700af411" FOREIGN KEY ("designationId") REFERENCES "designations"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "users" ADD CONSTRAINT "FK_368e146b785b574f42ae9e53d5e" FOREIGN KEY ("roleId") REFERENCES "roles"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "salesman_distributors" ADD CONSTRAINT "FK_037a2ae28b82ef35d37558a0d60" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "salesman_distributors" ADD CONSTRAINT "FK_31e455e65a8a050cb678697d49d" FOREIGN KEY ("distributorId") REFERENCES "distributors"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
         await queryRunner.query(`ALTER TABLE "pjp_plans" ADD CONSTRAINT "FK_70e9fef610a86676c398ae41062" FOREIGN KEY ("salesmanId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE NO ACTION`);
         await queryRunner.query(`ALTER TABLE "pjp_routes" ADD CONSTRAINT "FK_0fefe4771f11f44fafd4622cfb6" FOREIGN KEY ("pjpId") REFERENCES "pjp_plans"("id") ON DELETE RESTRICT ON UPDATE NO ACTION`);
         await queryRunner.query(`ALTER TABLE "pjp_routes" ADD CONSTRAINT "FK_4decedea8a8df76a8c52bea0906" FOREIGN KEY ("routeId") REFERENCES "routes"("id") ON DELETE RESTRICT ON UPDATE NO ACTION`);
@@ -72,6 +69,12 @@ export class TenantDb1777465335807 implements MigrationInterface {
         await queryRunner.query(`ALTER TABLE "stock_balances" ADD CONSTRAINT "FK_6840607b19b9f629d9c6845f31c" FOREIGN KEY ("productId") REFERENCES "products"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
         await queryRunner.query(`ALTER TABLE "stock_balances" ADD CONSTRAINT "FK_53c9974de6f1d1581bd7998445c" FOREIGN KEY ("productFlavourId") REFERENCES "product_flavours"("id") ON DELETE RESTRICT ON UPDATE NO ACTION`);
         await queryRunner.query(`ALTER TABLE "stock_balances" ADD CONSTRAINT "FK_9f933ebe19686b338e1b3277ac1" FOREIGN KEY ("productPricingId") REFERENCES "product_pricings"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "stock_transfers" ADD CONSTRAINT "FK_4f7c2a31ce918de1f122b9e9ea1" FOREIGN KEY ("fromDistributorId") REFERENCES "distributors"("id") ON DELETE RESTRICT ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "stock_transfers" ADD CONSTRAINT "FK_707314286019327054dda97576c" FOREIGN KEY ("toDistributorId") REFERENCES "distributors"("id") ON DELETE RESTRICT ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "stock_transfer_items" ADD CONSTRAINT "FK_99f2530758c959cd8d5b18f91a1" FOREIGN KEY ("StockTransferId") REFERENCES "stock_transfers"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "stock_transfer_items" ADD CONSTRAINT "FK_f3d2b9e6f306fc4a292c687a12d" FOREIGN KEY ("productId") REFERENCES "products"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "stock_transfer_items" ADD CONSTRAINT "FK_b330dd3d94732f0398be5c9eb1d" FOREIGN KEY ("productFlavourId") REFERENCES "product_flavours"("id") ON DELETE RESTRICT ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "stock_transfer_items" ADD CONSTRAINT "FK_c459a3dd06d1149012669481e44" FOREIGN KEY ("productPricingId") REFERENCES "product_pricings"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
         await queryRunner.query(`ALTER TABLE "product_categories" ADD CONSTRAINT "FK_66bf1d237f3576eeae37ac1b2eb" FOREIGN KEY ("created_by") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE NO ACTION`);
         await queryRunner.query(`ALTER TABLE "products" ADD CONSTRAINT "FK_ff56834e735fa78a15d0cf21926" FOREIGN KEY ("categoryId") REFERENCES "product_categories"("id") ON DELETE RESTRICT ON UPDATE NO ACTION`);
         await queryRunner.query(`ALTER TABLE "products" ADD CONSTRAINT "FK_ea86d0c514c4ecbb5694cbf57df" FOREIGN KEY ("brandId") REFERENCES "product_brands"("id") ON DELETE SET NULL ON UPDATE NO ACTION`);
@@ -86,12 +89,10 @@ export class TenantDb1777465335807 implements MigrationInterface {
         await queryRunner.query(`ALTER TABLE "purchase_stock_items" ADD CONSTRAINT "FK_b6bcb012d13d64ae3bee1e3bb1e" FOREIGN KEY ("productFlavourId") REFERENCES "product_flavours"("id") ON DELETE RESTRICT ON UPDATE NO ACTION`);
         await queryRunner.query(`ALTER TABLE "purchase_stock_items" ADD CONSTRAINT "FK_3ead6f3aee294292edad5d1cae9" FOREIGN KEY ("productPricingId") REFERENCES "product_pricings"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
         await queryRunner.query(`ALTER TABLE "distributors" ADD CONSTRAINT "FK_e5620b921daa1088ac510d0f023" FOREIGN KEY ("areaId") REFERENCES "areas"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "stock_transfers" ADD CONSTRAINT "FK_4f7c2a31ce918de1f122b9e9ea1" FOREIGN KEY ("fromDistributorId") REFERENCES "distributors"("id") ON DELETE RESTRICT ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "stock_transfers" ADD CONSTRAINT "FK_707314286019327054dda97576c" FOREIGN KEY ("toDistributorId") REFERENCES "distributors"("id") ON DELETE RESTRICT ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "stock_transfer_items" ADD CONSTRAINT "FK_99f2530758c959cd8d5b18f91a1" FOREIGN KEY ("StockTransferId") REFERENCES "stock_transfers"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "stock_transfer_items" ADD CONSTRAINT "FK_f3d2b9e6f306fc4a292c687a12d" FOREIGN KEY ("productId") REFERENCES "products"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "stock_transfer_items" ADD CONSTRAINT "FK_b330dd3d94732f0398be5c9eb1d" FOREIGN KEY ("productFlavourId") REFERENCES "product_flavours"("id") ON DELETE RESTRICT ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "stock_transfer_items" ADD CONSTRAINT "FK_c459a3dd06d1149012669481e44" FOREIGN KEY ("productPricingId") REFERENCES "product_pricings"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "users" ADD CONSTRAINT "FK_071a5e4a3131d00a0fc700af411" FOREIGN KEY ("designationId") REFERENCES "designations"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "users" ADD CONSTRAINT "FK_368e146b785b574f42ae9e53d5e" FOREIGN KEY ("roleId") REFERENCES "roles"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "salesman_distributors" ADD CONSTRAINT "FK_037a2ae28b82ef35d37558a0d60" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "salesman_distributors" ADD CONSTRAINT "FK_31e455e65a8a050cb678697d49d" FOREIGN KEY ("distributorId") REFERENCES "distributors"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
         await queryRunner.query(`ALTER TABLE "retailers" ADD CONSTRAINT "FK_4d12073533cb8395e686a125eee" FOREIGN KEY ("createdBy") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE NO ACTION`);
         await queryRunner.query(`ALTER TABLE "retailers" ADD CONSTRAINT "FK_e5e845d6015c8a18d843ce7b630" FOREIGN KEY ("approvedBy") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE NO ACTION`);
         await queryRunner.query(`ALTER TABLE "retailers" ADD CONSTRAINT "FK_58d6c6a4048dae0340b17146a47" FOREIGN KEY ("routeId") REFERENCES "routes"("id") ON DELETE RESTRICT ON UPDATE NO ACTION`);
@@ -113,12 +114,10 @@ export class TenantDb1777465335807 implements MigrationInterface {
         await queryRunner.query(`ALTER TABLE "retailers" DROP CONSTRAINT "FK_58d6c6a4048dae0340b17146a47"`);
         await queryRunner.query(`ALTER TABLE "retailers" DROP CONSTRAINT "FK_e5e845d6015c8a18d843ce7b630"`);
         await queryRunner.query(`ALTER TABLE "retailers" DROP CONSTRAINT "FK_4d12073533cb8395e686a125eee"`);
-        await queryRunner.query(`ALTER TABLE "stock_transfer_items" DROP CONSTRAINT "FK_c459a3dd06d1149012669481e44"`);
-        await queryRunner.query(`ALTER TABLE "stock_transfer_items" DROP CONSTRAINT "FK_b330dd3d94732f0398be5c9eb1d"`);
-        await queryRunner.query(`ALTER TABLE "stock_transfer_items" DROP CONSTRAINT "FK_f3d2b9e6f306fc4a292c687a12d"`);
-        await queryRunner.query(`ALTER TABLE "stock_transfer_items" DROP CONSTRAINT "FK_99f2530758c959cd8d5b18f91a1"`);
-        await queryRunner.query(`ALTER TABLE "stock_transfers" DROP CONSTRAINT "FK_707314286019327054dda97576c"`);
-        await queryRunner.query(`ALTER TABLE "stock_transfers" DROP CONSTRAINT "FK_4f7c2a31ce918de1f122b9e9ea1"`);
+        await queryRunner.query(`ALTER TABLE "salesman_distributors" DROP CONSTRAINT "FK_31e455e65a8a050cb678697d49d"`);
+        await queryRunner.query(`ALTER TABLE "salesman_distributors" DROP CONSTRAINT "FK_037a2ae28b82ef35d37558a0d60"`);
+        await queryRunner.query(`ALTER TABLE "users" DROP CONSTRAINT "FK_368e146b785b574f42ae9e53d5e"`);
+        await queryRunner.query(`ALTER TABLE "users" DROP CONSTRAINT "FK_071a5e4a3131d00a0fc700af411"`);
         await queryRunner.query(`ALTER TABLE "distributors" DROP CONSTRAINT "FK_e5620b921daa1088ac510d0f023"`);
         await queryRunner.query(`ALTER TABLE "purchase_stock_items" DROP CONSTRAINT "FK_3ead6f3aee294292edad5d1cae9"`);
         await queryRunner.query(`ALTER TABLE "purchase_stock_items" DROP CONSTRAINT "FK_b6bcb012d13d64ae3bee1e3bb1e"`);
@@ -133,6 +132,12 @@ export class TenantDb1777465335807 implements MigrationInterface {
         await queryRunner.query(`ALTER TABLE "products" DROP CONSTRAINT "FK_ea86d0c514c4ecbb5694cbf57df"`);
         await queryRunner.query(`ALTER TABLE "products" DROP CONSTRAINT "FK_ff56834e735fa78a15d0cf21926"`);
         await queryRunner.query(`ALTER TABLE "product_categories" DROP CONSTRAINT "FK_66bf1d237f3576eeae37ac1b2eb"`);
+        await queryRunner.query(`ALTER TABLE "stock_transfer_items" DROP CONSTRAINT "FK_c459a3dd06d1149012669481e44"`);
+        await queryRunner.query(`ALTER TABLE "stock_transfer_items" DROP CONSTRAINT "FK_b330dd3d94732f0398be5c9eb1d"`);
+        await queryRunner.query(`ALTER TABLE "stock_transfer_items" DROP CONSTRAINT "FK_f3d2b9e6f306fc4a292c687a12d"`);
+        await queryRunner.query(`ALTER TABLE "stock_transfer_items" DROP CONSTRAINT "FK_99f2530758c959cd8d5b18f91a1"`);
+        await queryRunner.query(`ALTER TABLE "stock_transfers" DROP CONSTRAINT "FK_707314286019327054dda97576c"`);
+        await queryRunner.query(`ALTER TABLE "stock_transfers" DROP CONSTRAINT "FK_4f7c2a31ce918de1f122b9e9ea1"`);
         await queryRunner.query(`ALTER TABLE "stock_balances" DROP CONSTRAINT "FK_9f933ebe19686b338e1b3277ac1"`);
         await queryRunner.query(`ALTER TABLE "stock_balances" DROP CONSTRAINT "FK_53c9974de6f1d1581bd7998445c"`);
         await queryRunner.query(`ALTER TABLE "stock_balances" DROP CONSTRAINT "FK_6840607b19b9f629d9c6845f31c"`);
@@ -154,10 +159,6 @@ export class TenantDb1777465335807 implements MigrationInterface {
         await queryRunner.query(`ALTER TABLE "pjp_routes" DROP CONSTRAINT "FK_4decedea8a8df76a8c52bea0906"`);
         await queryRunner.query(`ALTER TABLE "pjp_routes" DROP CONSTRAINT "FK_0fefe4771f11f44fafd4622cfb6"`);
         await queryRunner.query(`ALTER TABLE "pjp_plans" DROP CONSTRAINT "FK_70e9fef610a86676c398ae41062"`);
-        await queryRunner.query(`ALTER TABLE "salesman_distributors" DROP CONSTRAINT "FK_31e455e65a8a050cb678697d49d"`);
-        await queryRunner.query(`ALTER TABLE "salesman_distributors" DROP CONSTRAINT "FK_037a2ae28b82ef35d37558a0d60"`);
-        await queryRunner.query(`ALTER TABLE "users" DROP CONSTRAINT "FK_368e146b785b574f42ae9e53d5e"`);
-        await queryRunner.query(`ALTER TABLE "users" DROP CONSTRAINT "FK_071a5e4a3131d00a0fc700af411"`);
         await queryRunner.query(`ALTER TABLE "notifications" DROP CONSTRAINT "FK_692a909ee0fa9383e7859f9b406"`);
         await queryRunner.query(`DROP INDEX "public"."IDX_5cb213a16a7b5204c8aff88151"`);
         await queryRunner.query(`DROP INDEX "public"."IDX_b20f4ad2fcaa0d311f92516267"`);
@@ -170,8 +171,9 @@ export class TenantDb1777465335807 implements MigrationInterface {
         await queryRunner.query(`DROP TYPE "public"."retailers_class_enum"`);
         await queryRunner.query(`DROP TABLE "retailer_channels"`);
         await queryRunner.query(`DROP TABLE "retailer_categories"`);
-        await queryRunner.query(`DROP TABLE "stock_transfer_items"`);
-        await queryRunner.query(`DROP TABLE "stock_transfers"`);
+        await queryRunner.query(`DROP TABLE "salesman_distributors"`);
+        await queryRunner.query(`DROP TABLE "users"`);
+        await queryRunner.query(`DROP TABLE "designations"`);
         await queryRunner.query(`DROP TABLE "distributors"`);
         await queryRunner.query(`DROP TABLE "purchase_stock_items"`);
         await queryRunner.query(`DROP TABLE "purchase_stocks"`);
@@ -182,6 +184,8 @@ export class TenantDb1777465335807 implements MigrationInterface {
         await queryRunner.query(`DROP TABLE "uoms"`);
         await queryRunner.query(`DROP TABLE "flavours"`);
         await queryRunner.query(`DROP TABLE "product_categories"`);
+        await queryRunner.query(`DROP TABLE "stock_transfer_items"`);
+        await queryRunner.query(`DROP TABLE "stock_transfers"`);
         await queryRunner.query(`DROP TABLE "stock_balances"`);
         await queryRunner.query(`DROP TABLE "stock_movements"`);
         await queryRunner.query(`DROP TYPE "public"."stock_movements_referencetype_enum"`);
@@ -193,11 +197,9 @@ export class TenantDb1777465335807 implements MigrationInterface {
         await queryRunner.query(`DROP TABLE "routes"`);
         await queryRunner.query(`DROP TABLE "pjp_routes"`);
         await queryRunner.query(`DROP TABLE "pjp_plans"`);
+        await queryRunner.query(`DROP TYPE "public"."pjp_plans_status_enum"`);
         await queryRunner.query(`DROP INDEX "public"."IDX_1ab3aa79ae29d7f99f17c9a4a7"`);
         await queryRunner.query(`DROP TABLE "regions"`);
-        await queryRunner.query(`DROP TABLE "salesman_distributors"`);
-        await queryRunner.query(`DROP TABLE "users"`);
-        await queryRunner.query(`DROP TABLE "designations"`);
         await queryRunner.query(`DROP TABLE "notifications"`);
         await queryRunner.query(`DROP TABLE "roles"`);
         await queryRunner.query(`DROP TABLE "permissions"`);

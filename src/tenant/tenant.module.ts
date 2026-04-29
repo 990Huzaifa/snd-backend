@@ -17,6 +17,7 @@ import { FlavourController } from './controller/flavour.controller';
 import { ProductBrandController } from './controller/product-brand.controller';
 import { ProductCategoryController } from './controller/product-category.controller';
 import { ProductController } from './controller/product.controller';
+import { PjpController } from './controller/pjp.controller';
 import { RegionController } from './controller/region.controller';
 import { RouteController } from './controller/route.controller';
 import { TenantRoleController } from './controller/tenant-role.controller';
@@ -32,6 +33,7 @@ import { FlavourService } from './service/flavour.service';
 import { ProductBrandService } from './service/product-brand.service';
 import { ProductCategoryService } from './service/product-category.service';
 import { ProductService } from './service/product.service';
+import { PjpService } from './service/pjp.service';
 import { RegionService } from './service/region.service';
 import { RouteService } from './service/route.service';
 import { TenantRoleService } from './service/tenant-role.service';
@@ -63,6 +65,7 @@ import { MasterGeoHelperService } from './service/master-geo-helper.service';
     ProductBrandController,
     ProductCategoryController,
     ProductController,
+    PjpController,
     RegionController,
     RouteController,
     UomController,
@@ -81,6 +84,7 @@ import { MasterGeoHelperService } from './service/master-geo-helper.service';
     ProductBrandService,
     ProductCategoryService,
     ProductService,
+    PjpService,
     RegionService,
     RouteService,
     UomService,
