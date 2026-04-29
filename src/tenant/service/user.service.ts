@@ -133,6 +133,7 @@ export class UserService {
     const userRepo = tenantDb.getRepository(User);
     const user = await userRepo.findOne({
       where: { id },
+      relations: ['role', 'designation'],
     });
     if (!user) {
       throw new NotFoundException('User not found');
