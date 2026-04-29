@@ -54,6 +54,16 @@ export class TenantUtilityService {
     return { result: regions };
   }
 
+  async getRegionsByCityId(tenantDb: DataSource, cityId: string) {
+    const regions = await tenantDb.getRepository(Region).find({
+      where: { cityId: cityId, isActive: true },
+      select: ['id', 'name', 'code'],
+      order: { name: 'ASC' },
+    });
+
+    return { result: regions };
+  }
+
   async getAreas(tenantDb: DataSource, regionId: string) {
     const areas = await tenantDb.getRepository(Area).find({
       where: { region: { id: regionId }},

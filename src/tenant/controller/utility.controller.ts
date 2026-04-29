@@ -31,6 +31,11 @@ export class TenantUtilityController {
         return this.utilityService.getRegions(tenantDb);
     }
 
+    @Get('regions/:cityId')
+    async getRegionsByCityId(@TenantConnection() tenantDb: DataSource, @Param('cityId') cityId: string) {
+        return this.utilityService.getRegionsByCityId(tenantDb, cityId);
+    }
+
     @Get('areas/:regionId')
     async getAreas(@TenantConnection() tenantDb: DataSource, @Param('regionId') regionId: string) {
         return this.utilityService.getAreas(tenantDb, regionId);
