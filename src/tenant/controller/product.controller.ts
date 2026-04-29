@@ -47,20 +47,20 @@ export class ProductController {
     @TenantConnection() tenantDb: DataSource,
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 10,
-    @Query('search') search: string = '',
+    @Query('search') search: string | null | undefined,
     @Req() req: Request,
-    @Query('categoryIds') categoryIds?: string,
-    @Query('brandIds') brandIds?: string,
-    @Query('flavourIds') flavourIds?: string,
+    @Query('categoryId') categoryId: string | null | undefined,
+    @Query('brandId') brandId: string | null | undefined,
+    @Query('flavourId') flavourId: string | null | undefined,
   ) {
     return this.productService.list(
       tenantDb,
       page,
       limit,
       search,
-      categoryIds,
-      brandIds,
-      flavourIds,
+      categoryId,
+      brandId,
+      flavourId,
       req.user,
     );
   }

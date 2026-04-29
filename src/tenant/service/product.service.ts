@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Brackets, DataSource, In } from 'typeorm';
+import { Brackets, DataSource, In, Like } from 'typeorm';
 import {
   Flavour,
   Product,
@@ -21,7 +21,7 @@ import { ActivityLogService } from './activity-log.service';
 export class ProductService {
   constructor(private readonly activityLogService: ActivityLogService) {}
 
-  private parseCsvIds(value?: string): string[] {
+  private parseCsvIds(value?: string | null): string[] {
     if (!value?.trim()) {
       return [];
     }
@@ -167,83 +167,58 @@ export class ProductService {
     tenantDb: DataSource,
     page: number,
     limit: number,
-    search: string,
-    categoryIdsParam: string | undefined,
-    brandIdsParam: string | undefined,
-    flavourIdsParam: string | undefined,
+    search: string | null | undefined,
+    categoryIdParam: string | null | undefined,
+    brandIdParam: string | null | undefined,
+    flavourIdParam: string | null | undefined,
     user: any,
   ) {
-    const categoryIds = this.parseCsvIds(categoryIdsParam);
-    const brandIds = this.parseCsvIds(brandIdsParam);
-    const flavourIds = this.parseCsvIds(flavourIdsParam);
-    const normalizedSearch = search.trim();
+    const [products, total] = await tenantDb.getRepository(Product).findAndCount({
+      relations: ['category', 'brand'],
+      where: {
+        categoryId: categoryIdParam,
+        brandId: brandIdParam,
+        name: Like(`%${search}%`),
+      },
+      order: { createdAt: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+    const productIds = products.map((product) => product.id);
+    let result = products as Array<Product & { flavourCount: number; pricingCount: number }>;
 
-    const baseQb = tenantDb
-      .getRepository(Product)
-      .createQueryBuilder('product')
-      .leftJoin('product.category', 'category')
-      .leftJoin('product.brand', 'brand')
-      .leftJoin('product.flavours', 'productFlavour')
-      .where('product.isDelete = :isDelete', { isDelete: false });
+    if (productIds.length) {
+      const flavourRows = await tenantDb
+        .getRepository(ProductFlavour)
+        .createQueryBuilder('pf')
+        .select('pf.productId', 'productId')
+        .addSelect('COUNT(*)', 'count')
+        .where('pf.productId IN (:...productIds)', { productIds })
+        .groupBy('pf.productId')
+        .getRawMany<{ productId: string; count: string }>();
 
-    if (normalizedSearch) {
-      baseQb.andWhere(
-        new Brackets((subQuery) => {
-          subQuery.where('product.name LIKE :search', {
-            search: `%${normalizedSearch}%`,
-          });
-        }),
+      const pricingRows = await tenantDb
+        .getRepository(ProductPricing)
+        .createQueryBuilder('pp')
+        .select('pp.productId', 'productId')
+        .addSelect('COUNT(*)', 'count')
+        .where('pp.productId IN (:...productIds)', { productIds })
+        .groupBy('pp.productId')
+        .getRawMany<{ productId: string; count: string }>();
+
+      const flavourCountByProductId = new Map(
+        flavourRows.map((row) => [row.productId, Number(row.count)]),
       );
+      const pricingCountByProductId = new Map(
+        pricingRows.map((row) => [row.productId, Number(row.count)]),
+      );
+
+      result = products.map((product) => ({
+        ...product,
+        flavourCount: flavourCountByProductId.get(product.id) ?? 0,
+        pricingCount: pricingCountByProductId.get(product.id) ?? 0,
+      }));
     }
-
-    if (categoryIds.length) {
-      baseQb.andWhere('category.id IN (:...categoryIds)', { categoryIds });
-    }
-
-    if (brandIds.length) {
-      baseQb.andWhere('brand.id IN (:...brandIds)', { brandIds });
-    }
-
-    if (flavourIds.length) {
-      baseQb.andWhere('productFlavour.flavourId IN (:...flavourIds)', {
-        flavourIds,
-      });
-    }
-
-    const total = await baseQb
-      .clone()
-      .select('product.id')
-      .distinct(true)
-      .getCount();
-
-    const rows = await baseQb
-      .clone()
-      .select('product.id', 'id')
-      .distinct(true)
-      .orderBy('product.createdAt', 'DESC')
-      .skip((page - 1) * limit)
-      .take(limit)
-      .getRawMany<{ id: string }>();
-
-    const productIds = rows.map((row) => row.id);
-    const products = productIds.length
-      ? await tenantDb.getRepository(Product).find({
-          where: { id: In(productIds), isDelete: false },
-          relations: [
-            'category',
-            'brand',
-            'flavours',
-            'flavours.flavour',
-            'pricing',
-            'pricing.uom',
-          ],
-        })
-      : [];
-
-    const productMap = new Map(products.map((product) => [product.id, product]));
-    const orderedProducts = productIds
-      .map((id) => productMap.get(id))
-      .filter((product): product is Product => Boolean(product));
 
     await this.activityLogService.recordActivityLog(tenantDb, {
       actorId: user.userId,
@@ -253,13 +228,10 @@ export class ProductService {
         total,
         page,
         limit,
-        categoryIds,
-        brandIds,
-        flavourIds,
       },
     });
 
-    return { result: orderedProducts, meta: { total, page, limit } };
+    return { result, meta: { total, page, limit } };
   }
 
   async view(tenantDb: DataSource, id: string, user: any) {

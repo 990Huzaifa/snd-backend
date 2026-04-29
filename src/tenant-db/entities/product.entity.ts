@@ -153,7 +153,7 @@ export class ProductFlavour {
     @Column()
     productId: string;
 
-    @ManyToOne(() => Flavour, (flavour) => flavour.products, { onDelete: 'RESTRICT' })
+    @ManyToOne(() => Flavour, { onDelete: 'RESTRICT' })
     @JoinColumn()
     flavour: Flavour;
 
