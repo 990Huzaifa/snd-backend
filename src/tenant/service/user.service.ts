@@ -107,7 +107,7 @@ export class UserService {
     });
 
     // remove admin role user from the list
-    const filteredusers = users.filter(user => user.role.code !== 'SUPER_ADMIN');
+    // const filteredusers = users.filter(user => user.role.code !== 'SUPER_ADMIN');
     
     await this.activityLogService.recordActivityLog(tenantDb, {
       actorId: user.userId,
@@ -117,7 +117,7 @@ export class UserService {
     });
 
     return {
-      result: filteredusers,
+      result: users,
       totalUsers,
       totalActiveUsers,
       totalInactiveUsers,
