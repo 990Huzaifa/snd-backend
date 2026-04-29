@@ -15,15 +15,38 @@ export class TenantRoleService {
   constructor(private readonly activityLogService: ActivityLogService) {}
 
   async listRoles(tenantDb: DataSource, page: number, limit: number, search: string, user: any) {
-    const roleRepo = tenantDb.getRepository(Role);
-    const [roles, total] = await roleRepo.findAndCount({
-      where: {
-        name: Like(`%${search}%`),
-        isActive: true,
-      },
-      order: { createdAt: 'DESC' },
-      skip: (page - 1) * limit,
-      take: limit,
+    const qb = tenantDb
+    .getRepository(Role)
+    .createQueryBuilder('role')
+    .where('role.isActive = :isActive', { isActive: true });
+
+    if (search) {
+      qb.andWhere('role.name LIKE :search', { search: `%${search}%` });
+    }
+
+    qb.orderBy('role.createdAt', 'DESC')
+    .skip((page - 1) * limit)
+    .take(limit);
+    const [roles, total] = await qb.getManyAndCount();
+    const roleIds = roles.map((role) => role.id);
+    const rolesWithPermissions = roleIds.length
+      ? await tenantDb.getRepository(Role).find({
+          where: { id: In(roleIds) },
+          relations: ['permissions'],
+        })
+      : [];
+    const rolesWithPermissionsMap = new Map(
+      rolesWithPermissions.map((role) => [role.id, role]),
+    );
+    roles.forEach((role) => {
+      const roleWithPermissions = rolesWithPermissionsMap.get(role.id);
+      const permissions = roleWithPermissions?.permissions ?? [];
+      role.permissions = permissions;
+      (role as any).permissionCount = permissions.length;
+    });
+    // remove permissions array from roles
+    roles.forEach((role) => {
+      delete (role as any).permissions;
     });
     await this.activityLogService.recordActivityLog(tenantDb, {
       actorId: user.userId,
