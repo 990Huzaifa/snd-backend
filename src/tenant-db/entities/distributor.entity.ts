@@ -51,10 +51,10 @@ export class Distributor {
     locationTitle: string;
 
     @Column()
-    latitude: number;
+    latitude: string;
 
     @Column()
-    longitude: number;
+    longitude: string;
 
     @Column()
     maxRadius: string;

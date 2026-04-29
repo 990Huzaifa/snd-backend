@@ -1,7 +1,6 @@
 import {
   IsBoolean,
   IsEmail,
-  IsNumber,
   IsOptional,
   IsString,
   IsUUID,
@@ -49,12 +48,12 @@ export class UpdateDistributorDto {
   locationTitle?: string;
 
   @IsOptional()
-  @IsNumber()
-  latitude?: number;
+  @IsString()
+  latitude?: string;
 
   @IsOptional()
-  @IsNumber()
-  longitude?: number;
+  @IsString()
+  longitude?: string;
 
   @IsOptional()
   @IsString()

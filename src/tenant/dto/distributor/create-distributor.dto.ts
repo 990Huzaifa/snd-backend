@@ -1,7 +1,6 @@
 import {
   IsBoolean,
   IsEmail,
-  IsNumber,
   IsOptional,
   IsString,
   IsUUID,
@@ -41,11 +40,11 @@ export class CreateDistributorDto {
   @IsString()
   locationTitle: string;
 
-  @IsNumber()
-  latitude: number;
+  @IsString()
+  latitude: string;
 
-  @IsNumber()
-  longitude: number;
+  @IsString()
+  longitude: string;
 
   @IsString()
   maxRadius: string;

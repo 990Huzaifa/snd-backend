@@ -16,6 +16,7 @@ import { AreaController } from './controller/area.controller';
 import { FlavourController } from './controller/flavour.controller';
 import { ProductBrandController } from './controller/product-brand.controller';
 import { ProductCategoryController } from './controller/product-category.controller';
+import { ProductController } from './controller/product.controller';
 import { RegionController } from './controller/region.controller';
 import { TenantRoleController } from './controller/tenant-role.controller';
 import { TenantUserController } from './controller/tenant-user.controller';
@@ -29,6 +30,7 @@ import { AreaService } from './service/area.service';
 import { FlavourService } from './service/flavour.service';
 import { ProductBrandService } from './service/product-brand.service';
 import { ProductCategoryService } from './service/product-category.service';
+import { ProductService } from './service/product.service';
 import { RegionService } from './service/region.service';
 import { TenantRoleService } from './service/tenant-role.service';
 import { UomService } from './service/uom.service';
@@ -58,6 +60,7 @@ import { MasterGeoHelperService } from './service/master-geo-helper.service';
     FlavourController,
     ProductBrandController,
     ProductCategoryController,
+    ProductController,
     RegionController,
     UomController,
     TenantUtilityController,
@@ -74,6 +77,7 @@ import { MasterGeoHelperService } from './service/master-geo-helper.service';
     FlavourService,
     ProductBrandService,
     ProductCategoryService,
+    ProductService,
     RegionService,
     UomService,
     TenantUtilityService,
