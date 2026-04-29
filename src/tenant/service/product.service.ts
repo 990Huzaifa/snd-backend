@@ -382,4 +382,31 @@ export class ProductService {
 
     return this.view(tenantDb, id, user);
   }
+
+  async updateStatus(tenantDb: DataSource, id: string, status: boolean, user: any) {
+    const product = await tenantDb.getRepository(Product).findOne({
+      where: { id, isDelete: false },
+    });
+    if (!product) {
+      throw new NotFoundException('Product not found');
+    }
+    product.isActive = status;
+    await tenantDb.getRepository(Product).save(product);
+
+    await this.activityLogService.recordActivityLog(tenantDb, {
+      actorId: user.userId,
+      action: 'PRODUCT_STATUS_UPDATED',
+      description: `Product ${product.name} status updated to ${status}`,
+      metadata: { productId: product.id, status },
+    });
+
+    return {
+      message: 'Product status updated successfully',
+      product: {
+        id: product.id,
+        name: product.name,
+        status: product.isActive,
+      },
+    };
+  }
 }

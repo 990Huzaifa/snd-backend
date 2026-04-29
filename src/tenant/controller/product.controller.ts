@@ -83,4 +83,15 @@ export class ProductController {
   ) {
     return this.productService.edit(tenantDb, id, dto, req.user);
   }
+
+  @Put('update/:id/status')
+  @RequirePermissions('UPDATE_PRODUCT')
+  updateStatus(
+    @TenantConnection() tenantDb: DataSource,
+    @Param('id') id: string,
+    @Query('status') status: boolean,
+    @Req() req: Request,
+  ) {
+    return this.productService.updateStatus(tenantDb, id, status, req.user);
+  }
 }
