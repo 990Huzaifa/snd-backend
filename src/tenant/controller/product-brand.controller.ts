@@ -1,16 +1,4 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Param,
-  Post,
-  Put,
-  Query,
-  Req,
-  UploadedFile,
-  UseGuards,
-  UseInterceptors,
-} from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Put, Query, Req, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import type { Request } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { DataSource } from 'typeorm';
@@ -54,18 +42,6 @@ export class ProductBrandController {
     @TenantCode() tenantCode: string,
   ) {
     return this.productBrandService.importBrands(tenantDb, file, req.user, tenantCode);
-  }
-
-  @Get('import/jobs')
-  @RequirePermissions('LIST_PRODUCT_BRAND')
-  listImportJobs(@Req() req: Request) {
-    return this.productBrandService.getMyImportJobs(req.user);
-  }
-
-  @Get('import/jobs/:jobId')
-  @RequirePermissions('VIEW_PRODUCT_BRAND')
-  getImportJobStatus(@Param('jobId') jobId: string, @Req() req: Request) {
-    return this.productBrandService.getImportJobStatus(jobId, req.user);
   }
 
   @Get()

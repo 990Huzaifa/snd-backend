@@ -23,6 +23,7 @@ import { RouteController } from './controller/route.controller';
 import { TenantRoleController } from './controller/tenant-role.controller';
 import { TenantUserController } from './controller/tenant-user.controller';
 import { UomController } from './controller/uom.controller';
+import { TenantJobController } from './controller/tenant-job.controller';
 import { TenantAuthService } from './service/tenant-auth.service';
 import { ActivityLogService } from './service/activity-log.service';
 import { TenantDesignationService } from './service/tenant-designation.service';
@@ -45,6 +46,7 @@ import { MailModule } from 'src/common/mail/mail.module';
 import { TenantUtilityService } from './service/tenant-utility.service';
 import { MasterGeoHelperService } from './service/master-geo-helper.service';
 import { PusherService } from 'src/common/pusher/pusher.service';
+import { TenantJobService } from './service/tenant-job.service';
 
 @Module({
   imports: [
@@ -70,6 +72,7 @@ import { PusherService } from 'src/common/pusher/pusher.service';
     RegionController,
     RouteController,
     UomController,
+    TenantJobController,
     TenantUtilityController,
     TenantUserController,
   ],
@@ -94,6 +97,7 @@ import { PusherService } from 'src/common/pusher/pusher.service';
     UserService,
     TenantPermissionGuard,
     PusherService,
+    TenantJobService,
   ],
 })
 export class TenantModule { }

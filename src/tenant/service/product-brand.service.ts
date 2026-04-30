@@ -2,7 +2,6 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
-  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { DataSource, Like } from 'typeorm';
@@ -11,42 +10,15 @@ import { ActivityLogService } from './activity-log.service';
 import { CreateProductBrandDto } from '../dto/product-brand/create-product-brand.dto';
 import { UpdateProductBrandDto } from '../dto/product-brand/update-product-brand.dto';
 import * as XLSX from 'xlsx';
-import { randomUUID } from 'crypto';
-import { Notification } from 'src/tenant-db/entities/notification.entity';
-import { PusherService } from 'src/common/pusher/pusher.service';
 import { NotificationService } from './notification.service';
-
-type BrandImportLog = {
-  row: number;
-  name: string;
-  status: 'success' | 'error';
-  error?: string;
-  brandId?: string;
-};
-
-type BrandImportJob = {
-  id: string;
-  fileName: string;
-  status: 'queued' | 'processing' | 'completed' | 'failed';
-  tenantCode: string;
-  createdBy: string;
-  createdAt: Date;
-  completedAt: Date | null;
-  totalRows: number;
-  inserted: number;
-  failed: number;
-  logs: BrandImportLog[];
-};
+import { TenantJob, TenantJobService } from './tenant-job.service';
 
 @Injectable()
 export class ProductBrandService {
-  private readonly logger = new Logger(ProductBrandService.name);
-  private readonly importJobs = new Map<string, BrandImportJob>();
-
   constructor(
     private readonly activityLogService: ActivityLogService,
-    private readonly pusherService: PusherService,
     private readonly notificationService: NotificationService,
+    private readonly tenantJobService: TenantJobService,
   ) {}
 
   private sanitizeBrandName(value: unknown): string {
@@ -93,7 +65,7 @@ export class ProductBrandService {
 
   private async notifyImportCompletion(
     tenantDb: DataSource,
-    job: BrandImportJob,
+    job: TenantJob,
     user: any,
     tenantCode: string,
     status: 'completed' | 'failed',
@@ -110,7 +82,19 @@ export class ProductBrandService {
       title,
       message,
       type: 'product_brand_import',
-    }, tenantCode);
+    }, tenantCode, {
+      job: {
+        id: job.id,
+        jobType: job.jobType,
+        status,
+        fileName: job.fileName,
+        totalRows: job.totalRows,
+        inserted: job.inserted,
+        failed: job.failed,
+        completedAt: job.completedAt,
+        logs: job.logs,
+      },
+    });
   }
 
   private async processImportJob(
@@ -120,20 +104,14 @@ export class ProductBrandService {
     user: any,
     tenantCode: string,
   ) {
-    const job = this.importJobs.get(jobId);
-    if (!job) {
-      return;
-    }
-
-    job.status = 'processing';
+    const job = this.tenantJobService.startJob(jobId);
 
     const brandRepo = tenantDb.getRepository(ProductBrand);
     for (const row of rows) {
       try {
         const exists = await brandRepo.findOne({ where: { name: row.name } });
         if (exists) {
-          job.failed += 1;
-          job.logs.push({
+          this.tenantJobService.appendLog(jobId, {
             row: row.row,
             name: row.name,
             status: 'error',
@@ -143,16 +121,14 @@ export class ProductBrandService {
         }
 
         const created = await brandRepo.save(brandRepo.create({ name: row.name }));
-        job.inserted += 1;
-        job.logs.push({
+        this.tenantJobService.appendLog(jobId, {
           row: row.row,
           name: row.name,
           status: 'success',
-          brandId: created.id,
+          metadata: { brandId: created.id },
         });
       } catch (error) {
-        job.failed += 1;
-        job.logs.push({
+        this.tenantJobService.appendLog(jobId, {
           row: row.row,
           name: row.name,
           status: 'error',
@@ -161,23 +137,23 @@ export class ProductBrandService {
       }
     }
 
-    job.status = 'completed';
-    job.completedAt = new Date();
+    const completedJob = this.tenantJobService.completeJob(jobId);
 
     await this.activityLogService.recordActivityLog(tenantDb, {
       actorId: user.userId,
-      action: 'PRODUCT_BRAND_IMPORT_COMPLETED',
-      description: `Product brand import completed for ${job.fileName}`,
+      action: 'TENANT_JOB_COMPLETED',
+      description: `Product brand import completed for ${completedJob.fileName}`,
       metadata: {
-        jobId: job.id,
-        fileName: job.fileName,
-        totalRows: job.totalRows,
-        inserted: job.inserted,
-        failed: job.failed,
+        jobId: completedJob.id,
+        jobType: completedJob.jobType,
+        fileName: completedJob.fileName,
+        totalRows: completedJob.totalRows,
+        inserted: completedJob.inserted,
+        failed: completedJob.failed,
       },
     });
 
-    await this.notifyImportCompletion(tenantDb, job, user, tenantCode, 'completed');
+    await this.notifyImportCompletion(tenantDb, completedJob, user, tenantCode, 'completed');
   }
 
   async create(tenantDb: DataSource, dto: CreateProductBrandDto, user: any) {
@@ -287,54 +263,43 @@ export class ProductBrandService {
       throw new BadRequestException('No brand names found in file');
     }
 
-    const jobId = randomUUID();
-    const job: BrandImportJob = {
-      id: jobId,
-      fileName: file.originalname,
-      status: 'queued',
+    const job = this.tenantJobService.createJob({
       tenantCode,
+      jobType: 'PRODUCT_BRAND_IMPORT',
+      fileName: file.originalname,
       createdBy: user.userId,
-      createdAt: new Date(),
-      completedAt: null,
       totalRows: rows.length,
-      inserted: 0,
-      failed: 0,
-      logs: [],
-    };
-    this.importJobs.set(jobId, job);
+    });
 
     await this.activityLogService.recordActivityLog(tenantDb, {
       actorId: user.userId,
-      action: 'PRODUCT_BRAND_IMPORT_STARTED',
+      action: 'TENANT_JOB_STARTED',
       description: `Product brand import started for ${file.originalname}`,
       metadata: {
-        jobId,
+        jobId: job.id,
+        jobType: job.jobType,
         fileName: file.originalname,
         totalRows: rows.length,
       },
     });
 
-    void this.processImportJob(tenantDb, jobId, rows, user, tenantCode).catch(async (error) => {
-      const failedJob = this.importJobs.get(jobId);
-      if (!failedJob) {
-        return;
-      }
-      failedJob.status = 'failed';
-      failedJob.completedAt = new Date();
-      failedJob.failed = failedJob.totalRows;
-      failedJob.logs.push({
+    void this.processImportJob(tenantDb, job.id, rows, user, tenantCode).catch(async (error) => {
+      this.tenantJobService.failJob(job.id);
+      this.tenantJobService.appendLog(job.id, {
         row: 0,
         name: '',
         status: 'error',
         error: error instanceof Error ? error.message : 'Unknown processing failure',
       });
+      const failedJob = this.tenantJobService.getJobById(job.id, tenantCode, user.userId);
 
       await this.activityLogService.recordActivityLog(tenantDb, {
         actorId: user.userId,
-        action: 'PRODUCT_BRAND_IMPORT_FAILED',
+        action: 'TENANT_JOB_FAILED',
         description: `Product brand import failed for ${file.originalname}`,
         metadata: {
-          jobId,
+          jobId: job.id,
+          jobType: job.jobType,
           fileName: file.originalname,
           error: error instanceof Error ? error.message : String(error),
         },
@@ -344,23 +309,17 @@ export class ProductBrandService {
 
     return {
       message: 'Product brand import started',
-      jobId,
+      jobId: job.id,
       status: job.status,
       totalRows: job.totalRows,
     };
   }
 
-  getImportJobStatus(jobId: string, user: any) {
-    const job = this.importJobs.get(jobId);
-    if (!job || job.createdBy !== user.userId) {
-      throw new NotFoundException('Import job not found');
-    }
-    return job;
+  getImportJobStatus(jobId: string, user: any, tenantCode: string) {
+    return this.tenantJobService.getJobById(jobId, tenantCode, user.userId);
   }
 
-  getMyImportJobs(user: any) {
-    return [...this.importJobs.values()]
-      .filter((job) => job.createdBy === user.userId)
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  getMyImportJobs(user: any, tenantCode: string) {
+    return this.tenantJobService.listJobsForUser(tenantCode, user.userId);
   }
 }

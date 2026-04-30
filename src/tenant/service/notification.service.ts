@@ -24,7 +24,12 @@ export class NotificationService {
         return { result: notifications };
     }
 
-    async createNotification(tenantDb: DataSource, payload: CreateNotificationDto, tenantCode: string) {
+    async createNotification(
+        tenantDb: DataSource,
+        payload: CreateNotificationDto,
+        tenantCode: string,
+        realtimePayload?: Record<string, unknown>,
+    ) {
         
         const user = await tenantDb.getRepository(User).findOne({
             where: { id: payload.userId },
@@ -49,7 +54,10 @@ export class NotificationService {
             await this.pusherService.trigger(
                 `private-tenant-${tenantCode}-user-${user.id}`,
                 'notification.new',
-                { message: saved },
+                {
+                    message: saved,
+                    ...(realtimePayload ? { data: realtimePayload } : {}),
+                },
             );
         } catch (err) {
             this.logger.warn(
