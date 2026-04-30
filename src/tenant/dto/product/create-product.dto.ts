@@ -21,7 +21,7 @@ class CreateProductPricingDto {
   @IsString()
   retailPrice: string;
 
-  @IsInt()
+  @IsString()
   quantity: string;
 }
 
