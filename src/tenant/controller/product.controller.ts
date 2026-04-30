@@ -7,7 +7,9 @@ import {
   Put,
   Query,
   Req,
+  UploadedFiles,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { DataSource } from 'typeorm';
@@ -20,6 +22,7 @@ import { TenantConnection } from 'src/common/tenant/tenant-connection.decorator'
 import { CreateProductDto } from '../dto/product/create-product.dto';
 import { UpdateProductDto } from '../dto/product/update-product.dto';
 import { ProductService } from '../service/product.service';
+import { FilesInterceptor } from '@nestjs/platform-express';
 
 @Controller('tenant/products')
 @UseGuards(
@@ -33,12 +36,14 @@ export class ProductController {
 
   @Post('create')
   @RequirePermissions('CREATE_PRODUCT')
+  @UseInterceptors(FilesInterceptor('images', 10))
   create(
     @TenantConnection() tenantDb: DataSource,
     @Body() dto: CreateProductDto,
     @Req() req: Request,
+    @UploadedFiles() files: Express.Multer.File[],
   ) {
-    return this.productService.create(tenantDb, dto, req.user);
+    return this.productService.create(tenantDb, dto, req.user, files);
   }
 
   @Get()

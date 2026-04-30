@@ -43,6 +43,7 @@ import { UserService } from './service/user.service';
 import { TenantPermissionGuard } from 'src/auth/tenant-permission.guard';
 import { TenantUtilityController } from './controller/utility.controller';
 import { MailModule } from 'src/common/mail/mail.module';
+import { CommonModule } from 'src/common/common.module';
 import { TenantUtilityService } from './service/tenant-utility.service';
 import { MasterGeoHelperService } from './service/master-geo-helper.service';
 import { PusherService } from 'src/common/pusher/pusher.service';
@@ -53,6 +54,7 @@ import { TenantJobService } from './service/tenant-job.service';
     HttpModule,
     AuthModule,
     MailModule,
+    CommonModule,
     TenantRuntimeModule,
     TypeOrmModule.forFeature([Tenant, Country, State, City]),
   ],

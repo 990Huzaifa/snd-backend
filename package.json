@@ -22,6 +22,7 @@
     "seed:tenant": "ts-node src/tenant-db/seeders/run-tenant-seeders.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1039.0",
     "@nestjs/axios": "^4.0.1",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.3",

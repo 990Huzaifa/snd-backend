@@ -16,10 +16,16 @@ import {
 import { CreateProductDto } from '../dto/product/create-product.dto';
 import { UpdateProductDto } from '../dto/product/update-product.dto';
 import { ActivityLogService } from './activity-log.service';
+import { S3Service } from 'src/common/s3/s3.service';
+import { randomUUID } from 'node:crypto';
+import { extname } from 'node:path';
 
 @Injectable()
 export class ProductService {
-  constructor(private readonly activityLogService: ActivityLogService) {}
+  constructor(
+    private readonly activityLogService: ActivityLogService,
+    private readonly s3Service: S3Service,
+  ) {}
 
   private parseCsvIds(value?: string | null): string[] {
     if (!value?.trim()) {
@@ -94,13 +100,33 @@ export class ProductService {
     }
   }
 
-  async create(tenantDb: DataSource, dto: CreateProductDto, user: any) {
+  async create(
+    tenantDb: DataSource,
+    dto: CreateProductDto,
+    user: any,
+    files: Express.Multer.File[] = [],
+  ) {
     const categoryId = dto.categoryId.trim();
     const brandId = dto.brandId?.trim();
     const skuCode = dto.skuCode.trim();
     const name = dto.name.trim();
     const description = dto.description?.trim() || null;
-    const image = dto.image?.trim() || null;
+    const uploadedImageUrls: string[] = [];
+    for (const file of files) {
+      const extension = extname(file.originalname || '').toLowerCase();
+      const fileName = `${Date.now()}-${randomUUID()}${extension}`;
+      const key = `products/${fileName}`;
+      const uploadResult = await this.s3Service.uploadObject(
+        key,
+        file.buffer,
+        file.mimetype,
+      );
+      uploadedImageUrls.push(uploadResult.url);
+    }
+    const image =
+      uploadedImageUrls.length > 0
+        ? uploadedImageUrls.join(',')
+        : dto.image?.trim() || null;
     const flavourIds = dto.flavourIds.map((id) => id.trim()).filter(Boolean);
 
     await this.ensureCategoryExists(tenantDb, categoryId);
