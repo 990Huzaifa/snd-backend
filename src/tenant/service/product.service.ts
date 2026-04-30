@@ -171,7 +171,8 @@ export class ProductService {
           uomId: price.uomId.trim(),
           tradePrice: price.tradePrice,
           retailPrice: price.retailPrice,
-          quantity: price.quantity,
+          // convert it to number
+          quantity: Number(price.quantity),
         }),
       );
       await productPricingRepo.save(pricingRows);

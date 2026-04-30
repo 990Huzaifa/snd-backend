@@ -22,7 +22,7 @@ class CreateProductPricingDto {
   retailPrice: string;
 
   @IsInt()
-  quantity: number;
+  quantity: string;
 }
 
 export class CreateProductDto {
