@@ -152,7 +152,7 @@ export class ProductService {
         name,
         description,
         image,
-        isActive: dto.isActive ?? true,
+        isActive: dto.isActive === 'true',
       });
 
       const savedProduct = await productRepo.save(product);

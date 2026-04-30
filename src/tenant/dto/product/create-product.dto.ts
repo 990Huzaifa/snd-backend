@@ -2,6 +2,7 @@ import {
   ArrayMinSize,
   IsArray,
   IsBoolean,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
@@ -47,8 +48,9 @@ export class CreateProductDto {
   image?: string;
 
   @IsOptional()
-  @IsBoolean()
-  isActive?: boolean;
+  @IsString()
+  @IsIn(['true', 'false'])
+  isActive?: string;
 
   @IsArray()
   @ArrayMinSize(1)
