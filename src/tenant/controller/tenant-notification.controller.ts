@@ -6,7 +6,7 @@ import { TenantConnectionGuard } from 'src/common/guards/tenant-connection.guard
 import { TenantJwtGuard } from 'src/common/guards/tenant-jwt.guard';
 import { TenantConnection } from 'src/common/tenant/tenant-connection.decorator';
 import { DataSource } from 'typeorm';
-import { TenantNotificationService } from '../service/tenant-notification.service';
+import { NotificationService } from '../service/notification.service';
 
 type TenantRequestUser = {
   userId?: string;
@@ -15,7 +15,7 @@ type TenantRequestUser = {
 @Controller('tenant/notifications')
 @UseGuards(TenantJwtAuthGuard, TenantJwtGuard, TenantConnectionGuard, TenantPermissionGuard)
 export class TenantNotificationController {
-  constructor(private readonly tenantNotificationService: TenantNotificationService) {}
+  constructor(private readonly notificationService: NotificationService) {}
 
   private getUserId(req: Request): string {
     const user = req.user as TenantRequestUser;
@@ -27,15 +27,14 @@ export class TenantNotificationController {
 
   @Get('')
   list(@TenantConnection() tenantDb: DataSource, @Req() req: Request) {
-    return this.tenantNotificationService.getUserNotifications(tenantDb, this.getUserId(req));
+    return this.notificationService.getUserNotifications(tenantDb, this.getUserId(req));
   }
 
   @Put(':id/read')
   markAsRead(
     @TenantConnection() tenantDb: DataSource,
     @Param('id') id: string,
-    @Req() req: Request,
   ) {
-    return this.tenantNotificationService.markAsRead(tenantDb, id, this.getUserId(req));
+    return this.notificationService.markAsRead(tenantDb, id);
   }
 }

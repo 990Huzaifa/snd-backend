@@ -4,6 +4,7 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 import { DataSource } from 'typeorm';
+import { TenantContext } from './tenant-context';
 
 export const TenantConnection = createParamDecorator(
   (_data: unknown, ctx: ExecutionContext): DataSource => {
@@ -15,5 +16,18 @@ export const TenantConnection = createParamDecorator(
     }
 
     return req.tenantDb;
+  },
+);
+
+export const TenantCode = createParamDecorator(
+  (_data: unknown, ctx: ExecutionContext): string => {
+    const req = ctx.switchToHttp().getRequest<{ tenant?: TenantContext }>();
+    if (!req.tenant) {
+      throw new InternalServerErrorException(
+        'Tenant context is not available on request',
+      );
+    }
+
+    return req.tenant.code;
   },
 );

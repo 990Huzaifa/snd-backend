@@ -26,7 +26,7 @@ import { UomController } from './controller/uom.controller';
 import { TenantAuthService } from './service/tenant-auth.service';
 import { ActivityLogService } from './service/activity-log.service';
 import { TenantDesignationService } from './service/tenant-designation.service';
-import { TenantNotificationService } from './service/tenant-notification.service';
+import { NotificationService } from './service/notification.service';
 import { DistributorService } from './service/distributor.service';
 import { AreaService } from './service/area.service';
 import { FlavourService } from './service/flavour.service';
@@ -44,6 +44,7 @@ import { TenantUtilityController } from './controller/utility.controller';
 import { MailModule } from 'src/common/mail/mail.module';
 import { TenantUtilityService } from './service/tenant-utility.service';
 import { MasterGeoHelperService } from './service/master-geo-helper.service';
+import { PusherService } from 'src/common/pusher/pusher.service';
 
 @Module({
   imports: [
@@ -77,7 +78,7 @@ import { MasterGeoHelperService } from './service/master-geo-helper.service';
     ActivityLogService,
     TenantRoleService,
     TenantDesignationService,
-    TenantNotificationService,
+    NotificationService,
     DistributorService,
     AreaService,
     FlavourService,
@@ -92,6 +93,7 @@ import { MasterGeoHelperService } from './service/master-geo-helper.service';
     MasterGeoHelperService,
     UserService,
     TenantPermissionGuard,
+    PusherService,
   ],
 })
 export class TenantModule { }
