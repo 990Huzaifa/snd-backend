@@ -391,7 +391,7 @@ export class ProductService {
             uomId: item.uomId.trim(),
             tradePrice: item.tradePrice,
             retailPrice: item.retailPrice,
-            quantity: item.quantity,
+            quantity: Number(item.quantity),
           }),
         );
         await tenantDb.getRepository(ProductPricing).save(rows);
