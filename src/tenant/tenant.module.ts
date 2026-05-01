@@ -5,6 +5,9 @@ import { Tenant } from 'src/master-db/entities/tenant.entity';
 import { Country } from 'src/master-db/entities/country.entity';
 import { State } from 'src/master-db/entities/state.entity';
 import { City } from 'src/master-db/entities/city.entity';
+import { TenantSettings } from 'src/master-db/entities/tenant-settings.entity';
+import { TenantGeoPolicy } from 'src/master-db/entities/tenant-geo-policy.entity';
+import { TenantTheme } from 'src/master-db/entities/tenant-themes.entity';
 import { AuthModule } from 'src/auth/auth.module';
 import { TenantRuntimeModule } from 'src/tenant-db/tenant-runtime.module';
 import { TenantAuthController } from './controller/tenant-auth.controller';
@@ -27,6 +30,7 @@ import { TenantJobController } from './controller/tenant-job.controller';
 import { OpeningStockController } from './controller/opening-stock.controller';
 import { ProductPricingJobController } from './controller/product-pricing-job.controller';
 import { PurchaseStockController } from './controller/purchase-stock.controller';
+import { MasterTenantDataController } from './controller/master-tenant-data.controller';
 import { TenantAuthService } from './service/tenant-auth.service';
 import { ActivityLogService } from './service/activity-log.service';
 import { TenantDesignationService } from './service/tenant-designation.service';
@@ -55,6 +59,7 @@ import { OpeningStockService } from './service/opening-stock.service';
 import { StockService } from './service/stock.service';
 import { ProductPricingJobService } from './service/product-pricing-job.service';
 import { PurchaseStockService } from './service/purchase-stock.service';
+import { MasterTenantDataService } from './service/master-tenant-data.service';
 
 @Module({
   imports: [
@@ -63,7 +68,15 @@ import { PurchaseStockService } from './service/purchase-stock.service';
     MailModule,
     CommonModule,
     TenantRuntimeModule,
-    TypeOrmModule.forFeature([Tenant, Country, State, City]),
+    TypeOrmModule.forFeature([
+      Tenant,
+      Country,
+      State,
+      City,
+      TenantSettings,
+      TenantGeoPolicy,
+      TenantTheme,
+    ]),
   ],
   controllers: [
     TenantAuthController,
@@ -87,6 +100,7 @@ import { PurchaseStockService } from './service/purchase-stock.service';
     OpeningStockController,
     ProductPricingJobController,
     PurchaseStockController,
+    MasterTenantDataController,
   ],
   providers: [
     TenantAuthService,
@@ -114,6 +128,7 @@ import { PurchaseStockService } from './service/purchase-stock.service';
     PurchaseStockService,
     StockService,
     ProductPricingJobService,
+    MasterTenantDataService,
   ],
 })
 export class TenantModule { }

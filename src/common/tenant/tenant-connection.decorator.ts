@@ -31,3 +31,16 @@ export const TenantCode = createParamDecorator(
     return req.tenant.code;
   },
 );
+
+export const TenantId = createParamDecorator(
+  (_data: unknown, ctx: ExecutionContext): string => {
+    const req = ctx.switchToHttp().getRequest<{ tenant?: TenantContext }>();
+    if (!req.tenant?.tenantId) {
+      throw new InternalServerErrorException(
+        'Tenant id is not available on request',
+      );
+    }
+
+    return req.tenant.tenantId;
+  },
+);
