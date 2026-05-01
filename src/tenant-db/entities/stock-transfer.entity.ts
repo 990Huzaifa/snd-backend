@@ -3,6 +3,7 @@ import { Distributor } from "./distributor.entity";
 import { ProductFlavour, Product, ProductPricing } from "./product.entity";
 import { JoinColumn } from "typeorm";
 import { ManyToOne } from "typeorm";
+import { OneToMany } from "typeorm";
 import { Entity } from "typeorm";
 
 @Entity('stock_transfers')
@@ -35,6 +36,9 @@ export class StockTransfer {
 
     @UpdateDateColumn()
     updatedAt: Date;
+
+    @OneToMany(() => StockTransferItem, (item) => item.StockTransfer)
+    items: StockTransferItem[];
 }
 
 @Entity('stock_transfer_items')

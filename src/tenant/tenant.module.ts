@@ -31,6 +31,7 @@ import { OpeningStockController } from './controller/opening-stock.controller';
 import { ProductPricingJobController } from './controller/product-pricing-job.controller';
 import { PurchaseStockController } from './controller/purchase-stock.controller';
 import { MasterTenantDataController } from './controller/master-tenant-data.controller';
+import { StockTransferController } from './controller/stock-transfer.controller';
 import { TenantAuthService } from './service/tenant-auth.service';
 import { ActivityLogService } from './service/activity-log.service';
 import { TenantDesignationService } from './service/tenant-designation.service';
@@ -60,6 +61,7 @@ import { StockService } from './service/stock.service';
 import { ProductPricingJobService } from './service/product-pricing-job.service';
 import { PurchaseStockService } from './service/purchase-stock.service';
 import { MasterTenantDataService } from './service/master-tenant-data.service';
+import { StockTransferService } from './service/stock-transfer.service';
 
 @Module({
   imports: [
@@ -101,6 +103,7 @@ import { MasterTenantDataService } from './service/master-tenant-data.service';
     ProductPricingJobController,
     PurchaseStockController,
     MasterTenantDataController,
+    StockTransferController,
   ],
   providers: [
     TenantAuthService,
@@ -129,6 +132,7 @@ import { MasterTenantDataService } from './service/master-tenant-data.service';
     StockService,
     ProductPricingJobService,
     MasterTenantDataService,
+    StockTransferService,
   ],
 })
 export class TenantModule { }
