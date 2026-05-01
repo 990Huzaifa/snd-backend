@@ -7,16 +7,19 @@ import {
   Put,
   Query,
   Req,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import type { Request } from 'express';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { DataSource } from 'typeorm';
 import { TenantJwtAuthGuard } from 'src/auth/tenant-jwt-auth.guard';
 import { TenantPermissionGuard } from 'src/auth/tenant-permission.guard';
 import { RequirePermissions } from 'src/auth/require-permission.decorator';
 import { TenantConnectionGuard } from 'src/common/guards/tenant-connection.guard';
 import { TenantJwtGuard } from 'src/common/guards/tenant-jwt.guard';
-import { TenantConnection } from 'src/common/tenant/tenant-connection.decorator';
+import { TenantCode, TenantConnection } from 'src/common/tenant/tenant-connection.decorator';
 import { UomService } from '../service/uom.service';
 import { CreateUomDto } from '../dto/uom/create-uom.dto';
 import { UpdateUomDto } from '../dto/uom/update-uom.dto';
@@ -39,6 +42,34 @@ export class UomController {
     @Req() req: Request,
   ) {
     return this.uomService.create(tenantDb, dto, req.user);
+  }
+
+  @Post('import')
+  @RequirePermissions('CREATE_UOM')
+  @UseInterceptors(FileInterceptor('file'))
+  importUoms(
+    @TenantConnection() tenantDb: DataSource,
+    @UploadedFile() file: Express.Multer.File,
+    @Req() req: Request,
+    @TenantCode() tenantCode: string,
+  ) {
+    return this.uomService.importUoms(tenantDb, file, req.user, tenantCode);
+  }
+
+  @Get('import/jobs')
+  @RequirePermissions('LIST_UOM')
+  getMyImportJobs(@Req() req: Request, @TenantCode() tenantCode: string) {
+    return this.uomService.getMyImportJobs(req.user, tenantCode);
+  }
+
+  @Get('import/jobs/:jobId')
+  @RequirePermissions('LIST_UOM')
+  getImportJobStatus(
+    @Param('jobId') jobId: string,
+    @Req() req: Request,
+    @TenantCode() tenantCode: string,
+  ) {
+    return this.uomService.getImportJobStatus(jobId, req.user, tenantCode);
   }
 
   @Get()
