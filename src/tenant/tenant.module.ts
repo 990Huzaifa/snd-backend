@@ -26,6 +26,7 @@ import { UomController } from './controller/uom.controller';
 import { TenantJobController } from './controller/tenant-job.controller';
 import { OpeningStockController } from './controller/opening-stock.controller';
 import { ProductPricingJobController } from './controller/product-pricing-job.controller';
+import { PurchaseStockController } from './controller/purchase-stock.controller';
 import { TenantAuthService } from './service/tenant-auth.service';
 import { ActivityLogService } from './service/activity-log.service';
 import { TenantDesignationService } from './service/tenant-designation.service';
@@ -53,6 +54,7 @@ import { TenantJobService } from './service/tenant-job.service';
 import { OpeningStockService } from './service/opening-stock.service';
 import { StockService } from './service/stock.service';
 import { ProductPricingJobService } from './service/product-pricing-job.service';
+import { PurchaseStockService } from './service/purchase-stock.service';
 
 @Module({
   imports: [
@@ -84,6 +86,7 @@ import { ProductPricingJobService } from './service/product-pricing-job.service'
     TenantUserController,
     OpeningStockController,
     ProductPricingJobController,
+    PurchaseStockController,
   ],
   providers: [
     TenantAuthService,
@@ -108,6 +111,7 @@ import { ProductPricingJobService } from './service/product-pricing-job.service'
     PusherService,
     TenantJobService,
     OpeningStockService,
+    PurchaseStockService,
     StockService,
     ProductPricingJobService,
   ],

@@ -1,4 +1,4 @@
-import { Column, CreateDateColumn, PrimaryGeneratedColumn, UpdateDateColumn } from "typeorm";
+import { Column, CreateDateColumn, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn } from "typeorm";
 import { Distributor } from "./distributor.entity";
 import { Product, ProductFlavour, ProductPricing } from "./product.entity";
 import { JoinColumn } from "typeorm";
@@ -22,6 +22,9 @@ export class PurchaseStock {
 
     @Column()
     purchaseDate: Date;
+
+    @OneToMany(() => PurchaseStockItem, (line) => line.purchaseStock)
+    items: PurchaseStockItem[];
     
     @CreateDateColumn()
     createdAt: Date;
