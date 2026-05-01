@@ -14,7 +14,7 @@ import { Route } from './route.entity';
 import { PurchaseStock } from './purchase-stock.entity';
 import { OpeningStock } from './opening-stock.entity';
 import { StockTransfer } from './stock-transfer.entity';
-import { StockMovement } from './stock.entity';
+import { StockBalance, StockMovement } from './stock.entity';
 
 @Entity('distributors')
 export class Distributor {
@@ -93,4 +93,10 @@ export class Distributor {
     
     @OneToMany(() => StockTransfer, (stockTransfer) => stockTransfer.toDistributor)
     toStockTransfers: StockTransfer[];
+
+    @OneToMany(() => StockMovement, (stockMovement) => stockMovement.distributor)
+    stockMovements: StockMovement[];
+
+    @OneToMany(() => StockBalance, (stockBalance) => stockBalance.distributor)
+    stockBalances: StockBalance[];
 }

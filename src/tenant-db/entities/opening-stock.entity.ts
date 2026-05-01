@@ -1,17 +1,24 @@
-import { Column, CreateDateColumn, PrimaryGeneratedColumn, UpdateDateColumn } from "typeorm";
-import { Distributor } from "./distributor.entity";
-import { ProductFlavour, Product, ProductPricing } from "./product.entity";
-import { JoinColumn } from "typeorm";
-import { ManyToOne } from "typeorm";
-import { Entity } from "typeorm";
+import {
+    Column,
+    CreateDateColumn,
+    Entity,
+    JoinColumn,
+    ManyToOne,
+    OneToMany,
+    PrimaryGeneratedColumn,
+    UpdateDateColumn,
+} from 'typeorm';
+import { Distributor } from './distributor.entity';
+import { ProductFlavour, Product, ProductPricing } from './product.entity';
+import { User } from './user.entity';
 
 @Entity('opening_stocks')
 export class OpeningStock {
     @PrimaryGeneratedColumn('uuid')
     id: string;
-    
+
     @Column()
-    distributorId: string;  
+    distributorId: string;
 
     @ManyToOne(() => Distributor, { onDelete: 'RESTRICT' })
     @JoinColumn({ name: 'distributorId' })
@@ -22,7 +29,14 @@ export class OpeningStock {
 
     @Column()
     Date: Date;
-    
+
+    @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })
+    @JoinColumn({ name: 'createdBy' })
+    createdBy: User | null;
+
+    @OneToMany(() => OpeningStockItem, (line) => line.OpeningStock)
+    items: OpeningStockItem[];
+
     @CreateDateColumn()
     createdAt: Date;
 
@@ -38,7 +52,7 @@ export class OpeningStockItem {
     @Column()
     OpeningStockId: string;
 
-    @ManyToOne(() => OpeningStock, { onDelete: 'CASCADE' })
+    @ManyToOne(() => OpeningStock, (stock) => stock.items, { onDelete: 'CASCADE' })
     @JoinColumn({ name: 'OpeningStockId' })
     OpeningStock: OpeningStock;
     

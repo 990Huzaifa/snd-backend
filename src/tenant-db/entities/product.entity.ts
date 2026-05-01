@@ -159,6 +159,9 @@ export class Product {
 
     @OneToMany(() => StockTransferItem, (stockTransferItem) => stockTransferItem.product)
     stockTransferItems: StockTransferItem[];
+
+    @OneToMany(() => ProductPricingJob, (productPricingJob) => productPricingJob.product)
+    pricingJobs: ProductPricingJob[];
 }
 
 @Entity('product_flavours')
@@ -238,5 +241,51 @@ export class ProductPricing {
     stockBalances: StockBalance[];
     @OneToMany(() => StockTransferItem, (stockTransferItem) => stockTransferItem.productPricing)
     stockTransferItems: StockTransferItem[];
+    @OneToMany(() => ProductPricingJob, (productPricingJob) => productPricingJob.productPricing)
+    pricingJobs: ProductPricingJob[];
 
+}
+
+@Entity('product_pricing_jobs')
+export class ProductPricingJob {
+    @PrimaryGeneratedColumn('uuid')
+    id: string;
+
+    @Column()
+    productId: string;
+
+    @ManyToOne(() => Product, (product) => product.pricingJobs, { onDelete: 'CASCADE' })
+    @JoinColumn()
+    product: Product;
+    
+    @Column()
+    productPricingId: string;
+
+    @ManyToOne(() => ProductPricing, (productPricing) => productPricing.pricingJobs, { onDelete: 'CASCADE' })
+    @JoinColumn()
+    productPricing: ProductPricing;
+
+    @Column()
+    startDate: Date;
+
+    @Column()
+    status: 'PENDING' | 'COMPLETED' | 'FAILED';
+
+    @Column()
+    tradePrice: string;
+
+    @Column()
+    retailPrice: string;
+
+    @Column()
+    quantity: number;
+
+    @Column()
+    errorMessage: string;
+
+    @CreateDateColumn()
+    createdAt: Date;
+
+    @UpdateDateColumn()
+    updatedAt: Date;
 }

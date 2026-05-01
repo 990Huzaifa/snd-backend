@@ -24,6 +24,8 @@ import { TenantRoleController } from './controller/tenant-role.controller';
 import { TenantUserController } from './controller/tenant-user.controller';
 import { UomController } from './controller/uom.controller';
 import { TenantJobController } from './controller/tenant-job.controller';
+import { OpeningStockController } from './controller/opening-stock.controller';
+import { ProductPricingJobController } from './controller/product-pricing-job.controller';
 import { TenantAuthService } from './service/tenant-auth.service';
 import { ActivityLogService } from './service/activity-log.service';
 import { TenantDesignationService } from './service/tenant-designation.service';
@@ -48,6 +50,9 @@ import { TenantUtilityService } from './service/tenant-utility.service';
 import { MasterGeoHelperService } from './service/master-geo-helper.service';
 import { PusherService } from 'src/common/pusher/pusher.service';
 import { TenantJobService } from './service/tenant-job.service';
+import { OpeningStockService } from './service/opening-stock.service';
+import { StockService } from './service/stock.service';
+import { ProductPricingJobService } from './service/product-pricing-job.service';
 
 @Module({
   imports: [
@@ -77,6 +82,8 @@ import { TenantJobService } from './service/tenant-job.service';
     TenantJobController,
     TenantUtilityController,
     TenantUserController,
+    OpeningStockController,
+    ProductPricingJobController,
   ],
   providers: [
     TenantAuthService,
@@ -100,6 +107,9 @@ import { TenantJobService } from './service/tenant-job.service';
     TenantPermissionGuard,
     PusherService,
     TenantJobService,
+    OpeningStockService,
+    StockService,
+    ProductPricingJobService,
   ],
 })
 export class TenantModule { }

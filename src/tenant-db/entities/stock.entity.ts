@@ -1,5 +1,6 @@
 import { ProductFlavour, Product, ProductPricing } from "./product.entity";
 import { CreateDateColumn, Entity,PrimaryGeneratedColumn, UpdateDateColumn, Column, ManyToOne, JoinColumn } from "typeorm";
+import { Distributor } from "./distributor.entity";
 
 
 export enum ReferenceType {
@@ -22,6 +23,13 @@ export enum StockMovementType {
 export class StockMovement {
     @PrimaryGeneratedColumn('uuid')
     id: string;
+
+    @Column()
+    distributorId: string;
+
+    @ManyToOne(() => Distributor, { onDelete: 'RESTRICT' })
+    @JoinColumn({ name: 'distributorId' })
+    distributor: Distributor;
 
     @Column()
     productId: string;
@@ -70,6 +78,13 @@ export class StockMovement {
 export class StockBalance {
     @PrimaryGeneratedColumn('uuid')
     id: string;
+
+    @Column()
+    distributorId: string;
+
+    @ManyToOne(() => Distributor, { onDelete: 'RESTRICT' })
+    @JoinColumn({ name: 'distributorId' })
+    distributor: Distributor;
 
     @Column()
     productId: string;

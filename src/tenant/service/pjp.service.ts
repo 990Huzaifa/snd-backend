@@ -216,9 +216,6 @@ export class PjpService {
     if (!pjp) {
       throw new NotFoundException('PJP not found');
     }
-    if (pjp.status !== PJPStatus.PENDING) {
-      throw new ConflictException('PJP is not pending');
-    }
 
     const nextWeekStartDate = dto.weekStartDate
       ? new Date(dto.weekStartDate)
