@@ -9,9 +9,39 @@ import { Distributor } from 'src/tenant-db/entities/distributor.entity';
 import { Flavour, Product, ProductBrand, ProductCategory, Uom } from 'src/tenant-db/entities/product.entity';
 import { RetailerCategory, RetailerChannel } from 'src/tenant-db/entities/retailer.entity';
 import { Route } from 'src/tenant-db/entities/route.entity';
+import { User } from 'src/tenant-db/entities/user.entity';
 
 @Injectable()
 export class TenantUtilityService {
+  private async getUsersByRoleCode(tenantDb: DataSource, roleCode: string) {
+    const users = await tenantDb.getRepository(User).find({
+      where: {
+        isDeleted: false,
+        isActive: true,
+        role: { code: roleCode },
+      },
+      relations: { role: true },
+      select: {
+        id: true,
+        code: true,
+        name: true,
+        email: true,
+        role: { id: true, code: true, name: true },
+      },
+      order: { name: 'ASC' },
+    });
+
+    return { result: users };
+  }
+
+  async getSalesmanUsers(tenantDb: DataSource) {
+    return this.getUsersByRoleCode(tenantDb, 'SALESMAN');
+  }
+
+  async getMerchandiserUsers(tenantDb: DataSource) {
+    return this.getUsersByRoleCode(tenantDb, 'MERCHANDISER');
+  }
+
   async getDesignations(tenantDb: DataSource) {
     const designations = await tenantDb.getRepository(Designation).find({
       where: { isActive: true },

@@ -85,4 +85,14 @@ export class TenantUtilityController {
     async getRoutes(@TenantConnection() tenantDb: DataSource,) {
         return this.utilityService.getRoutes(tenantDb);
     }
+
+    @Get('salesman-users')
+    async getSalesmanUsers(@TenantConnection() tenantDb: DataSource,) {
+        return this.utilityService.getSalesmanUsers(tenantDb);
+    }
+
+    @Get('merchandiser-users')
+    async getMerchandiserUsers(@TenantConnection() tenantDb: DataSource,) {
+        return this.utilityService.getMerchandiserUsers(tenantDb);
+    }
 }
