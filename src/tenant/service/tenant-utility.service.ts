@@ -148,13 +148,11 @@ export class TenantUtilityService {
         id: true,
         name: true,
         skuCode: true,
-        category: {
-          id: true,
-          name: true,
-        },
       },
       relations: {
-        pricing: true,
+        pricing: {
+          uom: true,
+        },
       },
       order: { name: 'ASC' },
     });
