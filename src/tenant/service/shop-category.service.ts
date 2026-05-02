@@ -3,6 +3,7 @@ import { DataSource, Like } from 'typeorm';
 import { RetailerCategory } from 'src/tenant-db/entities/retailer.entity';
 import { ActivityLogService } from './activity-log.service';
 import { CreateShopCategoryDto } from '../dto/shop-category/create-shop-category.dto';
+import { UpdateShopCategoryDto } from '../dto/shop-category/update-shop-category.dto';
 
 @Injectable()
 export class ShopCategoryService {
@@ -76,5 +77,36 @@ export class ShopCategoryService {
     });
 
     return category;
+  }
+
+  async edit(tenantDb: DataSource, id: string, dto: UpdateShopCategoryDto, user: any) {
+    const repo = tenantDb.getRepository(RetailerCategory);
+    const category = await repo.findOne({ where: { id } });
+
+    if (!category) {
+      throw new NotFoundException('Shop category not found');
+    }
+
+    if (dto.name !== undefined) {
+      const nextName = this.normalize(dto.name);
+      if (nextName !== category.name) {
+        const nameTaken = await repo.findOne({ where: { name: nextName } });
+        if (nameTaken) {
+          throw new ConflictException('Shop category with this name already exists');
+        }
+        category.name = nextName;
+      }
+    }
+
+    const updated = await repo.save(category);
+
+    await this.activityLogService.recordActivityLog(tenantDb, {
+      actorId: user.userId,
+      action: 'RETAILER_CATEGORY_UPDATED',
+      description: `Shop category ${updated.name} updated`,
+      metadata: { shopCategoryId: updated.id },
+    });
+
+    return updated;
   }
 }

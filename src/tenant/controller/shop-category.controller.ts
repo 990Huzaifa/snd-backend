@@ -4,6 +4,7 @@ import {
   Get,
   Param,
   Post,
+  Put,
   Query,
   Req,
   UseGuards,
@@ -18,6 +19,7 @@ import { TenantJwtGuard } from 'src/common/guards/tenant-jwt.guard';
 import { TenantConnection } from 'src/common/tenant/tenant-connection.decorator';
 import { ShopCategoryService } from '../service/shop-category.service';
 import { CreateShopCategoryDto } from '../dto/shop-category/create-shop-category.dto';
+import { UpdateShopCategoryDto } from '../dto/shop-category/update-shop-category.dto';
 
 @Controller('tenant/shop-categories')
 @UseGuards(
@@ -37,6 +39,17 @@ export class ShopCategoryController {
     @Req() req: Request,
   ) {
     return this.shopCategoryService.create(tenantDb, dto, req.user);
+  }
+
+  @Put('update/:id')
+  @RequirePermissions('UPDATE_RETAILER_CATEGORY')
+  edit(
+    @TenantConnection() tenantDb: DataSource,
+    @Param('id') id: string,
+    @Body() dto: UpdateShopCategoryDto,
+    @Req() req: Request,
+  ) {
+    return this.shopCategoryService.edit(tenantDb, id, dto, req.user);
   }
 
   @Get()
