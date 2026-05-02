@@ -153,6 +153,7 @@ export class TenantUtilityService {
         pricing: {
           uom: true,
         },
+        flavours: true,
       },
       order: { name: 'ASC' },
     });
