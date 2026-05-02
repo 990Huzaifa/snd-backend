@@ -70,4 +70,16 @@ export class StockTransferController {
       req.user as { userId: string },
     );
   }
+
+  @Get('stock-by-distributor/:distributorId')
+  @RequirePermissions('VIEW_STOCK_TRANSFER')
+  stockByDistributor(
+    @TenantConnection() tenantDb: DataSource,
+    @Param('distributorId') distributorId: string,
+    ) {
+    return this.stockTransferService.stockByDistributor(
+      tenantDb,
+      distributorId,
+    );
+  }
 }

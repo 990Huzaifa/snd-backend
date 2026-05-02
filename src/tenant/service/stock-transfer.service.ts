@@ -10,7 +10,7 @@ import {
   StockTransferItem,
 } from 'src/tenant-db/entities/stock-transfer.entity';
 import { ProductFlavour, ProductPricing } from 'src/tenant-db/entities/product.entity';
-import { ReferenceType, StockMovementType } from 'src/tenant-db/entities/stock.entity';
+import { ReferenceType, StockBalance, StockMovementType } from 'src/tenant-db/entities/stock.entity';
 import { ActivityLogService } from './activity-log.service';
 import { StockService } from './stock.service';
 import { CreateStockTransferDto } from '../dto/stock-transfer/create-stock-transfer.dto';
@@ -302,5 +302,21 @@ export class StockTransferService {
     });
 
     return this.view(tenantDb, transferId, user);
+  }
+
+  async stockByDistributor(
+    tenantDb: DataSource,
+    distributorId: string,
+  ) {
+    const stock = await tenantDb.getRepository(StockBalance).find({
+      where: { distributorId },
+      relations: {
+        product: true,
+        productFlavour: true,
+        productPricing: true,
+      },
+    });
+
+    return stock;
   }
 }
