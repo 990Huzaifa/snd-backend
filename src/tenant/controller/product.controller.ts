@@ -36,14 +36,24 @@ export class ProductController {
 
   @Post('create')
   @RequirePermissions('CREATE_PRODUCT')
-  @UseInterceptors(FilesInterceptor('images', 10))
   create(
     @TenantConnection() tenantDb: DataSource,
     @Body() dto: CreateProductDto,
     @Req() req: Request,
+  ) {
+    return this.productService.create(tenantDb, dto, req.user);
+  }
+
+  @Post(':id/images')
+  @RequirePermissions('UPDATE_PRODUCT')
+  @UseInterceptors(FilesInterceptor('images', 10))
+  uploadImages(
+    @TenantConnection() tenantDb: DataSource,
+    @Param('id') id: string,
+    @Req() req: Request,
     @UploadedFiles() files: Express.Multer.File[],
   ) {
-    return this.productService.create(tenantDb, dto, req.user, files);
+    return this.productService.uploadImages(tenantDb, id, files, req.user);
   }
 
   @Get()

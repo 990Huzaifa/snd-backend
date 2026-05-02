@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -100,33 +101,12 @@ export class ProductService {
     }
   }
 
-  async create(
-    tenantDb: DataSource,
-    dto: CreateProductDto,
-    user: any,
-    files: Express.Multer.File[] = [],
-  ) {
+  async create(tenantDb: DataSource, dto: CreateProductDto, user: any) {
     const categoryId = dto.categoryId.trim();
     const brandId = dto.brandId?.trim();
     const skuCode = dto.skuCode.trim();
     const name = dto.name.trim();
     const description = dto.description?.trim() || null;
-    const uploadedImageUrls: string[] = [];
-    for (const file of files) {
-      const extension = extname(file.originalname || '').toLowerCase();
-      const fileName = `${Date.now()}-${randomUUID()}${extension}`;
-      const key = `products/${fileName}`;
-      const uploadResult = await this.s3Service.uploadObject(
-        key,
-        file.buffer,
-        file.mimetype,
-      );
-      uploadedImageUrls.push(uploadResult.url);
-    }
-    const image =
-      uploadedImageUrls.length > 0
-        ? uploadedImageUrls.join(',')
-        : dto.image?.trim() || null;
     const flavourIds = dto.flavourIds.map((id) => id.trim()).filter(Boolean);
 
     await this.ensureCategoryExists(tenantDb, categoryId);
@@ -151,8 +131,8 @@ export class ProductService {
         skuCode,
         name,
         description,
-        image,
         isActive: dto.isActive === 'true',
+        createdBy: user.userId,
       });
 
       const savedProduct = await productRepo.save(product);
@@ -435,5 +415,51 @@ export class ProductService {
         status: product.isActive,
       },
     };
+  }
+
+  async uploadImages(
+    tenantDb: DataSource,
+    productId: string,
+    files: Express.Multer.File[],
+    user: any,
+  ) {
+    if (!files?.length) {
+      throw new BadRequestException('At least one image file is required');
+    }
+
+    const productRepo = tenantDb.getRepository(Product);
+    const product = await productRepo.findOne({
+      where: { id: productId, isDelete: false },
+    });
+    if (!product) {
+      throw new NotFoundException('Product not found');
+    }
+
+    const uploadedImageUrls: string[] = [];
+    for (const file of files) {
+      const extension = extname(file.originalname || '').toLowerCase();
+      const fileName = `${Date.now()}-${randomUUID()}${extension}`;
+      const key = `products/${fileName}`;
+      const uploadResult = await this.s3Service.uploadObject(
+        key,
+        file.buffer,
+        file.mimetype,
+      );
+      uploadedImageUrls.push(uploadResult.url);
+    }
+
+    const newUrls = uploadedImageUrls.join(',');
+    const existing = product.image?.trim();
+    product.image = existing ? `${existing},${newUrls}` : newUrls;
+    await productRepo.save(product);
+
+    await this.activityLogService.recordActivityLog(tenantDb, {
+      actorId: user.userId,
+      action: 'PRODUCT_UPDATED',
+      description: `Product ${product.name} images uploaded`,
+      metadata: { productId: product.id },
+    });
+
+    return this.view(tenantDb, productId, user);
   }
 }
