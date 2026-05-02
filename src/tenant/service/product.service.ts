@@ -131,7 +131,7 @@ export class ProductService {
         skuCode,
         name,
         description,
-        isActive: dto.isActive === 'true',
+        isActive: dto.isActive,
         createdBy: user.userId,
       });
 

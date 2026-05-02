@@ -2,11 +2,11 @@ import {
   ArrayMinSize,
   IsArray,
   IsBoolean,
-  IsIn,
-  IsInt,
+  IsNumber,
   IsOptional,
   IsString,
   IsUUID,
+  Min,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -21,8 +21,9 @@ class CreateProductPricingDto {
   @IsString()
   retailPrice: string;
 
-  @IsString()
-  quantity: string;
+  @IsNumber()
+  @Min(1)
+  quantity: number;
 }
 
 export class CreateProductDto {
@@ -45,12 +46,10 @@ export class CreateProductDto {
 
   @IsOptional()
   @IsString()
-  image?: string;
+  image?: string | null;
 
-  @IsOptional()
-  @IsString()
-  @IsIn(['true', 'false'])
-  isActive?: string;
+  @IsBoolean()
+  isActive: boolean;
 
   @IsArray()
   @ArrayMinSize(1)
