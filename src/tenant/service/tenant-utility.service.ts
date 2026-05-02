@@ -6,7 +6,9 @@ import { Permission } from 'src/tenant-db/entities/permission.entity';
 import { Region } from 'src/tenant-db/entities/region.entity';
 import { Area } from 'src/tenant-db/entities/area.entity';
 import { Distributor } from 'src/tenant-db/entities/distributor.entity';
-import { Flavour, ProductBrand, ProductCategory, Uom } from 'src/tenant-db/entities/product.entity';
+import { Flavour, Product, ProductBrand, ProductCategory, Uom } from 'src/tenant-db/entities/product.entity';
+import { RetailerCategory, RetailerChannel } from 'src/tenant-db/entities/retailer.entity';
+import { Route } from 'src/tenant-db/entities/route.entity';
 
 @Injectable()
 export class TenantUtilityService {
@@ -119,5 +121,69 @@ export class TenantUtilityService {
     });
 
     return { result: uoms };
+  }
+
+
+  async getRetailerCategories(tenantDb: DataSource) {
+    const retailerCategories = await tenantDb.getRepository(RetailerCategory).find({
+      select: ['id', 'name'],
+      order: { name: 'ASC' },
+    });
+
+    return { result: retailerCategories };
+  }
+
+  async getRetailerChannels(tenantDb: DataSource) {
+    const retailerChannels = await tenantDb.getRepository(RetailerChannel).find({
+      select: ['id', 'name'],
+      order: { name: 'ASC' },
+    });
+
+    return { result: retailerChannels };
+  }
+
+  async getProductList(tenantDb: DataSource) {
+    const productList = await tenantDb.getRepository(Product).find({
+      select: {
+        id: true,
+        name: true,
+        skuCode: true,
+        category: {
+          id: true,
+          name: true,
+        },
+      },
+      relations: {
+        pricing: true,
+      },
+      order: { name: 'ASC' },
+    });
+
+    return { result: productList };
+  }
+
+  async getRoutes(tenantDb: DataSource) {
+    const routes = await tenantDb.getRepository(Route).find({
+      select: {
+        id: true,
+        name: true,
+        area: {
+          id: true,
+          name: true,
+          code: true,
+        },
+        distributor: {
+          id: true,
+          name: true,
+          code: true,
+        },
+      },
+      relations: {
+        area: true,
+        distributor: true,
+      },
+    });
+
+    return { result: routes };
   }
 }
