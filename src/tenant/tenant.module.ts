@@ -34,6 +34,7 @@ import { MasterTenantDataController } from './controller/master-tenant-data.cont
 import { StockTransferController } from './controller/stock-transfer.controller';
 import { RetailerCategoryController } from './controller/retailer-category.controller';
 import { RetailerChannelController } from './controller/retailer-channel.controller';
+import { RetailerController } from './controller/retailer.controller';
 import { TenantAuthService } from './service/tenant-auth.service';
 import { ActivityLogService } from './service/activity-log.service';
 import { TenantDesignationService } from './service/tenant-designation.service';
@@ -66,6 +67,7 @@ import { MasterTenantDataService } from './service/master-tenant-data.service';
 import { StockTransferService } from './service/stock-transfer.service';
 import { RetailerCategoryService } from './service/retailer-category.service';
 import { RetailerChannelService } from './service/retailer-channel.service';
+import { RetailerService } from './service/retailer.service';
 
 @Module({
   imports: [
@@ -110,6 +112,7 @@ import { RetailerChannelService } from './service/retailer-channel.service';
     StockTransferController,
     RetailerCategoryController,
     RetailerChannelController,
+    RetailerController,
   ],
   providers: [
     TenantAuthService,
@@ -141,6 +144,7 @@ import { RetailerChannelService } from './service/retailer-channel.service';
     StockTransferService,
     RetailerCategoryService,
     RetailerChannelService,
+    RetailerService,
   ],
 })
 export class TenantModule { }
