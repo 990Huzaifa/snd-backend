@@ -32,7 +32,8 @@ import { ProductPricingJobController } from './controller/product-pricing-job.co
 import { PurchaseStockController } from './controller/purchase-stock.controller';
 import { MasterTenantDataController } from './controller/master-tenant-data.controller';
 import { StockTransferController } from './controller/stock-transfer.controller';
-import { ShopCategoryController } from './controller/shop-category.controller';
+import { RetailerCategoryController } from './controller/retailer-category.controller';
+import { RetailerChannelController } from './controller/retailer-channel.controller';
 import { TenantAuthService } from './service/tenant-auth.service';
 import { ActivityLogService } from './service/activity-log.service';
 import { TenantDesignationService } from './service/tenant-designation.service';
@@ -63,7 +64,8 @@ import { ProductPricingJobService } from './service/product-pricing-job.service'
 import { PurchaseStockService } from './service/purchase-stock.service';
 import { MasterTenantDataService } from './service/master-tenant-data.service';
 import { StockTransferService } from './service/stock-transfer.service';
-import { ShopCategoryService } from './service/shop-category.service';
+import { RetailerCategoryService } from './service/retailer-category.service';
+import { RetailerChannelService } from './service/retailer-channel.service';
 
 @Module({
   imports: [
@@ -106,7 +108,8 @@ import { ShopCategoryService } from './service/shop-category.service';
     PurchaseStockController,
     MasterTenantDataController,
     StockTransferController,
-    ShopCategoryController,
+    RetailerCategoryController,
+    RetailerChannelController,
   ],
   providers: [
     TenantAuthService,
@@ -136,7 +139,8 @@ import { ShopCategoryService } from './service/shop-category.service';
     ProductPricingJobService,
     MasterTenantDataService,
     StockTransferService,
-    ShopCategoryService,
+    RetailerCategoryService,
+    RetailerChannelService,
   ],
 })
 export class TenantModule { }

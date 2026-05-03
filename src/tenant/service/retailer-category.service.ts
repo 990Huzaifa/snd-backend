@@ -2,18 +2,18 @@ import { ConflictException, Injectable, NotFoundException } from '@nestjs/common
 import { DataSource, Like } from 'typeorm';
 import { RetailerCategory } from 'src/tenant-db/entities/retailer.entity';
 import { ActivityLogService } from './activity-log.service';
-import { CreateShopCategoryDto } from '../dto/shop-category/create-shop-category.dto';
-import { UpdateShopCategoryDto } from '../dto/shop-category/update-shop-category.dto';
+import { CreateRetailerCategoryDto } from '../dto/retailer-category/create-retailer-category.dto';
+import { UpdateRetailerCategoryDto } from '../dto/retailer-category/update-retailer-category.dto';
 
 @Injectable()
-export class ShopCategoryService {
+export class RetailerCategoryService {
   constructor(private readonly activityLogService: ActivityLogService) {}
 
   private normalize(value: string): string {
     return value.trim();
   }
 
-  async create(tenantDb: DataSource, dto: CreateShopCategoryDto, user: any) {
+  async create(tenantDb: DataSource, dto: CreateRetailerCategoryDto, user: any) {
     const name = this.normalize(dto.name);
 
     const existing = await tenantDb.getRepository(RetailerCategory).findOne({
@@ -79,7 +79,7 @@ export class ShopCategoryService {
     return category;
   }
 
-  async edit(tenantDb: DataSource, id: string, dto: UpdateShopCategoryDto, user: any) {
+    async edit(tenantDb: DataSource, id: string, dto: UpdateRetailerCategoryDto, user: any) {
     const repo = tenantDb.getRepository(RetailerCategory);
     const category = await repo.findOne({ where: { id } });
 

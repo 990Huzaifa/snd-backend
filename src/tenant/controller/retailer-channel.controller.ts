@@ -1,10 +1,10 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Post,
-  Put,
   Query,
   Req,
   UseGuards,
@@ -17,43 +17,31 @@ import { RequirePermissions } from 'src/auth/require-permission.decorator';
 import { TenantConnectionGuard } from 'src/common/guards/tenant-connection.guard';
 import { TenantJwtGuard } from 'src/common/guards/tenant-jwt.guard';
 import { TenantConnection } from 'src/common/tenant/tenant-connection.decorator';
-import { ShopCategoryService } from '../service/shop-category.service';
-import { CreateShopCategoryDto } from '../dto/shop-category/create-shop-category.dto';
-import { UpdateShopCategoryDto } from '../dto/shop-category/update-shop-category.dto';
+import { RetailerChannelService } from '../service/retailer-channel.service';
+import { CreateRetailerChannelDto } from '../dto/retailer-channel/create-retailer-channel.dto';
 
-@Controller('tenant/shop-categories')
+@Controller('tenant/retailer-channels')
 @UseGuards(
   TenantJwtAuthGuard,
   TenantJwtGuard,
   TenantConnectionGuard,
   TenantPermissionGuard,
 )
-export class ShopCategoryController {
-  constructor(private readonly shopCategoryService: ShopCategoryService) {}
+export class RetailerChannelController {
+  constructor(private readonly retailerChannelService: RetailerChannelService) {}
 
   @Post('create')
-  @RequirePermissions('CREATE_RETAILER_CATEGORY')
+  @RequirePermissions('CREATE_RETAILER_CHANNEL')
   create(
     @TenantConnection() tenantDb: DataSource,
-    @Body() dto: CreateShopCategoryDto,
+    @Body() dto: CreateRetailerChannelDto,
     @Req() req: Request,
   ) {
-    return this.shopCategoryService.create(tenantDb, dto, req.user);
-  }
-
-  @Put('update/:id')
-  @RequirePermissions('UPDATE_RETAILER_CATEGORY')
-  edit(
-    @TenantConnection() tenantDb: DataSource,
-    @Param('id') id: string,
-    @Body() dto: UpdateShopCategoryDto,
-    @Req() req: Request,
-  ) {
-    return this.shopCategoryService.edit(tenantDb, id, dto, req.user);
+    return this.retailerChannelService.create(tenantDb, dto, req.user);
   }
 
   @Get()
-  @RequirePermissions('LIST_RETAILER_CATEGORY')
+  @RequirePermissions('LIST_RETAILER_CHANNEL')
   list(
     @TenantConnection() tenantDb: DataSource,
     @Query('page') page: number = 1,
@@ -61,16 +49,26 @@ export class ShopCategoryController {
     @Query('search') search: string = '',
     @Req() req: Request,
   ) {
-    return this.shopCategoryService.list(tenantDb, page, limit, search, req.user);
+    return this.retailerChannelService.list(tenantDb, page, limit, search, req.user);
   }
 
   @Get(':id')
-  @RequirePermissions('VIEW_RETAILER_CATEGORY')
+  @RequirePermissions('VIEW_RETAILER_CHANNEL')
   view(
     @TenantConnection() tenantDb: DataSource,
     @Param('id') id: string,
     @Req() req: Request,
   ) {
-    return this.shopCategoryService.view(tenantDb, id, req.user);
+    return this.retailerChannelService.view(tenantDb, id, req.user);
+  }
+
+  @Delete(':id')
+  @RequirePermissions('DELETE_RETAILER_CHANNEL')
+  delete(
+    @TenantConnection() tenantDb: DataSource,
+    @Param('id') id: string,
+    @Req() req: Request,
+  ) {
+    return this.retailerChannelService.delete(tenantDb, id, req.user);
   }
 }
