@@ -312,8 +312,8 @@ export class StockTransferService {
       where: { distributorId },
       relations: {
         product: true,
-        productFlavour: true,
-        productPricing: true,
+        productFlavour: { flavour: true },
+        productPricing: { uom: true },
       },
     });
 
