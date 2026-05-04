@@ -4,6 +4,7 @@ import { TenantGeoPolicy } from 'src/master-db/entities/tenant-geo-policy.entity
 import { TenantSettings } from 'src/master-db/entities/tenant-settings.entity';
 import { TenantTheme } from 'src/master-db/entities/tenant-themes.entity';
 import { Repository } from 'typeorm';
+import { Tenant } from 'src/master-db/entities/tenant.entity';
 
 @Injectable()
 export class MasterTenantDataService {
@@ -14,6 +15,8 @@ export class MasterTenantDataService {
     private readonly tenantGeoPolicyRepo: Repository<TenantGeoPolicy>,
     @InjectRepository(TenantTheme)
     private readonly tenantThemeRepo: Repository<TenantTheme>,
+    @InjectRepository(Tenant)
+    private readonly tenantRepo: Repository<Tenant>,
   ) {}
 
   async getTenantSettingsByTenantId(tenantId?: string | null): Promise<TenantSettings | null> {
@@ -46,9 +49,22 @@ export class MasterTenantDataService {
     });
   }
 
+  async getTenantCodeByTenantId(tenantId?: string | null): Promise<string | null> {
+    if (!tenantId?.trim()) {
+      return null;
+    }
+    const tenant = await this.tenantRepo.findOne({
+      where: { id: tenantId.trim() },
+      select: ['code'],
+    });
+    return tenant?.code ?? null;
+
+  }
+
   async getTenantMasterDataByTenantId(tenantId?: string | null) {
     if (!tenantId?.trim()) {
       return {
+        tenantCode: null,
         settings: null,
         geoPolicy: null,
         theme: null,
@@ -57,13 +73,15 @@ export class MasterTenantDataService {
 
     const normalizedTenantId = tenantId.trim();
 
-    const [settings, geoPolicy, theme] = await Promise.all([
+    const [tenantCode, settings, geoPolicy, theme] = await Promise.all([
+      this.getTenantCodeByTenantId(normalizedTenantId),
       this.getTenantSettingsByTenantId(normalizedTenantId),
       this.getTenantGeoPolicyByTenantId(normalizedTenantId),
       this.getTenantThemeByTenantId(normalizedTenantId),
     ]);
 
     return {
+      tenantCode,
       settings,
       geoPolicy,
       theme,

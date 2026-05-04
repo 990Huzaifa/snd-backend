@@ -72,6 +72,7 @@ export class TenantAuthController {
   @UseGuards(TenantJwtAuthGuard)
   @Post('pusher')
   async pusherAuth(@Req() req: Request, @Res() res: any) {
+    
     const socketId = (req.body as { socket_id?: string }).socket_id;
     const channel = (req.body as { channel_name?: string }).channel_name;
     const user = req.user as { userId?: string; sub?: string; tenantCode?: string };
