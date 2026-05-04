@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import {
+    CopyObjectCommand,
     DeleteObjectCommand,
     HeadObjectCommand,
     PutObjectCommand,
@@ -59,6 +60,25 @@ export class S3Service {
             new HeadObjectCommand({
                 Bucket: this.bucketName,
                 Key: key,
+            }),
+        );
+    }
+
+    /**
+     * Server-side copy within the same bucket. Source key must exist.
+     * CopySource is URL-encoded per S3 requirements.
+     */
+    async copyObject(sourceKey: string, destinationKey: string) {
+        const encodedSourceKey = sourceKey
+            .split('/')
+            .map((segment) => encodeURIComponent(segment))
+            .join('%2F');
+        const copySource = `${this.bucketName}/${encodedSourceKey}`;
+        await this.s3Client.send(
+            new CopyObjectCommand({
+                Bucket: this.bucketName,
+                Key: destinationKey,
+                CopySource: copySource,
             }),
         );
     }

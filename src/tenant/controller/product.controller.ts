@@ -18,7 +18,10 @@ import { TenantPermissionGuard } from 'src/auth/tenant-permission.guard';
 import { RequirePermissions } from 'src/auth/require-permission.decorator';
 import { TenantConnectionGuard } from 'src/common/guards/tenant-connection.guard';
 import { TenantJwtGuard } from 'src/common/guards/tenant-jwt.guard';
-import { TenantConnection } from 'src/common/tenant/tenant-connection.decorator';
+import {
+  TenantConnection,
+  TenantId,
+} from 'src/common/tenant/tenant-connection.decorator';
 import { CreateProductDto } from '../dto/product/create-product.dto';
 import { UpdateProductDto } from '../dto/product/update-product.dto';
 import { ProductService } from '../service/product.service';
@@ -40,8 +43,9 @@ export class ProductController {
     @TenantConnection() tenantDb: DataSource,
     @Body() dto: CreateProductDto,
     @Req() req: Request,
+    @TenantId() tenantId: string,
   ) {
-    return this.productService.create(tenantDb, dto, req.user);
+    return this.productService.create(tenantDb, tenantId, dto, req.user);
   }
 
   @Post(':id/images')

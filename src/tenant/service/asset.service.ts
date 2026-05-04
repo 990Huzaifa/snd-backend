@@ -6,25 +6,14 @@ import {
 } from '@nestjs/common';
 import { S3Service } from 'src/common/s3/s3.service';
 import { Asset, AssetStatus } from 'src/tenant-db/entities/asset.entity';
-import { Product } from 'src/tenant-db/entities/product.entity';
-import { Retailer } from 'src/tenant-db/entities/retailer.entity';
-import { User } from 'src/tenant-db/entities/user.entity';
-import { DataSource, EntityManager } from 'typeorm';
+import { DataSource } from 'typeorm';
 import { basename, extname } from 'path';
 import { randomUUID } from 'crypto';
-import {
-    ASSET_RULES,
-    AssetEntityType,
-    AssetPurpose,
-} from '../config/asset-rules.config';
+import { ASSET_RULES, AssetPurpose } from '../config/asset-rules.config';
 import { CreateAssetUploadRequestDto } from '../dto/asset/create-asset-upload-request.dto';
 import { ConfirmAssetUploadDto } from '../dto/asset/confirm-asset-upload.dto';
 
 const PRESIGNED_PUT_EXPIRES_SEC = 15 * 60;
-
-const PERM_UPDATE_PRODUCT = 'UPDATE_PRODUCT';
-const PERM_UPDATE_RETAILER = 'UPDATE_RETAILER';
-const PERM_UPDATE_USER = 'UPDATE_USER';
 
 const MIME_TO_EXTENSION: Record<string, string> = {
     'image/jpeg': 'jpg',
@@ -235,194 +224,27 @@ export class AssetService {
                 );
             }
 
-            const imageUrl = this.s3Service.getObjectUrl(asset.s3Key);
+            const oldKey = asset.s3Key;
+            const destKey = `tenants/${tenantId}/${rules.folder}/${asset.id}.${asset.fileExtension}`;
 
-            await this.assetCanAttachToEntity(tenantDb, user, asset);
+            await this.s3Service.copyObject(oldKey, destKey);
 
-            await tenantDb.transaction(async (manager) => {
-                await this.confirmAssetAndAttachInTransaction(
-                    manager,
-                    asset.id,
-                    imageUrl,
-                    user,
-                );
-            });
+            asset.s3Key = destKey;
+            asset.status = AssetStatus.APPROVED;
+            asset.confirmedAt = new Date();
+            try {
+                await repo.save(asset);
+            } catch (err) {
+                await this.s3Service.deleteObject(destKey).catch(() => undefined);
+                throw err;
+            }
+
+            await this.s3Service.deleteObject(oldKey).catch(() => undefined);
 
             results.push({ assetId: asset.id, status: AssetStatus.APPROVED });
         }
 
         return { results };
-    }
-
-    private async assetCanAttachToEntity(
-        tenantDb: DataSource,
-        user: any,
-        asset: Asset,
-    ): Promise<void> {
-        if (!asset.entityId || !asset.entityType) {
-            return;
-        }
-
-        const jwtRole = user.role?.toUpperCase();
-        if (jwtRole === 'SUPER_ADMIN') {
-            return;
-        }
-
-        const perm = await this.getUserPermissionSet(tenantDb, user.userId);
-        if (perm === 'ALL') {
-            return;
-        }
-
-        switch (asset.entityType as AssetEntityType) {
-            case AssetEntityType.PRODUCT:
-                if (!perm.has(PERM_UPDATE_PRODUCT)) {
-                    throw new ForbiddenException(
-                        `Missing permission ${PERM_UPDATE_PRODUCT} to attach to this product`,
-                    );
-                }
-                return;
-            case AssetEntityType.RETAILER:
-                if (!perm.has(PERM_UPDATE_RETAILER)) {
-                    throw new ForbiddenException(
-                        `Missing permission ${PERM_UPDATE_RETAILER} to attach to this retailer`,
-                    );
-                }
-                return;
-            case AssetEntityType.USER:
-                if (asset.entityId === user.userId) {
-                    return;
-                }
-                if (!perm.has(PERM_UPDATE_USER)) {
-                    throw new ForbiddenException(
-                        `Missing permission ${PERM_UPDATE_USER} to update another user's avatar`,
-                    );
-                }
-                return;
-            case AssetEntityType.SHOP_VISIT:
-            case AssetEntityType.SHOP_MERCHANDISE:
-                throw new BadRequestException(
-                    'Attaching shop images to an entity column is not supported yet',
-                );
-            default:
-                throw new BadRequestException(`Unknown entityType ${asset.entityType}`);
-        }
-    }
-
-    private async getUserPermissionSet(
-        tenantDb: DataSource,
-        userId: string,
-    ): Promise<Set<string> | 'ALL'> {
-        const tenantUser = await tenantDb.getRepository(User).findOne({
-            where: { id: userId },
-            relations: ['role', 'role.permissions'],
-        });
-        if (!tenantUser?.role) {
-            return new Set();
-        }
-        if (tenantUser.role.code?.toUpperCase() === 'SUPER_ADMIN') {
-            return 'ALL';
-        }
-        const codes = (tenantUser.role.permissions ?? []).map((p) => p.code.toUpperCase());
-        return new Set(codes);
-    }
-
-    private async confirmAssetAndAttachInTransaction(
-        manager: EntityManager,
-        assetId: string,
-        imageUrl: string,
-        user: any,
-    ): Promise<void> {
-        const assetRepo = manager.getRepository(Asset);
-        const fresh = await assetRepo.findOne({
-            where: { id: assetId, status: AssetStatus.PENDING },
-        });
-        if (!fresh) {
-            throw new BadRequestException(`Asset ${assetId} is no longer pending`);
-        }
-
-        let attachedAt: Date | null = null;
-
-        if (fresh.entityId && fresh.entityType) {
-            await this.attachImageToEntity(manager, fresh, imageUrl, user);
-            attachedAt = new Date();
-        }
-
-        fresh.status = AssetStatus.APPROVED;
-        fresh.confirmedAt = new Date();
-        if (attachedAt) {
-            fresh.attachedAt = attachedAt;
-        }
-        await assetRepo.save(fresh);
-    }
-
-    private async attachImageToEntity(
-        manager: EntityManager,
-        asset: Asset,
-        imageUrl: string,
-        user: any,
-    ): Promise<void> {
-        switch (asset.entityType as AssetEntityType) {
-            case AssetEntityType.PRODUCT: {
-                const productRepo = manager.getRepository(Product);
-                const product = await productRepo.findOne({
-                    where: { id: asset.entityId!, isDelete: false },
-                });
-                if (!product) {
-                    throw new NotFoundException('Product not found');
-                }
-                product.image = this.mergeCommaSeparatedImage(product.image, imageUrl);
-                await productRepo.save(product);
-                return;
-            }
-            case AssetEntityType.RETAILER: {
-                const retailerRepo = manager.getRepository(Retailer);
-                const retailer = await retailerRepo.findOne({
-                    where: { id: asset.entityId! },
-                });
-                if (!retailer) {
-                    throw new NotFoundException('Retailer not found');
-                }
-                retailer.image = this.mergeCommaSeparatedImage(retailer.image, imageUrl);
-                await retailerRepo.save(retailer);
-                return;
-            }
-            case AssetEntityType.USER: {
-                if (asset.purpose !== AssetPurpose.USER_AVATAR) {
-                    throw new BadRequestException('USER entityType requires USER_AVATAR purpose');
-                }
-                const userRepo = manager.getRepository(User);
-                const targetUser = await userRepo.findOne({
-                    where: { id: asset.entityId!, isDeleted: false },
-                });
-                if (!targetUser) {
-                    throw new NotFoundException('User not found');
-                }
-                targetUser.avatar = imageUrl;
-                await userRepo.save(targetUser);
-                return;
-            }
-            case AssetEntityType.SHOP_VISIT:
-            case AssetEntityType.SHOP_MERCHANDISE:
-                throw new BadRequestException(
-                    'Attaching shop images to an entity column is not supported yet',
-                );
-            default:
-                throw new BadRequestException(`Unknown entityType ${asset.entityType}`);
-        }
-    }
-
-    private mergeCommaSeparatedImage(
-        existing: string | null | undefined,
-        url: string,
-    ): string {
-        const parts = (existing ?? '')
-            .split(',')
-            .map((s) => s.trim())
-            .filter(Boolean);
-        if (parts.includes(url)) {
-            return parts.join(',');
-        }
-        return parts.length ? `${parts.join(',')},${url}` : url;
     }
 
     private sanitizeOriginalFileName(name: string): string {

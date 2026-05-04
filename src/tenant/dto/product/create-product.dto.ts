@@ -48,6 +48,11 @@ export class CreateProductDto {
   @IsString()
   image?: string | null;
 
+  @IsOptional()
+  @IsArray()
+  @IsUUID('4', { each: true })
+  assetIds?: string[];
+
   @IsBoolean()
   isActive: boolean;
 

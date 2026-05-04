@@ -1,10 +1,18 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Brackets, DataSource, In, Like, SelectQueryBuilder } from 'typeorm';
+import {
+  Brackets,
+  DataSource,
+  EntityManager,
+  In,
+  Like,
+  SelectQueryBuilder,
+} from 'typeorm';
 import {
   Flavour,
   Product,
@@ -14,6 +22,12 @@ import {
   ProductPricing,
   Uom,
 } from 'src/tenant-db/entities/product.entity';
+import { Asset, AssetStatus } from 'src/tenant-db/entities/asset.entity';
+import {
+  ASSET_RULES,
+  AssetEntityType,
+  AssetPurpose,
+} from '../config/asset-rules.config';
 import { CreateProductDto } from '../dto/product/create-product.dto';
 import { UpdateProductDto } from '../dto/product/update-product.dto';
 import { ActivityLogService } from './activity-log.service';
@@ -27,6 +41,58 @@ export class ProductService {
     private readonly activityLogService: ActivityLogService,
     private readonly s3Service: S3Service,
   ) {}
+
+  private dedupeAssetIdsPreserveOrder(ids: string[]): string[] {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const id of ids) {
+      if (!seen.has(id)) {
+        seen.add(id);
+        out.push(id);
+      }
+    }
+    return out;
+  }
+
+  private async collectApprovedProductImageUrls(
+    manager: EntityManager,
+    tenantId: string,
+    assetIds: string[],
+    user: { userId: string },
+  ): Promise<string[]> {
+    const assetRepo = manager.getRepository(Asset);
+    const urls: string[] = [];
+
+    for (const assetId of assetIds) {
+      const asset = await assetRepo.findOne({ where: { id: assetId } });
+      if (!asset) {
+        throw new NotFoundException(`Asset ${assetId} not found`);
+      }
+      if (asset.uploadedById !== user.userId) {
+        throw new ForbiddenException(`Not allowed to use asset ${assetId}`);
+      }
+      if (asset.status !== AssetStatus.APPROVED) {
+        throw new BadRequestException(
+          `Asset ${assetId} must be confirmed (APPROVED) before attaching to a product`,
+        );
+      }
+      if (asset.purpose !== AssetPurpose.PRODUCT_IMAGE) {
+        throw new BadRequestException(`Asset ${assetId} is not a product image`);
+      }
+      if (asset.entityId != null || asset.attachedAt != null) {
+        throw new BadRequestException(`Asset ${assetId} is already linked to an entity`);
+      }
+      const productImageRules = ASSET_RULES[AssetPurpose.PRODUCT_IMAGE];
+      const tempPrefix = `tenants/${tenantId}/temp/uploads/${asset.id}.`;
+      const finalPrefix = `tenants/${tenantId}/${productImageRules.folder}/${asset.id}.`;
+      if (!asset.s3Key.startsWith(tempPrefix) && !asset.s3Key.startsWith(finalPrefix)) {
+        throw new BadRequestException(`Asset ${assetId} has an unexpected storage key`);
+      }
+      urls.push(this.s3Service.getObjectUrl(asset.s3Key));
+    }
+
+    return urls;
+  }
 
   private parseCsvIds(value?: string | null): string[] {
     if (!value?.trim()) {
@@ -101,7 +167,7 @@ export class ProductService {
     }
   }
 
-  async create(tenantDb: DataSource, dto: CreateProductDto, user: any) {
+  async create(tenantDb: DataSource, tenantId: string, dto: CreateProductDto, user: any) {
     const categoryId = dto.categoryId.trim();
     const brandId = dto.brandId?.trim();
     const skuCode = dto.skuCode.trim();
@@ -120,10 +186,28 @@ export class ProductService {
       dto.pricing.map((item) => item.uomId.trim()),
     );
 
+    const uniqueAssetIds = dto.assetIds?.length
+      ? this.dedupeAssetIdsPreserveOrder(
+          dto.assetIds.map((id) => id.trim()).filter(Boolean),
+        )
+      : [];
+
     const createdProduct = await tenantDb.transaction(async (manager) => {
       const productRepo = manager.getRepository(Product);
       const productFlavourRepo = manager.getRepository(ProductFlavour);
       const productPricingRepo = manager.getRepository(ProductPricing);
+      const assetRepo = manager.getRepository(Asset);
+
+      let productImage: string | null = dto.image?.trim() || null;
+      if (uniqueAssetIds.length) {
+        const urls = await this.collectApprovedProductImageUrls(
+          manager,
+          tenantId,
+          uniqueAssetIds,
+          user,
+        );
+        productImage = urls.join(',');
+      }
 
       const product = productRepo.create({
         categoryId,
@@ -131,11 +215,26 @@ export class ProductService {
         skuCode,
         name,
         description,
+        image: productImage,
         isActive: dto.isActive,
         createdBy: user.userId,
       });
 
       const savedProduct = await productRepo.save(product);
+
+      if (uniqueAssetIds.length) {
+        const now = new Date();
+        for (const assetId of uniqueAssetIds) {
+          await assetRepo.update(
+            { id: assetId },
+            {
+              entityType: AssetEntityType.PRODUCT,
+              entityId: savedProduct.id,
+              attachedAt: now,
+            },
+          );
+        }
+      }
 
       const flavourRows = [...new Set(flavourIds)].map((flavourId) =>
         productFlavourRepo.create({
