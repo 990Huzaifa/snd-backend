@@ -49,6 +49,11 @@ export class UpdateProductDto {
   image?: string;
 
   @IsOptional()
+  @IsArray()
+  @IsUUID('4', { each: true })
+  assetIds?: string[];
+
+  @IsOptional()
   @IsBoolean()
   isActive?: boolean;
 

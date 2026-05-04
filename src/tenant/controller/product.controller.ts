@@ -48,17 +48,6 @@ export class ProductController {
     return this.productService.create(tenantDb, tenantId, dto, req.user);
   }
 
-  @Post(':id/images')
-  @RequirePermissions('UPDATE_PRODUCT')
-  @UseInterceptors(FilesInterceptor('images', 10))
-  uploadImages(
-    @TenantConnection() tenantDb: DataSource,
-    @Param('id') id: string,
-    @Req() req: Request,
-    @UploadedFiles() files: Express.Multer.File[],
-  ) {
-    return this.productService.uploadImages(tenantDb, id, files, req.user);
-  }
 
   @Get()
   @RequirePermissions('LIST_PRODUCT')
@@ -99,8 +88,9 @@ export class ProductController {
     @Param('id') id: string,
     @Body() dto: UpdateProductDto,
     @Req() req: Request,
+    @TenantId() tenantId: string,
   ) {
-    return this.productService.edit(tenantDb, id, dto, req.user);
+    return this.productService.edit(tenantDb, tenantId, id, dto, req.user);
   }
 
   @Put('update/:id/status')

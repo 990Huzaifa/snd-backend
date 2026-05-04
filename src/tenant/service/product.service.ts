@@ -391,99 +391,167 @@ export class ProductService {
     return product;
   }
 
-  async edit(tenantDb: DataSource, id: string, dto: UpdateProductDto, user: any) {
-    const productRepo = tenantDb.getRepository(Product);
-    const product = await productRepo.findOne({
-      where: { id, isDelete: false },
+  async edit(
+    tenantDb: DataSource,
+    tenantId: string,
+    id: string,
+    dto: UpdateProductDto,
+    user: any,
+  ) {
+    let logName: string;
+    let logSku: string;
+
+    await tenantDb.transaction(async (manager) => {
+      const productRepo = manager.getRepository(Product);
+      const product = await productRepo.findOne({
+        where: { id, isDelete: false },
+      });
+
+      if (!product) {
+        throw new NotFoundException('Product not found');
+      }
+
+      if (dto.categoryId !== undefined) {
+        await this.ensureCategoryExists(tenantDb, dto.categoryId.trim());
+        product.categoryId = dto.categoryId.trim();
+      }
+
+      if (dto.brandId !== undefined) {
+        const nextBrandId = dto.brandId?.trim();
+        if (nextBrandId) {
+          await this.ensureBrandExists(tenantDb, nextBrandId);
+          product.brandId = nextBrandId;
+        } else {
+          product.brandId = null;
+        }
+      }
+
+      if (dto.skuCode !== undefined) {
+        const skuCode = dto.skuCode.trim();
+        await this.ensureSkuUnique(tenantDb, skuCode, id);
+        product.skuCode = skuCode;
+      }
+
+      if (dto.name !== undefined) {
+        product.name = dto.name.trim();
+      }
+
+      if (dto.description !== undefined) {
+        product.description = dto.description?.trim() || null;
+      }
+
+      const assetRepo = manager.getRepository(Asset);
+
+      if (dto.assetIds !== undefined) {
+        await assetRepo.update(
+          {
+            entityType: AssetEntityType.PRODUCT,
+            entityId: product.id,
+            purpose: AssetPurpose.PRODUCT_IMAGE,
+          },
+          {
+            entityType: null,
+            entityId: null,
+            attachedAt: null,
+          },
+        );
+
+        const uniqueAssetIds = dto.assetIds.length
+          ? this.dedupeAssetIdsPreserveOrder(
+              dto.assetIds.map((aid) => aid.trim()).filter(Boolean),
+            )
+          : [];
+
+        if (uniqueAssetIds.length) {
+          const urls = await this.collectApprovedProductImageUrls(
+            manager,
+            tenantId,
+            uniqueAssetIds,
+            user,
+          );
+          product.image = urls.join(',');
+        } else {
+          product.image = dto.image?.trim() || null;
+        }
+      } else if (dto.image !== undefined) {
+        product.image = dto.image?.trim() || null;
+      }
+
+      if (dto.isActive !== undefined) {
+        product.isActive = dto.isActive;
+      }
+
+      if (dto.flavourIds !== undefined) {
+        const flavourIds = dto.flavourIds.map((item) => item.trim()).filter(Boolean);
+        if (flavourIds.length) {
+          await this.ensureFlavoursExist(tenantDb, flavourIds);
+        }
+        await manager.getRepository(ProductFlavour).delete({ productId: product.id });
+        if (flavourIds.length) {
+          const rows = [...new Set(flavourIds)].map((flavourId) =>
+            manager.getRepository(ProductFlavour).create({
+              productId: product.id,
+              flavourId,
+            }),
+          );
+          await manager.getRepository(ProductFlavour).save(rows);
+        }
+      }
+
+      if (dto.pricing !== undefined) {
+        if (dto.pricing.length) {
+          await this.ensureUomsExist(
+            tenantDb,
+            dto.pricing.map((item) => item.uomId.trim()),
+          );
+        }
+        await manager.getRepository(ProductPricing).delete({ productId: product.id });
+        if (dto.pricing.length) {
+          const rows = dto.pricing.map((item) =>
+            manager.getRepository(ProductPricing).create({
+              productId: product.id,
+              uomId: item.uomId.trim(),
+              tradePrice: item.tradePrice,
+              retailPrice: item.retailPrice,
+              quantity: Number(item.quantity),
+            }),
+          );
+          await manager.getRepository(ProductPricing).save(rows);
+        }
+      }
+
+      await productRepo.save(product);
+
+      if (dto.assetIds !== undefined) {
+        const uniqueAssetIds = dto.assetIds.length
+          ? this.dedupeAssetIdsPreserveOrder(
+              dto.assetIds.map((aid) => aid.trim()).filter(Boolean),
+            )
+          : [];
+        if (uniqueAssetIds.length) {
+          const now = new Date();
+          for (const assetId of uniqueAssetIds) {
+            await assetRepo.update(
+              { id: assetId },
+              {
+                entityType: AssetEntityType.PRODUCT,
+                entityId: product.id,
+                attachedAt: now,
+              },
+            );
+          }
+        }
+      }
+
+      logName = product.name;
+      logSku = product.skuCode;
     });
-
-    if (!product) {
-      throw new NotFoundException('Product not found');
-    }
-
-    if (dto.categoryId !== undefined) {
-      await this.ensureCategoryExists(tenantDb, dto.categoryId.trim());
-      product.categoryId = dto.categoryId.trim();
-    }
-
-    if (dto.brandId !== undefined) {
-      const nextBrandId = dto.brandId?.trim();
-      if (nextBrandId) {
-        await this.ensureBrandExists(tenantDb, nextBrandId);
-        product.brandId = nextBrandId;
-      } else {
-        product.brandId = null;
-      }
-    }
-
-    if (dto.skuCode !== undefined) {
-      const skuCode = dto.skuCode.trim();
-      await this.ensureSkuUnique(tenantDb, skuCode, id);
-      product.skuCode = skuCode;
-    }
-
-    if (dto.name !== undefined) {
-      product.name = dto.name.trim();
-    }
-
-    if (dto.description !== undefined) {
-      product.description = dto.description?.trim() || null;
-    }
-
-    if (dto.image !== undefined) {
-      product.image = dto.image?.trim() || null;
-    }
-
-    if (dto.isActive !== undefined) {
-      product.isActive = dto.isActive;
-    }
-
-    if (dto.flavourIds !== undefined) {
-      const flavourIds = dto.flavourIds.map((item) => item.trim()).filter(Boolean);
-      if (flavourIds.length) {
-        await this.ensureFlavoursExist(tenantDb, flavourIds);
-      }
-      await tenantDb.getRepository(ProductFlavour).delete({ productId: product.id });
-      if (flavourIds.length) {
-        const rows = [...new Set(flavourIds)].map((flavourId) =>
-          tenantDb.getRepository(ProductFlavour).create({
-            productId: product.id,
-            flavourId,
-          }),
-        );
-        await tenantDb.getRepository(ProductFlavour).save(rows);
-      }
-    }
-
-    if (dto.pricing !== undefined) {
-      if (dto.pricing.length) {
-        await this.ensureUomsExist(
-          tenantDb,
-          dto.pricing.map((item) => item.uomId.trim()),
-        );
-      }
-      await tenantDb.getRepository(ProductPricing).delete({ productId: product.id });
-      if (dto.pricing.length) {
-        const rows = dto.pricing.map((item) =>
-          tenantDb.getRepository(ProductPricing).create({
-            productId: product.id,
-            uomId: item.uomId.trim(),
-            tradePrice: item.tradePrice,
-            retailPrice: item.retailPrice,
-            quantity: Number(item.quantity),
-          }),
-        );
-        await tenantDb.getRepository(ProductPricing).save(rows);
-      }
-    }
-
-    await productRepo.save(product);
 
     await this.activityLogService.recordActivityLog(tenantDb, {
       actorId: user.userId,
       action: 'PRODUCT_UPDATED',
-      description: `Product ${product.name} updated`,
-      metadata: { productId: product.id, skuCode: product.skuCode },
+      description: `Product ${logName} updated`,
+      metadata: { productId: id, skuCode: logSku },
     });
 
     return this.view(tenantDb, id, user);
@@ -514,51 +582,5 @@ export class ProductService {
         status: product.isActive,
       },
     };
-  }
-
-  async uploadImages(
-    tenantDb: DataSource,
-    productId: string,
-    files: Express.Multer.File[],
-    user: any,
-  ) {
-    if (!files?.length) {
-      throw new BadRequestException('At least one image file is required');
-    }
-
-    const productRepo = tenantDb.getRepository(Product);
-    const product = await productRepo.findOne({
-      where: { id: productId, isDelete: false },
-    });
-    if (!product) {
-      throw new NotFoundException('Product not found');
-    }
-
-    const uploadedImageUrls: string[] = [];
-    for (const file of files) {
-      const extension = extname(file.originalname || '').toLowerCase();
-      const fileName = `${Date.now()}-${randomUUID()}${extension}`;
-      const key = `products/${fileName}`;
-      const uploadResult = await this.s3Service.uploadObject(
-        key,
-        file.buffer,
-        file.mimetype,
-      );
-      uploadedImageUrls.push(uploadResult.url);
-    }
-
-    const newUrls = uploadedImageUrls.join(',');
-    const existing = product.image?.trim();
-    product.image = existing ? `${existing},${newUrls}` : newUrls;
-    await productRepo.save(product);
-
-    await this.activityLogService.recordActivityLog(tenantDb, {
-      actorId: user.userId,
-      action: 'PRODUCT_UPDATED',
-      description: `Product ${product.name} images uploaded`,
-      metadata: { productId: product.id },
-    });
-
-    return this.view(tenantDb, productId, user);
   }
 }
