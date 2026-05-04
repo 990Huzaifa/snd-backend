@@ -55,14 +55,6 @@ export class AssetService {
             );
         }
 
-        if (dto.entityId) {
-            if (!dto.entityType) {
-                throw new BadRequestException(
-                    'entityType is required when entityId is provided',
-                );
-            }
-        }
-
         if (dto.entityType !== undefined) {
             const allowedEntityTypes = rules.allowedEntityTypes as readonly string[];
             if (!allowedEntityTypes.includes(dto.entityType)) {
@@ -168,17 +160,7 @@ export class AssetService {
                 throw new BadRequestException(`Unknown purpose on asset ${assetId}`);
             }
 
-            if (asset.entityId && !asset.entityType) {
-                throw new BadRequestException(
-                    `Asset ${assetId} has entityId but no entityType; cannot attach`,
-                );
-            }
-            if (!asset.entityId && asset.entityType) {
-                throw new BadRequestException(
-                    `Asset ${assetId} has entityType but no entityId; cannot attach`,
-                );
-            }
-            if (asset.entityId && asset.entityType) {
+            if (asset.entityType) {
                 const allowed = rules.allowedEntityTypes as readonly string[];
                 if (!allowed.includes(asset.entityType)) {
                     throw new BadRequestException(
