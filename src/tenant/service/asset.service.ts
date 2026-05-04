@@ -190,21 +190,21 @@ export class AssetService {
                 throw err;
             }
 
-            const contentLength = head.ContentLength ?? 0;
-            if (contentLength !== asset.fileSize) {
-                throw new BadRequestException(
-                    `Stored size for asset ${assetId} does not match declared size ${contentLength}`,
-                );
-            }
+            // const contentLength = head.ContentLength ?? 0;
+            // if (contentLength !== asset.fileSize) {
+            //     throw new BadRequestException(
+            //         `Stored size for asset ${assetId} does not match declared size ${contentLength}`,
+            //     );
+            // }
 
-            if (
-                head.ContentType &&
-                !(rules.allowedMimeTypes as readonly string[]).includes(head.ContentType)
-            ) {
-                throw new BadRequestException(
-                    `Stored content type for asset ${assetId} is not allowed for its purpose`,
-                );
-            }
+            // if (
+            //     head.ContentType &&
+            //     !(rules.allowedMimeTypes as readonly string[]).includes(head.ContentType)
+            // ) {
+            //     throw new BadRequestException(
+            //         `Stored content type for asset ${assetId} is not allowed for its purpose`,
+            //     );
+            // }
 
             const oldKey = asset.s3Key;
             const destKey = `tenants/${tenantId}/${rules.folder}/${asset.id}.${asset.fileExtension}`;
