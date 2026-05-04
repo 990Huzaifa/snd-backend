@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from "typeorm";
 
-export class TenantDb1777624947226 implements MigrationInterface {
-    name = 'TenantDb1777624947226'
+export class TenantDb1777880157953 implements MigrationInterface {
+    name = 'TenantDb1777880157953'
 
     public async up(queryRunner: QueryRunner): Promise<void> {
         await queryRunner.query(`CREATE TABLE "permissions" ("id" SERIAL NOT NULL, "code" character varying NOT NULL, "name" character varying NOT NULL, "isActive" boolean NOT NULL DEFAULT true, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "UQ_8dad765629e83229da6feda1c1d" UNIQUE ("code"), CONSTRAINT "PK_920331560282b8bd21bb02290df" PRIMARY KEY ("id"))`);
@@ -37,6 +37,7 @@ export class TenantDb1777624947226 implements MigrationInterface {
         await queryRunner.query(`CREATE TABLE "designations" ("id" SERIAL NOT NULL, "name" character varying NOT NULL, "slug" character varying NOT NULL, "description" character varying, "isActive" boolean NOT NULL DEFAULT true, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_a0f024b99b1491a03fc421858ea" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE TABLE "users" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "code" character varying NOT NULL, "name" character varying NOT NULL, "email" character varying NOT NULL, "password" character varying, "phone" character varying, "cnic" character varying, "avatar" character varying, "address" character varying, "designationId" integer, "joiningDate" TIMESTAMP, "leavingDate" TIMESTAMP, "countryId" character varying, "stateId" character varying, "cityId" character varying, "isActive" boolean NOT NULL DEFAULT true, "isDeleted" boolean NOT NULL DEFAULT false, "roleId" uuid, "deviceId" character varying, "fcmToken" character varying, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "UQ_1f7a2b11e29b1422a2622beab36" UNIQUE ("code"), CONSTRAINT "UQ_97672ac88f789774dd47f7c8be3" UNIQUE ("email"), CONSTRAINT "PK_a3ffb1c0c8416b9fc6f907b7433" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE TABLE "salesman_distributors" ("id" SERIAL NOT NULL, "userId" uuid, "distributorId" uuid, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_dd7553ddfbbf53b5059265e66fd" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE TABLE "activity_logs" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "actorId" uuid, "action" character varying NOT NULL, "description" text, "metadata" jsonb, "jobId" character varying, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_f25287b6140c5ba18d38776a796" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE TABLE "retailer_categories" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "name" character varying NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_7e395337e17d0cba314dd0f0eec" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE TABLE "retailer_channels" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "name" character varying NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_393d8c324fe4965ad911b25fe37" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE TYPE "public"."retailers_class_enum" AS ENUM('A', 'B', 'C')`);
@@ -44,7 +45,8 @@ export class TenantDb1777624947226 implements MigrationInterface {
         await queryRunner.query(`CREATE TABLE "retailers" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "shopName" character varying NOT NULL, "ownerName" character varying NOT NULL, "image" character varying, "Phone" character varying, "Email" character varying, "CNIC" character varying, "STRN" character varying, "NTN" character varying, "Address" character varying NOT NULL, "latitude" character varying NOT NULL, "longitude" character varying NOT NULL, "maxRadius" character varying NOT NULL, "creditLimit" character varying NOT NULL, "class" "public"."retailers_class_enum" NOT NULL, "status" "public"."retailers_status_enum" NOT NULL, "createdBy" uuid NOT NULL, "approvedBy" uuid NOT NULL, "routeId" uuid NOT NULL, "retailerCategoryId" uuid NOT NULL, "retailerChannelId" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_1228653999402b52e75d40b1c66" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE TYPE "public"."retailer_ledgers_reftype_enum" AS ENUM('SALE', 'RETURN', 'PAYMENT')`);
         await queryRunner.query(`CREATE TABLE "retailer_ledgers" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "retailerId" uuid NOT NULL, "refType" "public"."retailer_ledgers_reftype_enum" NOT NULL, "credit" character varying, "debit" character varying, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_2e1f94213ed33d5cba51f007594" PRIMARY KEY ("id"))`);
-        await queryRunner.query(`CREATE TABLE "activity_logs" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "actorId" uuid, "action" character varying NOT NULL, "description" text, "metadata" jsonb, "jobId" character varying, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_f25287b6140c5ba18d38776a796" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE TYPE "public"."assets_status_enum" AS ENUM('PENDING', 'APPROVED', 'REJECTED')`);
+        await queryRunner.query(`CREATE TABLE "assets" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "uploadedById" uuid, "purpose" character varying NOT NULL, "s3Key" character varying NOT NULL, "entityType" character varying, "entityId" character varying, "originalFileName" character varying NOT NULL, "fileExtension" character varying NOT NULL, "fileSize" integer NOT NULL, "status" "public"."assets_status_enum" NOT NULL, "confirmedAt" TIMESTAMP, "attachedAt" TIMESTAMP, "deletedAt" TIMESTAMP, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_da96729a8b113377cfb6a62439c" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE TABLE "rolePermissions" ("roleId" uuid NOT NULL, "permissionId" integer NOT NULL, CONSTRAINT "PK_9e7ab7e8aec914fa1886f6fa632" PRIMARY KEY ("roleId", "permissionId"))`);
         await queryRunner.query(`CREATE INDEX "IDX_b20f4ad2fcaa0d311f92516267" ON "rolePermissions" ("roleId") `);
         await queryRunner.query(`CREATE INDEX "IDX_5cb213a16a7b5204c8aff88151" ON "rolePermissions" ("permissionId") `);
@@ -99,13 +101,14 @@ export class TenantDb1777624947226 implements MigrationInterface {
         await queryRunner.query(`ALTER TABLE "users" ADD CONSTRAINT "FK_368e146b785b574f42ae9e53d5e" FOREIGN KEY ("roleId") REFERENCES "roles"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
         await queryRunner.query(`ALTER TABLE "salesman_distributors" ADD CONSTRAINT "FK_037a2ae28b82ef35d37558a0d60" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
         await queryRunner.query(`ALTER TABLE "salesman_distributors" ADD CONSTRAINT "FK_31e455e65a8a050cb678697d49d" FOREIGN KEY ("distributorId") REFERENCES "distributors"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "activity_logs" ADD CONSTRAINT "FK_110bb0d32b7f65be46be37e2577" FOREIGN KEY ("actorId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE NO ACTION`);
         await queryRunner.query(`ALTER TABLE "retailers" ADD CONSTRAINT "FK_4d12073533cb8395e686a125eee" FOREIGN KEY ("createdBy") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE NO ACTION`);
         await queryRunner.query(`ALTER TABLE "retailers" ADD CONSTRAINT "FK_e5e845d6015c8a18d843ce7b630" FOREIGN KEY ("approvedBy") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE NO ACTION`);
         await queryRunner.query(`ALTER TABLE "retailers" ADD CONSTRAINT "FK_58d6c6a4048dae0340b17146a47" FOREIGN KEY ("routeId") REFERENCES "routes"("id") ON DELETE RESTRICT ON UPDATE NO ACTION`);
         await queryRunner.query(`ALTER TABLE "retailers" ADD CONSTRAINT "FK_2df00191c2b7fdee5c7a5421d6d" FOREIGN KEY ("retailerCategoryId") REFERENCES "retailer_categories"("id") ON DELETE RESTRICT ON UPDATE NO ACTION`);
         await queryRunner.query(`ALTER TABLE "retailers" ADD CONSTRAINT "FK_c249afceaa25eff4411aeea9750" FOREIGN KEY ("retailerChannelId") REFERENCES "retailer_channels"("id") ON DELETE RESTRICT ON UPDATE NO ACTION`);
         await queryRunner.query(`ALTER TABLE "retailer_ledgers" ADD CONSTRAINT "FK_f8abb09f406f647034790511edd" FOREIGN KEY ("retailerId") REFERENCES "retailers"("id") ON DELETE RESTRICT ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "activity_logs" ADD CONSTRAINT "FK_110bb0d32b7f65be46be37e2577" FOREIGN KEY ("actorId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "assets" ADD CONSTRAINT "FK_b9fdc4600fb5785205eb8ebef55" FOREIGN KEY ("uploadedById") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE NO ACTION`);
         await queryRunner.query(`ALTER TABLE "rolePermissions" ADD CONSTRAINT "FK_b20f4ad2fcaa0d311f925162675" FOREIGN KEY ("roleId") REFERENCES "roles"("id") ON DELETE CASCADE ON UPDATE CASCADE`);
         await queryRunner.query(`ALTER TABLE "rolePermissions" ADD CONSTRAINT "FK_5cb213a16a7b5204c8aff881518" FOREIGN KEY ("permissionId") REFERENCES "permissions"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
     }
@@ -113,13 +116,14 @@ export class TenantDb1777624947226 implements MigrationInterface {
     public async down(queryRunner: QueryRunner): Promise<void> {
         await queryRunner.query(`ALTER TABLE "rolePermissions" DROP CONSTRAINT "FK_5cb213a16a7b5204c8aff881518"`);
         await queryRunner.query(`ALTER TABLE "rolePermissions" DROP CONSTRAINT "FK_b20f4ad2fcaa0d311f925162675"`);
-        await queryRunner.query(`ALTER TABLE "activity_logs" DROP CONSTRAINT "FK_110bb0d32b7f65be46be37e2577"`);
+        await queryRunner.query(`ALTER TABLE "assets" DROP CONSTRAINT "FK_b9fdc4600fb5785205eb8ebef55"`);
         await queryRunner.query(`ALTER TABLE "retailer_ledgers" DROP CONSTRAINT "FK_f8abb09f406f647034790511edd"`);
         await queryRunner.query(`ALTER TABLE "retailers" DROP CONSTRAINT "FK_c249afceaa25eff4411aeea9750"`);
         await queryRunner.query(`ALTER TABLE "retailers" DROP CONSTRAINT "FK_2df00191c2b7fdee5c7a5421d6d"`);
         await queryRunner.query(`ALTER TABLE "retailers" DROP CONSTRAINT "FK_58d6c6a4048dae0340b17146a47"`);
         await queryRunner.query(`ALTER TABLE "retailers" DROP CONSTRAINT "FK_e5e845d6015c8a18d843ce7b630"`);
         await queryRunner.query(`ALTER TABLE "retailers" DROP CONSTRAINT "FK_4d12073533cb8395e686a125eee"`);
+        await queryRunner.query(`ALTER TABLE "activity_logs" DROP CONSTRAINT "FK_110bb0d32b7f65be46be37e2577"`);
         await queryRunner.query(`ALTER TABLE "salesman_distributors" DROP CONSTRAINT "FK_31e455e65a8a050cb678697d49d"`);
         await queryRunner.query(`ALTER TABLE "salesman_distributors" DROP CONSTRAINT "FK_037a2ae28b82ef35d37558a0d60"`);
         await queryRunner.query(`ALTER TABLE "users" DROP CONSTRAINT "FK_368e146b785b574f42ae9e53d5e"`);
@@ -174,7 +178,8 @@ export class TenantDb1777624947226 implements MigrationInterface {
         await queryRunner.query(`DROP INDEX "public"."IDX_5cb213a16a7b5204c8aff88151"`);
         await queryRunner.query(`DROP INDEX "public"."IDX_b20f4ad2fcaa0d311f92516267"`);
         await queryRunner.query(`DROP TABLE "rolePermissions"`);
-        await queryRunner.query(`DROP TABLE "activity_logs"`);
+        await queryRunner.query(`DROP TABLE "assets"`);
+        await queryRunner.query(`DROP TYPE "public"."assets_status_enum"`);
         await queryRunner.query(`DROP TABLE "retailer_ledgers"`);
         await queryRunner.query(`DROP TYPE "public"."retailer_ledgers_reftype_enum"`);
         await queryRunner.query(`DROP TABLE "retailers"`);
@@ -182,6 +187,7 @@ export class TenantDb1777624947226 implements MigrationInterface {
         await queryRunner.query(`DROP TYPE "public"."retailers_class_enum"`);
         await queryRunner.query(`DROP TABLE "retailer_channels"`);
         await queryRunner.query(`DROP TABLE "retailer_categories"`);
+        await queryRunner.query(`DROP TABLE "activity_logs"`);
         await queryRunner.query(`DROP TABLE "salesman_distributors"`);
         await queryRunner.query(`DROP TABLE "users"`);
         await queryRunner.query(`DROP TABLE "designations"`);

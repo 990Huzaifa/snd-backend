@@ -44,7 +44,7 @@ export class AssetService {
         tenantDb: DataSource,
         tenantId: string,
         dto: CreateAssetUploadRequestDto,
-        user: TenantUser,
+        user: any,
     ): Promise<{ uploads: AssetUploadRequestItemResult[] }> {
         const rules = ASSET_RULES[dto.purpose];
         if (!rules) {
@@ -131,7 +131,7 @@ export class AssetService {
         tenantDb: DataSource,
         tenantId: string,
         dto: ConfirmAssetUploadDto,
-        user: TenantUser,
+        user: any,
     ): Promise<{ results: ConfirmAssetUploadItemResult[] }> {
         const repo = tenantDb.getRepository(Asset);
         const results: ConfirmAssetUploadItemResult[] = [];

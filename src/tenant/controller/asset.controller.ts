@@ -6,7 +6,7 @@ import { TenantPermissionGuard } from 'src/auth/tenant-permission.guard';
 import { RequirePermissions } from 'src/auth/require-permission.decorator';
 import { TenantConnectionGuard } from 'src/common/guards/tenant-connection.guard';
 import { TenantJwtGuard } from 'src/common/guards/tenant-jwt.guard';
-import { TenantConnection } from 'src/common/tenant/tenant-connection.decorator';
+import { TenantConnection, TenantId } from 'src/common/tenant/tenant-connection.decorator';
 import { CreateAssetUploadRequestDto } from '../dto/asset/create-asset-upload-request.dto';
 import { ConfirmAssetUploadDto } from '../dto/asset/confirm-asset-upload.dto';
 import { AssetService } from '../service/asset.service';
@@ -27,13 +27,13 @@ export class AssetController {
         @TenantConnection() tenantDb: DataSource,
         @Req() req: Request,
         @Body() dto: CreateAssetUploadRequestDto,
+        @TenantId() tenantId: string
     ) {
-        const tenantId = req.tenant!.tenantId;
         return this.assetService.createUploadRequests(
             tenantDb,
             tenantId,
             dto,
-            { userId: (req.user as { userId: string }).userId },
+            req.user,
         );
     }
 
@@ -43,13 +43,13 @@ export class AssetController {
         @TenantConnection() tenantDb: DataSource,
         @Req() req: Request,
         @Body() dto: ConfirmAssetUploadDto,
+        @TenantId() tenantId: string
     ) {
-        const tenantId = req.tenant!.tenantId;
         return this.assetService.confirmUploads(
             tenantDb,
             tenantId,
             dto,
-            { userId: (req.user as { userId: string }).userId },
+            req.user,
         );
     }
 }
