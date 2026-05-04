@@ -55,9 +55,11 @@ export class MasterTenantDataService {
     }
     const tenant = await this.tenantRepo.findOne({
       where: { id: tenantId.trim() },
-      select: ['code'],
     });
-    return tenant?.code ?? null;
+    if (!tenant) {
+      return null;
+    }
+    return tenant.code;
 
   }
 
