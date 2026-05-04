@@ -7,6 +7,7 @@ import {
     IsInt,
     IsOptional,
     IsString,
+    IsUUID,
     MaxLength,
     Min,
     ValidateNested,
@@ -32,6 +33,10 @@ export class AssetUploadFileDescriptorDto {
 export class CreateAssetUploadRequestDto {
     @IsEnum(AssetPurpose)
     purpose: AssetPurpose;
+
+    @IsOptional()
+    @IsUUID('4')
+    entityId?: string;
 
     @IsOptional()
     @IsEnum(AssetEntityType)
