@@ -93,7 +93,6 @@ export class RetailerService {
       class: dto.class,
       status: dto.status ?? Status.PENDING,
       createdBy: user.userId,
-      approvedBy,
       routeId: dto.routeId,
       retailerCategoryId: dto.retailerCategoryId,
       retailerChannelId: dto.retailerChannelId,
