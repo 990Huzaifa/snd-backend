@@ -191,11 +191,11 @@ export class AssetService {
             }
 
             const contentLength = head.ContentLength ?? 0;
-            if (contentLength !== asset.fileSize) {
-                throw new BadRequestException(
-                    `Stored size for asset ${assetId} does not match declared size`,
-                );
-            }
+            // if (contentLength !== asset.fileSize) {
+            //     throw new BadRequestException(
+            //         `Stored size for asset ${assetId} does not match declared size ${contentLength}`,
+            //     );
+            // }
 
             if (
                 head.ContentType &&
