@@ -68,6 +68,8 @@ import { StockTransferService } from './service/stock-transfer.service';
 import { RetailerCategoryService } from './service/retailer-category.service';
 import { RetailerChannelService } from './service/retailer-channel.service';
 import { RetailerService } from './service/retailer.service';
+import { AssetController } from './controller/asset.controller';
+import { AssetService } from './service/asset.service';
 
 @Module({
   imports: [
@@ -113,6 +115,7 @@ import { RetailerService } from './service/retailer.service';
     RetailerCategoryController,
     RetailerChannelController,
     RetailerController,
+    AssetController,
   ],
   providers: [
     TenantAuthService,
@@ -145,6 +148,7 @@ import { RetailerService } from './service/retailer.service';
     RetailerCategoryService,
     RetailerChannelService,
     RetailerService,
+    AssetService,
   ],
 })
 export class TenantModule { }
