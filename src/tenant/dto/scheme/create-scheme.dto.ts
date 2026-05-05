@@ -27,6 +27,14 @@ export class CreateSchemeSlabDto {
   benefitValue: string;
 }
 
+export class CreateSchemeProductDto {
+  @IsUUID('4')
+  productId: string;
+
+  @IsUUID('4')
+  productPricingId: string;
+}
+
 export class CreateSchemeDto {
   @IsString()
   name: string;
@@ -61,9 +69,9 @@ export class CreateSchemeDto {
 
   @IsOptional()
   @IsArray()
-  @ArrayUnique()
-  @IsUUID('4', { each: true })
-  productIds?: string[];
+  @ValidateNested({ each: true })
+  @Type(() => CreateSchemeProductDto)
+  schemeProducts?: CreateSchemeProductDto[];
 
   @IsOptional()
   @IsArray()

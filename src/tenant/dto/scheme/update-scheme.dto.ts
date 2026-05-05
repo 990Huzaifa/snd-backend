@@ -27,6 +27,14 @@ export class UpdateSchemeSlabDto {
   benefitValue: string;
 }
 
+export class UpdateSchemeProductDto {
+  @IsUUID('4')
+  productId: string;
+
+  @IsUUID('4')
+  productPricingId: string;
+}
+
 export class UpdateSchemeDto {
   @IsOptional()
   @IsString()
@@ -66,9 +74,9 @@ export class UpdateSchemeDto {
 
   @IsOptional()
   @IsArray()
-  @ArrayUnique()
-  @IsUUID('4', { each: true })
-  productIds?: string[];
+  @ValidateNested({ each: true })
+  @Type(() => UpdateSchemeProductDto)
+  schemeProducts?: UpdateSchemeProductDto[];
 
   @IsOptional()
   @IsArray()

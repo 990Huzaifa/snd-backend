@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { DataSource, EntityManager, In } from 'typeorm';
-import { Product, ProductCategory } from 'src/tenant-db/entities/product.entity';
+import { Product, ProductCategory, ProductPricing } from 'src/tenant-db/entities/product.entity';
 import { Retailer, RetailerChannel } from 'src/tenant-db/entities/retailer.entity';
 import {
   Scheme,
@@ -25,6 +25,29 @@ export class SchemeService {
 
   private toUniqueIds(ids?: string[]): string[] {
     return [...new Set((ids ?? []).map((id) => id.trim()).filter(Boolean))];
+  }
+
+  private normalizeSchemeProducts(
+    schemeProducts?: Array<{ productId: string; productPricingId: string }>,
+  ): Array<{ productId: string; productPricingId: string }> {
+    const normalized: Array<{ productId: string; productPricingId: string }> = [];
+    const seen = new Set<string>();
+
+    for (const item of schemeProducts ?? []) {
+      const productId = item.productId.trim();
+      const productPricingId = item.productPricingId.trim();
+      if (!productId || !productPricingId) {
+        continue;
+      }
+      const pairKey = `${productId}:${productPricingId}`;
+      if (seen.has(pairKey)) {
+        continue;
+      }
+      seen.add(pairKey);
+      normalized.push({ productId, productPricingId });
+    }
+
+    return normalized;
   }
 
   private async ensureIdsExist(
@@ -74,6 +97,44 @@ export class SchemeService {
     }
   }
 
+  private async ensureSchemeProductsValid(
+    tenantDb: DataSource,
+    schemeProducts: Array<{ productId: string; productPricingId: string }>,
+  ) {
+    if (!schemeProducts.length) {
+      return;
+    }
+
+    await this.ensureIdsExist(
+      tenantDb,
+      this.toUniqueIds(schemeProducts.map((item) => item.productId)),
+      Product,
+      'products',
+    );
+
+    const uniquePricingIds = this.toUniqueIds(
+      schemeProducts.map((item) => item.productPricingId),
+    );
+    const pricingRows = await tenantDb.getRepository(ProductPricing).find({
+      where: { id: In(uniquePricingIds) },
+      select: ['id', 'productId'],
+    });
+    if (pricingRows.length !== uniquePricingIds.length) {
+      throw new NotFoundException('One or more product pricings not found');
+    }
+
+    const pricingProductMap = new Map(
+      pricingRows.map((pricing) => [pricing.id, pricing.productId]),
+    );
+    for (const pair of schemeProducts) {
+      if (pricingProductMap.get(pair.productPricingId) !== pair.productId) {
+        throw new BadRequestException(
+          `Pricing ${pair.productPricingId} does not belong to product ${pair.productId}`,
+        );
+      }
+    }
+  }
+
   private async createRelations(
     manager: EntityManager,
     schemeId: string,
@@ -111,13 +172,14 @@ export class SchemeService {
       );
     }
 
-    const productIds = this.toUniqueIds(dto.productIds);
-    if (productIds.length) {
+    const schemeProducts = this.normalizeSchemeProducts(dto.schemeProducts);
+    if (schemeProducts.length) {
       await productRepo.save(
-        productIds.map((productId) =>
+        schemeProducts.map((item) =>
           productRepo.create({
             scheme: { id: schemeId },
-            product: { id: productId },
+            product: { id: item.productId },
+            productPricing: { id: item.productPricingId },
           }),
         ),
       );
@@ -155,17 +217,15 @@ export class SchemeService {
     this.validateDateRange(startDate, endDate);
 
     await this.ensureNameUnique(tenantDb, name);
+    await this.ensureSchemeProductsValid(
+      tenantDb,
+      this.normalizeSchemeProducts(dto.schemeProducts),
+    );
     await this.ensureIdsExist(
       tenantDb,
       this.toUniqueIds(dto.retailerIds),
       Retailer,
       'retailers',
-    );
-    await this.ensureIdsExist(
-      tenantDb,
-      this.toUniqueIds(dto.productIds),
-      Product,
-      'products',
     );
     await this.ensureIdsExist(
       tenantDb,
@@ -257,6 +317,7 @@ export class SchemeService {
         'retailers.retailer',
         'products',
         'products.product',
+        'products.productPricing',
         'productCategories',
         'productCategories.productCategory',
         'retailerChannels',
@@ -295,12 +356,10 @@ export class SchemeService {
         'retailers',
       );
     }
-    if (dto.productIds !== undefined) {
-      await this.ensureIdsExist(
+    if (dto.schemeProducts !== undefined) {
+      await this.ensureSchemeProductsValid(
         tenantDb,
-        this.toUniqueIds(dto.productIds),
-        Product,
-        'products',
+        this.normalizeSchemeProducts(dto.schemeProducts),
       );
     }
     if (dto.productCategoryIds !== undefined) {
@@ -353,7 +412,7 @@ export class SchemeService {
       if (dto.retailerIds !== undefined) {
         await manager.getRepository(SchemeRetailer).delete({ scheme: { id: scheme.id } });
       }
-      if (dto.productIds !== undefined) {
+      if (dto.schemeProducts !== undefined) {
         await manager.getRepository(SchemeProduct).delete({ scheme: { id: scheme.id } });
       }
       if (dto.productCategoryIds !== undefined) {
