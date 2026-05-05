@@ -6,6 +6,10 @@ import { CreateOpeningStockDto } from '../dto/opening-stock/create-opening-stock
 import { CreatePurchaseStockDto } from '../dto/purchase-stock/create-purchase-stock.dto';
 import { OpeningStockService } from './opening-stock.service';
 import { PurchaseStockService } from './purchase-stock.service';
+import { ActivityLogService } from './activity-log.service';
+import { NotificationService } from './notification.service';
+import { TenantJob, TenantJobService } from './tenant-job.service';
+import { ProductFlavour, ProductPricing } from 'src/tenant-db/entities/product.entity';
 
 type ParsedStockRow = {
   row: number;
@@ -18,6 +22,9 @@ type ParsedStockRow = {
 @Injectable()
 export class StockImportService {
   constructor(
+    private readonly activityLogService: ActivityLogService,
+    private readonly notificationService: NotificationService,
+    private readonly tenantJobService: TenantJobService,
     private readonly openingStockService: OpeningStockService,
     private readonly purchaseStockService: PurchaseStockService,
   ) {}
@@ -113,43 +120,235 @@ export class StockImportService {
     return parsedRows;
   }
 
+  private async notifyImportCompletion(
+    tenantDb: DataSource,
+    job: TenantJob,
+    user: { userId: string },
+    tenantCode: string,
+    status: 'completed' | 'failed',
+  ) {
+    const title = status === 'completed' ? 'Stock import completed' : 'Stock import failed';
+    const message =
+      status === 'completed'
+        ? `Import finished. Inserted: ${job.inserted}, Failed: ${job.failed}, Total: ${job.totalRows}`
+        : `Import failed for ${job.fileName}. Please review import logs.`;
+
+    await this.notificationService.createNotification(
+      tenantDb,
+      {
+        userId: user.userId,
+        title,
+        message,
+        type: 'stock_import',
+      },
+      tenantCode,
+      {
+        job: {
+          id: job.id,
+          jobType: job.jobType,
+          status,
+          fileName: job.fileName,
+          totalRows: job.totalRows,
+          inserted: job.inserted,
+          failed: job.failed,
+          completedAt: job.completedAt,
+          logs: job.logs,
+        },
+      },
+    );
+  }
+
+  private async validateRows(
+    tenantDb: DataSource,
+    rows: ParsedStockRow[],
+  ): Promise<{
+    validRows: ParsedStockRow[];
+    invalidLogs: Array<{ row: number; name: string; status: 'error'; error: string }>;
+  }> {
+    const flavourRepo = tenantDb.getRepository(ProductFlavour);
+    const pricingRepo = tenantDb.getRepository(ProductPricing);
+
+    const validRows: ParsedStockRow[] = [];
+    const invalidLogs: Array<{ row: number; name: string; status: 'error'; error: string }> = [];
+
+    for (const row of rows) {
+      const flavour = await flavourRepo.findOne({
+        where: { id: row.productFlavourId, productId: row.productId },
+        select: ['id'],
+      });
+      if (!flavour) {
+        invalidLogs.push({
+          row: row.row,
+          name: row.productId,
+          status: 'error',
+          error: `Product flavour ${row.productFlavourId} is not valid for product ${row.productId}`,
+        });
+        continue;
+      }
+
+      const pricing = await pricingRepo.findOne({
+        where: { id: row.productPricingId, productId: row.productId },
+        select: ['id'],
+      });
+      if (!pricing) {
+        invalidLogs.push({
+          row: row.row,
+          name: row.productId,
+          status: 'error',
+          error: `Product pricing ${row.productPricingId} is not valid for product ${row.productId}`,
+        });
+        continue;
+      }
+
+      validRows.push(row);
+    }
+
+    return { validRows, invalidLogs };
+  }
+
+  private async processImportJob(
+    tenantDb: DataSource,
+    jobId: string,
+    dto: ImportStockDto,
+    rows: ParsedStockRow[],
+    fileName: string,
+    user: { userId: string },
+    tenantCode: string,
+  ) {
+    this.tenantJobService.startJob(jobId);
+
+    const { validRows, invalidLogs } = await this.validateRows(tenantDb, rows);
+    for (const log of invalidLogs) {
+      this.tenantJobService.appendLog(jobId, log);
+    }
+
+    if (validRows.length > 0) {
+      if (dto.type === 'OPENING') {
+        const payload: CreateOpeningStockDto = {
+          distributorId: dto.distributorId,
+          date: dto.date,
+          remarks: `Imported via CSV: ${fileName}`,
+          items: validRows.map((row) => ({
+            productId: row.productId,
+            productFlavourId: Number(row.productFlavourId),
+            productPricingId: row.productPricingId,
+            quantity: row.quantity,
+          })),
+        };
+        await this.openingStockService.create(tenantDb, payload, user);
+      } else {
+        const payload: CreatePurchaseStockDto = {
+          distributorId: dto.distributorId,
+          date: dto.date,
+          remarks: `Imported via CSV: ${fileName}`,
+          items: validRows.map((row) => ({
+            productId: row.productId,
+            productFlavourId: Number(row.productFlavourId),
+            productPricingId: row.productPricingId,
+            quantity: row.quantity,
+          })),
+        };
+        await this.purchaseStockService.create(tenantDb, payload, user);
+      }
+
+      for (const row of validRows) {
+        this.tenantJobService.appendLog(jobId, {
+          row: row.row,
+          name: row.productId,
+          status: 'success',
+          metadata: {
+            type: dto.type,
+            productFlavourId: row.productFlavourId,
+            productPricingId: row.productPricingId,
+            quantity: row.quantity,
+          },
+        });
+      }
+    }
+
+    const completedJob = this.tenantJobService.completeJob(jobId);
+    await this.activityLogService.recordActivityLog(tenantDb, {
+      actorId: user.userId,
+      action: 'TENANT_JOB_COMPLETED',
+      description: `Stock import completed for ${completedJob.fileName}`,
+      metadata: {
+        jobId: completedJob.id,
+        jobType: completedJob.jobType,
+        fileName: completedJob.fileName,
+        totalRows: completedJob.totalRows,
+        inserted: completedJob.inserted,
+        failed: completedJob.failed,
+        stockType: dto.type,
+      },
+    });
+    await this.notifyImportCompletion(tenantDb, completedJob, user, tenantCode, 'completed');
+  }
+
   async importStock(
     tenantDb: DataSource,
     dto: ImportStockDto,
     file: Express.Multer.File,
     user: { userId: string },
+    tenantCode: string,
   ) {
     if (!file?.buffer?.length) {
       throw new BadRequestException('File is required');
     }
 
-    const parsedRows = this.parseCsvRows(file);
-    if (dto.type === 'OPENING') {
-      const payload: CreateOpeningStockDto = {
-        distributorId: dto.distributorId,
-        date: dto.date,
-        remarks: `Imported via CSV: ${file.originalname}`,
-        items: parsedRows.map((row) => ({
-          productId: row.productId,
-          productFlavourId: Number(row.productFlavourId),
-          productPricingId: row.productPricingId,
-          quantity: row.quantity,
-        })),
-      };
-      return this.openingStockService.create(tenantDb, payload, user);
-    }
+    const rows = this.parseCsvRows(file);
+    const job = this.tenantJobService.createJob({
+      tenantCode,
+      jobType: `STOCK_IMPORT_${dto.type}`,
+      fileName: file.originalname,
+      createdBy: user.userId,
+      totalRows: rows.length,
+    });
 
-    const payload: CreatePurchaseStockDto = {
-      distributorId: dto.distributorId,
-      date: dto.date,
-      remarks: `Imported via CSV: ${file.originalname}`,
-      items: parsedRows.map((row) => ({
-        productId: row.productId,
-        productFlavourId: Number(row.productFlavourId),
-        productPricingId: row.productPricingId,
-        quantity: row.quantity,
-      })),
+    await this.activityLogService.recordActivityLog(tenantDb, {
+      actorId: user.userId,
+      action: 'TENANT_JOB_STARTED',
+      description: `Stock import started for ${file.originalname}`,
+      metadata: {
+        jobId: job.id,
+        jobType: job.jobType,
+        fileName: file.originalname,
+        totalRows: rows.length,
+        stockType: dto.type,
+      },
+    });
+
+    void this.processImportJob(tenantDb, job.id, dto, rows, file.originalname, user, tenantCode).catch(
+      async (error) => {
+        this.tenantJobService.failJob(job.id);
+        this.tenantJobService.appendLog(job.id, {
+          row: 0,
+          name: '',
+          status: 'error',
+          error: error instanceof Error ? error.message : 'Unknown processing failure',
+        });
+        const failedJob = this.tenantJobService.getJobById(job.id, tenantCode, user.userId);
+
+        await this.activityLogService.recordActivityLog(tenantDb, {
+          actorId: user.userId,
+          action: 'TENANT_JOB_FAILED',
+          description: `Stock import failed for ${file.originalname}`,
+          metadata: {
+            jobId: job.id,
+            jobType: job.jobType,
+            fileName: file.originalname,
+            error: error instanceof Error ? error.message : String(error),
+            stockType: dto.type,
+          },
+        });
+        await this.notifyImportCompletion(tenantDb, failedJob, user, tenantCode, 'failed');
+      },
+    );
+
+    return {
+      message: 'Stock import started',
+      jobId: job.id,
+      status: job.status,
+      totalRows: job.totalRows,
     };
-    return this.purchaseStockService.create(tenantDb, payload, user);
   }
 }

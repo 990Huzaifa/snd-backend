@@ -15,7 +15,7 @@ import { TenantPermissionGuard } from 'src/auth/tenant-permission.guard';
 import { RequirePermissions } from 'src/auth/require-permission.decorator';
 import { TenantConnectionGuard } from 'src/common/guards/tenant-connection.guard';
 import { TenantJwtGuard } from 'src/common/guards/tenant-jwt.guard';
-import { TenantConnection } from 'src/common/tenant/tenant-connection.decorator';
+import { TenantCode, TenantConnection } from 'src/common/tenant/tenant-connection.decorator';
 import { ImportStockDto } from '../dto/stock/import-stock.dto';
 import { StockImportService } from '../service/stock-import.service';
 
@@ -37,7 +37,14 @@ export class StockController {
     @Body() dto: ImportStockDto,
     @UploadedFile() file: Express.Multer.File,
     @Req() req: Request,
+    @TenantCode() tenantCode: string,
   ) {
-    return this.stockImportService.importStock(tenantDb, dto, file, req.user as { userId: string });
+    return this.stockImportService.importStock(
+      tenantDb,
+      dto,
+      file,
+      req.user as { userId: string },
+      tenantCode,
+    );
   }
 }
