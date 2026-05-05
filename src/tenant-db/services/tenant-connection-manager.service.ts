@@ -3,6 +3,7 @@ import {
   Logger,
   NotFoundException,
   OnModuleDestroy,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -87,7 +88,7 @@ export class TenantConnectionManager implements OnModuleDestroy {
 
     if (!dbConfig) {
       this.logger.warn(`No tenant DB config found for tenant ${tenantId}`);
-      throw new NotFoundException('Tenant DB config not found');
+      throw new UnauthorizedException('Tenant DB config not found');
     }
 
     const dataSource = createTenantDataSource(
