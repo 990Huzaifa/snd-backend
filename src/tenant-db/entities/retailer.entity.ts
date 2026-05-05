@@ -1,6 +1,7 @@
 import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn } from "typeorm";
 import { Route } from "./route.entity";
 import { User } from "./user.entity";
+import { SchemeRetailer, SchemeRetailerChannel } from "./scheme.entity";
 
 @Entity('retailer_categories')
 export class RetailerCategory {
@@ -36,6 +37,9 @@ export class RetailerChannel {
 
     @OneToMany(() => Retailer, (retailer) => retailer.retailerChannel)
     retailers: Retailer[];
+
+    @OneToMany(() => SchemeRetailerChannel, (schemeRetailerChannel) => schemeRetailerChannel.retailerChannel, { onDelete: 'CASCADE' })
+    schemeRetailerChannels: SchemeRetailerChannel[];
 }
 
 export enum RetailerClass {
@@ -148,6 +152,9 @@ export class Retailer {
 
     @OneToMany(() => RetailerLedger, (retailerLedger) => retailerLedger.retailer)
     retailerLedgers: RetailerLedger[];
+
+    @OneToMany(() => SchemeRetailer, (schemeRetailer) => schemeRetailer.retailer)
+    schemes: SchemeRetailer[];
 }   
 
 @Entity('retailer_ledgers')

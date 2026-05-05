@@ -13,6 +13,7 @@ import { PurchaseStockItem } from './purchase-stock.entity';
 import { OpeningStockItem } from './opening-stock.entity';
 import { StockBalance, StockMovement } from './stock.entity';
 import { StockTransferItem } from './stock-transfer.entity';
+import { SchemeProduct, SchemeProductCategory } from './scheme.entity';
 
 @Entity('product_categories')
 export class ProductCategory {
@@ -35,8 +36,14 @@ export class ProductCategory {
     @OneToMany(() => Product, (product) => product.category)
     products: Product[];
 
-    @CreateDateColumn({ name: 'created_at' })
+    @CreateDateColumn()
     createdAt: Date;
+
+    @UpdateDateColumn()
+    updatedAt: Date;
+
+    @OneToMany(() => SchemeProductCategory, (schemeProductCategory) => schemeProductCategory.productCategory, { onDelete: 'CASCADE' })
+    schemeProductCategories: SchemeProductCategory[];
 }
 
 @Entity('flavours')
@@ -162,6 +169,9 @@ export class Product {
 
     @OneToMany(() => ProductPricingJob, (productPricingJob) => productPricingJob.product)
     pricingJobs: ProductPricingJob[];
+
+    @OneToMany(() => SchemeProduct, (schemeProduct) => schemeProduct.product, { onDelete: 'CASCADE' })
+    schemes: SchemeProduct[];
 }
 
 @Entity('product_flavours')

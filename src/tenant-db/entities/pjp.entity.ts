@@ -44,14 +44,14 @@ export class PJPRoute {
     @Column()
     pjpId: string;
 
-    @ManyToOne(() => PJP, { onDelete: 'RESTRICT' })
+    @ManyToOne(() => PJP, { onDelete: 'CASCADE' })
     @JoinColumn({ name: 'pjpId' })
     pjp: PJP;
 
     @Column()
     routeId: string;
 
-    @ManyToOne(() => Route, { onDelete: 'RESTRICT' })
+    @ManyToOne(() => Route, { onDelete: 'CASCADE' })
     @JoinColumn({ name: 'routeId' })
     route: Route;
 
