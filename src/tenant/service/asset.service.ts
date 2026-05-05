@@ -41,6 +41,7 @@ export class AssetService {
     async createUploadRequests(
         tenantDb: DataSource,
         tenantId: string,
+        tenantCode: string,
         dto: CreateAssetUploadRequestDto,
         user: any,
     ): Promise<{ uploads: AssetUploadRequestItemResult[] }> {
@@ -84,7 +85,7 @@ export class AssetService {
         for (const file of dto.files) {
             const assetId = randomUUID();
             const extension = this.resolveSafeExtension(file.originalFileName, file.mimeType);
-            const s3Key = `tenants/${tenantId}/temp/uploads/${assetId}.${extension}`;
+            const s3Key = `tenants/${tenantCode}/temp/uploads/${assetId}.${extension}`;
 
             const asset = repo.create({
                 id: assetId,
@@ -128,6 +129,7 @@ export class AssetService {
     async confirmUploads(
         tenantDb: DataSource,
         tenantId: string,
+        tenantCode: string,
         dto: ConfirmAssetUploadDto,
         user: any,
     ): Promise<{ results: ConfirmAssetUploadItemResult[] }> {
@@ -150,7 +152,7 @@ export class AssetService {
                 );
             }
 
-            const expectedPrefix = `tenants/${tenantId}/temp/uploads/${asset.id}.`;
+            const expectedPrefix = `tenants/${tenantCode}/temp/uploads/${asset.id}.`;
             if (!asset.s3Key.startsWith(expectedPrefix)) {
                 throw new BadRequestException(`Asset ${assetId} has an unexpected storage key`);
             }
@@ -207,7 +209,7 @@ export class AssetService {
             // }
 
             const oldKey = asset.s3Key;
-            const destKey = `tenants/${tenantId}/${rules.folder}/${asset.id}.${asset.fileExtension}`;
+            const destKey = `tenants/${tenantCode}/${rules.folder}/${asset.id}.${asset.fileExtension}`;
 
             await this.s3Service.copyObject(oldKey, destKey);
 
