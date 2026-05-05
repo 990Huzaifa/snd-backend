@@ -1,6 +1,6 @@
 import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn } from "typeorm";
 import { Retailer, RetailerChannel } from "./retailer.entity";
-import { Product, ProductCategory } from "./product.entity";
+import { Product, ProductCategory, ProductPricing } from "./product.entity";
 
 
 export enum SchemeType {
@@ -143,6 +143,16 @@ export class SchemeProduct {
     @ManyToOne(() => Product, (product) => product.schemes, { onDelete: 'CASCADE' })
     @JoinColumn({ name: 'productId' })
     product: Product;
+
+    // with its pricing
+
+    @Column()
+    productPricingId: string;
+
+    @ManyToOne(() => ProductPricing, (productPricing) => productPricing.schemeProducts, { onDelete: 'CASCADE' })
+    @JoinColumn({ name: 'productPricingId' })
+    productPricing: ProductPricing; 
+
 
     @CreateDateColumn()
     createdAt: Date;

@@ -254,6 +254,9 @@ export class ProductPricing {
     @OneToMany(() => ProductPricingJob, (productPricingJob) => productPricingJob.productPricing)
     pricingJobs: ProductPricingJob[];
 
+    @OneToMany(() => SchemeProduct, (schemeProduct) => schemeProduct.productPricing, { onDelete: 'CASCADE' })
+    schemeProducts: SchemeProduct[];
+
 }
 
 @Entity('product_pricing_jobs')
