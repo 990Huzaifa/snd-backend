@@ -20,7 +20,6 @@ import { TenantJwtGuard } from 'src/common/guards/tenant-jwt.guard';
 import { TenantConnection } from 'src/common/tenant/tenant-connection.decorator';
 import { CreateSchemeDto } from '../dto/scheme/create-scheme.dto';
 import { UpdateSchemeDto } from '../dto/scheme/update-scheme.dto';
-import { UpdateSchemeStatusDto } from '../dto/scheme/update-scheme-status.dto';
 import { SchemeService } from '../service/scheme.service';
 
 @Controller('tenant/schemes')
@@ -92,9 +91,9 @@ export class SchemeController {
   updateStatus(
     @TenantConnection() tenantDb: DataSource,
     @Param('id') id: string,
-    @Body() dto: UpdateSchemeStatusDto,
+    @Query('status') status: boolean,
     @Req() req: Request,
   ) {
-    return this.schemeService.updateStatus(tenantDb, id, dto.status, req.user);
+    return this.schemeService.updateStatus(tenantDb, id, status, req.user);
   }
 }

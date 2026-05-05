@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from "typeorm";
 
-export class TenantDb1777964992704 implements MigrationInterface {
-    name = 'TenantDb1777964992704'
+export class TenantDb1777967932643 implements MigrationInterface {
+    name = 'TenantDb1777967932643'
 
     public async up(queryRunner: QueryRunner): Promise<void> {
         await queryRunner.query(`CREATE TABLE "permissions" ("id" SERIAL NOT NULL, "code" character varying NOT NULL, "name" character varying NOT NULL, "isActive" boolean NOT NULL DEFAULT true, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "UQ_8dad765629e83229da6feda1c1d" UNIQUE ("code"), CONSTRAINT "PK_920331560282b8bd21bb02290df" PRIMARY KEY ("id"))`);
@@ -58,8 +58,8 @@ export class TenantDb1777964992704 implements MigrationInterface {
         await queryRunner.query(`CREATE INDEX "IDX_5cb213a16a7b5204c8aff88151" ON "rolePermissions" ("permissionId") `);
         await queryRunner.query(`ALTER TABLE "notifications" ADD CONSTRAINT "FK_692a909ee0fa9383e7859f9b406" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE NO ACTION`);
         await queryRunner.query(`ALTER TABLE "pjp_plans" ADD CONSTRAINT "FK_70e9fef610a86676c398ae41062" FOREIGN KEY ("salesmanId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "pjp_routes" ADD CONSTRAINT "FK_0fefe4771f11f44fafd4622cfb6" FOREIGN KEY ("pjpId") REFERENCES "pjp_plans"("id") ON DELETE RESTRICT ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "pjp_routes" ADD CONSTRAINT "FK_4decedea8a8df76a8c52bea0906" FOREIGN KEY ("routeId") REFERENCES "routes"("id") ON DELETE RESTRICT ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "pjp_routes" ADD CONSTRAINT "FK_0fefe4771f11f44fafd4622cfb6" FOREIGN KEY ("pjpId") REFERENCES "pjp_plans"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "pjp_routes" ADD CONSTRAINT "FK_4decedea8a8df76a8c52bea0906" FOREIGN KEY ("routeId") REFERENCES "routes"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
         await queryRunner.query(`ALTER TABLE "routes" ADD CONSTRAINT "FK_a8507b496096dd547189ec98af2" FOREIGN KEY ("areaId") REFERENCES "areas"("id") ON DELETE RESTRICT ON UPDATE NO ACTION`);
         await queryRunner.query(`ALTER TABLE "routes" ADD CONSTRAINT "FK_03484907485e7037f88ede88b90" FOREIGN KEY ("distributorId") REFERENCES "distributors"("id") ON DELETE RESTRICT ON UPDATE NO ACTION`);
         await queryRunner.query(`ALTER TABLE "route_transfer_logs" ADD CONSTRAINT "FK_b05e79dfe6eed2e3883e1ac6505" FOREIGN KEY ("fromSalesmanId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE NO ACTION`);
