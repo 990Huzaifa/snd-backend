@@ -106,12 +106,12 @@ export class TenantUtilityService {
     return { result: areas };
   }
 
-  async getDistributors(tenantDb: DataSource, areaId: string) {
-    const distributors = await tenantDb.getRepository(Distributor).find({
-      where: { area: { id: areaId }},
-      select: ['id', 'name', 'code'],
-      order: { name: 'ASC' },
-    });
+  async getDistributors(tenantDb: DataSource, areaId?: string) {
+    const distributorsQueryBuilder = tenantDb.getRepository(Distributor).createQueryBuilder('distributor').leftJoin('distributor.area', 'area').where('distributor.isDeleted = :isDeleted', { isDeleted: false }).andWhere('distributor.isActive = :isActive', { isActive: true });
+    if (areaId) {   
+      distributorsQueryBuilder.andWhere('area.id = :areaId', { areaId: areaId });
+    }
+    const distributors = await distributorsQueryBuilder.getMany();
 
     return { result: distributors };
   }

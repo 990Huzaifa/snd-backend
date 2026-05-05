@@ -1,4 +1,4 @@
-import { Controller, Get, Param, UseGuards } from "@nestjs/common";
+import { Controller, Get, Param, Query, UseGuards } from "@nestjs/common";
 import { TenantJwtAuthGuard } from "src/auth/tenant-jwt-auth.guard";
 import { TenantConnectionGuard } from "src/common/guards/tenant-connection.guard";
 import { TenantJwtGuard } from "src/common/guards/tenant-jwt.guard";
@@ -41,8 +41,8 @@ export class TenantUtilityController {
         return this.utilityService.getAreas(tenantDb, regionId);
     }
 
-    @Get('distributors/:areaId')
-    async getDistributors(@TenantConnection() tenantDb: DataSource, @Param('areaId') areaId: string) {
+    @Get('distributors')
+    async getDistributors(@TenantConnection() tenantDb: DataSource, @Query('areaId') areaId?: string) {
         return this.utilityService.getDistributors(tenantDb, areaId);
     }
 
