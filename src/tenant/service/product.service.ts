@@ -56,7 +56,7 @@ export class ProductService {
 
   private async collectApprovedProductImageUrls(
     manager: EntityManager,
-    tenantId: string,
+    tenantCode: string,
     assetIds: string[],
     user: { userId: string },
   ): Promise<string[]> {
@@ -83,8 +83,8 @@ export class ProductService {
         throw new BadRequestException(`Asset ${assetId} is already linked to an entity`);
       }
       const productImageRules = ASSET_RULES[AssetPurpose.PRODUCT_IMAGE];
-      const tempPrefix = `tenants/${tenantId}/temp/uploads/${asset.id}.`;
-      const finalPrefix = `tenants/${tenantId}/${productImageRules.folder}/${asset.id}.`;
+      const tempPrefix = `tenants/${tenantCode}/temp/uploads/${asset.id}.`;
+      const finalPrefix = `tenants/${tenantCode}/${productImageRules.folder}/${asset.id}.`;
       if (!asset.s3Key.startsWith(tempPrefix) && !asset.s3Key.startsWith(finalPrefix)) {
         throw new BadRequestException(`Asset ${assetId} has an unexpected storage key`);
       }
@@ -167,7 +167,7 @@ export class ProductService {
     }
   }
 
-  async create(tenantDb: DataSource, tenantId: string, dto: CreateProductDto, user: any) {
+  async create(tenantDb: DataSource, tenantCode: string, dto: CreateProductDto, user: any) {
     const categoryId = dto.categoryId.trim();
     const brandId = dto.brandId?.trim();
     const skuCode = dto.skuCode.trim();
@@ -202,7 +202,7 @@ export class ProductService {
       if (uniqueAssetIds.length) {
         const urls = await this.collectApprovedProductImageUrls(
           manager,
-          tenantId,
+          tenantCode,
           uniqueAssetIds,
           user,
         );

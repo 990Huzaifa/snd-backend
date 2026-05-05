@@ -19,6 +19,7 @@ import { RequirePermissions } from 'src/auth/require-permission.decorator';
 import { TenantConnectionGuard } from 'src/common/guards/tenant-connection.guard';
 import { TenantJwtGuard } from 'src/common/guards/tenant-jwt.guard';
 import {
+  TenantCode,
   TenantConnection,
   TenantId,
 } from 'src/common/tenant/tenant-connection.decorator';
@@ -43,9 +44,9 @@ export class ProductController {
     @TenantConnection() tenantDb: DataSource,
     @Body() dto: CreateProductDto,
     @Req() req: Request,
-    @TenantId() tenantId: string,
+    @TenantCode() tenantCode: string,
   ) {
-    return this.productService.create(tenantDb, tenantId, dto, req.user);
+    return this.productService.create(tenantDb, tenantCode, dto, req.user);
   }
 
 
