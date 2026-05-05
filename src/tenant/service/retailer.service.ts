@@ -70,9 +70,8 @@ export class RetailerService {
     if (!channel) {
       throw new NotFoundException('Retailer channel not found');
     }
-
-    const approvedBy = dto.approvedBy?.trim() || user.userId;
-    await this.ensureUser(tenantDb, approvedBy, 'Approver user');
+  //if status is pending, then approvedBy is null else approvedBy is the user id
+    const approvedBy = dto.status === Status.PENDING ? null : user.userId;
 
     const retailer = retailerRepo.create({
       shopName: this.normalize(dto.shopName),
@@ -93,6 +92,7 @@ export class RetailerService {
       class: dto.class,
       status: dto.status ?? Status.PENDING,
       createdBy: user.userId,
+      approvedBy: approvedBy,
       routeId: dto.routeId,
       retailerCategoryId: dto.retailerCategoryId,
       retailerChannelId: dto.retailerChannelId,

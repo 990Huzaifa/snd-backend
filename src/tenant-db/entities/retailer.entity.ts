@@ -117,7 +117,7 @@ export class Retailer {
     @JoinColumn({ name: 'createdBy' })
     createdByUser: User;
 
-    @Column()
+    @Column({nullable: true})
     approvedBy: string;
 
     @ManyToOne(() => User, { onDelete: 'RESTRICT' })
