@@ -36,6 +36,7 @@ import { RetailerCategoryController } from './controller/retailer-category.contr
 import { RetailerChannelController } from './controller/retailer-channel.controller';
 import { RetailerController } from './controller/retailer.controller';
 import { SchemeController } from './controller/scheme.controller';
+import { StockController } from './controller/stock.controller';
 import { TenantAuthService } from './service/tenant-auth.service';
 import { ActivityLogService } from './service/activity-log.service';
 import { TenantDesignationService } from './service/tenant-designation.service';
@@ -72,6 +73,7 @@ import { RetailerService } from './service/retailer.service';
 import { AssetController } from './controller/asset.controller';
 import { AssetService } from './service/asset.service';
 import { SchemeService } from './service/scheme.service';
+import { StockImportService } from './service/stock-import.service';
 
 @Module({
   imports: [
@@ -119,6 +121,7 @@ import { SchemeService } from './service/scheme.service';
     RetailerController,
     AssetController,
     SchemeController,
+    StockController,
   ],
   providers: [
     TenantAuthService,
@@ -153,6 +156,7 @@ import { SchemeService } from './service/scheme.service';
     RetailerService,
     AssetService,
     SchemeService,
+    StockImportService,
   ],
 })
 export class TenantModule { }
