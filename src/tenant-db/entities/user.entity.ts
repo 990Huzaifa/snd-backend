@@ -118,7 +118,7 @@ export class User {
     notifications: Notification[];
 
     @OneToMany(() => SalesmanDistributor, (salesman) => salesman.user)
-    salesmen: SalesmanDistributor[];
+    assignedDistributors: SalesmanDistributor[];
 
     @Column({ nullable: true })
     deviceId: string;
@@ -157,7 +157,7 @@ export class SalesmanDistributor {
     @PrimaryGeneratedColumn()
     id: number;
 
-    @ManyToOne(() => User, (user) => user.salesmen)
+    @ManyToOne(() => User, (user) => user.assignedDistributors)
     @JoinColumn({ name: 'userId' })
     user: User;
 
