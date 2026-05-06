@@ -78,7 +78,7 @@ export class DistributorService {
     const distributor = distributorRepo.create({
       code,
       name: this.normalize(dto.name),
-      email: this.normalize(dto.email).toLowerCase(),
+      email: dto.email ? this.normalize(dto.email).toLowerCase() : null,
       phone: this.normalize(dto.phone),
       address: this.normalize(dto.address),
       countryId: dto.countryId?.trim() || null,

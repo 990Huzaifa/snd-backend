@@ -10,8 +10,9 @@ export class CreateDistributorDto {
   @IsString()
   name: string;
 
+  @IsOptional()
   @IsEmail()
-  email: string;
+  email?: string;
 
   @IsString()
   phone: string;

@@ -4,16 +4,17 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { DataSource, Like, Not, Repository } from 'typeorm';
+import { DataSource, In, Like, Not, Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { MailService } from 'src/common/mail/mail.service';
-import { User } from 'src/tenant-db/entities/user.entity';
+import { SalesmanDistributor, User } from 'src/tenant-db/entities/user.entity';
 import { Role } from 'src/tenant-db/entities/role.entity';
 import { Designation } from 'src/tenant-db/entities/user.entity';
 import { CreateTenantUserDto } from '../dto/user/create-tenant-user.dto';
 import { InviteTenantUserDto } from '../dto/user/invite-tenant-user.dto';
 import { ActivityLogService } from './activity-log.service';
 import { MasterGeoHelperService } from './master-geo-helper.service';
+import { Distributor } from 'src/tenant-db/entities/distributor.entity';
 
 @Injectable()
 export class UserService {
@@ -147,6 +148,7 @@ export class UserService {
     });
     return userWithGeoNames;
   }
+
   async createUser(tenantDb: DataSource, dto: CreateTenantUserDto, Authuser: any) {
     const userRepo = tenantDb.getRepository(User);
     const roleRepo = tenantDb.getRepository(Role);
@@ -342,6 +344,45 @@ export class UserService {
       userCode: savedUser.code,
       email: savedUser.email,
       setupUrl,
+    };
+  }
+
+  async assignDistributorsToUser(tenantDb: DataSource, userId: string, distributorIds: string[], Authuser: any) {
+    const userRepo = tenantDb.getRepository(User);
+    const distributorRepo = tenantDb.getRepository(Distributor);
+    const user = await userRepo.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+    const salesmanDistributorRepo = tenantDb.getRepository(SalesmanDistributor);
+    const salesmanDistributors = await salesmanDistributorRepo.find({ where: { userId } });
+    if (salesmanDistributors.length > 0) {
+      for (const salesmanDistributor of salesmanDistributors) {
+        await salesmanDistributorRepo.remove(salesmanDistributor);
+      }
+    }
+    const distributors = await distributorRepo.find({ where: { id: In(distributorIds) } });
+    if (distributors.length !== distributorIds.length) {
+      throw new NotFoundException('Some distributors not found');
+    }
+    for (const distributor of distributors) {
+      const salesmanDistributor = salesmanDistributorRepo.create({
+        userId,
+        distributorId: distributor.id,
+      });
+      await salesmanDistributorRepo.save(salesmanDistributor);
+    }
+
+    await this.activityLogService.recordActivityLog(tenantDb, {
+      actorId: Authuser.userId,
+      action: 'DISTRIBUTORS_ASSIGNED_TO_USER',
+      description: `Distributors ${distributorIds.join(', ')} assigned to user ${userId}`,
+      metadata: { userId: userId, distributorIds: distributorIds },
+    });
+    return {
+      message: 'Distributors assigned to user successfully',
+      user,
+      distributors,
     };
   }
 }

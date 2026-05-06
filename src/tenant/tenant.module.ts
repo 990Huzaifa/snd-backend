@@ -7,6 +7,7 @@ import { State } from 'src/master-db/entities/state.entity';
 import { City } from 'src/master-db/entities/city.entity';
 import { TenantSettings } from 'src/master-db/entities/tenant-settings.entity';
 import { TenantGeoPolicy } from 'src/master-db/entities/tenant-geo-policy.entity';
+import { TenantModule as TenantModuleEntity } from 'src/master-db/entities/tenant-modules.entity';
 import { TenantTheme } from 'src/master-db/entities/tenant-themes.entity';
 import { AuthModule } from 'src/auth/auth.module';
 import { TenantRuntimeModule } from 'src/tenant-db/tenant-runtime.module';
@@ -75,6 +76,7 @@ import { AssetService } from './service/asset.service';
 import { SchemeService } from './service/scheme.service';
 import { StockImportService } from './service/stock-import.service';
 
+
 @Module({
   imports: [
     HttpModule,
@@ -90,6 +92,7 @@ import { StockImportService } from './service/stock-import.service';
       TenantSettings,
       TenantGeoPolicy,
       TenantTheme,
+      TenantModuleEntity
     ]),
   ],
   controllers: [

@@ -15,6 +15,7 @@ import { PurchaseStock } from './purchase-stock.entity';
 import { OpeningStock } from './opening-stock.entity';
 import { StockTransfer } from './stock-transfer.entity';
 import { StockBalance, StockMovement } from './stock.entity';
+import { Attendence } from './attendence.entity';
 
 @Entity('distributors')
 export class Distributor {
@@ -27,7 +28,7 @@ export class Distributor {
     @Column()
     code: string;
 
-    @Column()
+    @Column({nullable: true})
     email: string;
 
     @Column()
@@ -99,4 +100,7 @@ export class Distributor {
 
     @OneToMany(() => StockBalance, (stockBalance) => stockBalance.distributor)
     stockBalances: StockBalance[];
+
+    @OneToMany(() => Attendence, (attendence) => attendence.distributor)
+    attendences: Attendence[];
 }

@@ -3,6 +3,7 @@ import { Distributor } from "./distributor.entity";
 import { Area } from "./area.entity";
 import { PJPRoute, PJP } from "./pjp.entity";
 import { User } from "./user.entity";
+import { SaleOrder } from "./saleorder.entity";
 @Entity('routes')
 export class Route {
     @PrimaryGeneratedColumn('uuid')
@@ -33,6 +34,9 @@ export class Route {
 
     @OneToMany(() => PJPRoute, (pjpRoute) => pjpRoute.route)
     pjpRoutes: PJPRoute[];
+
+    @OneToMany(() => SaleOrder, (saleOrder) => saleOrder.route)
+    saleOrders: SaleOrder[];
 }
 
 @Entity('route_transfer_logs')
@@ -76,6 +80,42 @@ export class RouteTransferLog {
 
     @Column()
     remarks: string;    
+
+    @CreateDateColumn()
+    createdAt: Date;
+
+    @UpdateDateColumn()
+    updatedAt: Date;
+}
+
+@Entity('route_shares')
+export class RouteShare {
+    @PrimaryGeneratedColumn('uuid')
+    id: string;
+
+    @Column()
+    routeId: string;
+
+    @ManyToOne(() => Route, { onDelete: 'RESTRICT' })
+    @JoinColumn({ name: 'routeId' })
+    route: Route;
+
+    @Column()
+    fromSalesmanId: string;
+
+    @ManyToOne(() => User, { onDelete: 'RESTRICT' })
+    @JoinColumn({ name: 'fromSalesmanId' })
+    fromSalesman: User;
+
+    @Column()
+    toSalesmanId: string;
+
+    @ManyToOne(() => User, { onDelete: 'RESTRICT' })
+    @JoinColumn({ name: 'toSalesmanId' })
+    toSalesman: User;
+
+    @Column()
+    visitDate: Date;
 
     @CreateDateColumn()
     createdAt: Date;

@@ -11,6 +11,7 @@ import {
 import { Role } from './role.entity';
 import { Notification } from './notification.entity';
 import { Distributor } from './distributor.entity';
+import { Attendence } from './attendence.entity';
 
 
 @Entity('designations')
@@ -129,6 +130,9 @@ export class User {
 
     @UpdateDateColumn()
     updatedAt: Date;
+
+    @OneToMany(() => Attendence, (attendence) => attendence.user)
+    attendences: Attendence[];
 
 }
 

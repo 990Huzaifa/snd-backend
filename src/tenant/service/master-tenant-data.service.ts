@@ -5,6 +5,7 @@ import { TenantSettings } from 'src/master-db/entities/tenant-settings.entity';
 import { TenantTheme } from 'src/master-db/entities/tenant-themes.entity';
 import { Repository } from 'typeorm';
 import { Tenant } from 'src/master-db/entities/tenant.entity';
+import { TenantModule } from 'src/master-db/entities/tenant-modules.entity';
 
 @Injectable()
 export class MasterTenantDataService {
@@ -15,6 +16,8 @@ export class MasterTenantDataService {
     private readonly tenantGeoPolicyRepo: Repository<TenantGeoPolicy>,
     @InjectRepository(TenantTheme)
     private readonly tenantThemeRepo: Repository<TenantTheme>,
+    @InjectRepository(TenantModule)
+    private readonly tenantModuleRepo: Repository<TenantModule>,
     @InjectRepository(Tenant)
     private readonly tenantRepo: Repository<Tenant>,
   ) {}
@@ -63,9 +66,23 @@ export class MasterTenantDataService {
 
   }
 
+  async getTenantModulesByTenantId(tenantId?: string | null){
+    if (!tenantId?.trim()) {
+      return null;
+    }
+    const modules = await this.tenantModuleRepo.find({
+      where: { tenant: { id: tenantId.trim() } },
+    });
+    if (!modules) {
+      return [];
+    }
+    return modules;
+  }
+
   async getTenantMasterDataByTenantId(tenantId?: string | null) {
     if (!tenantId?.trim()) {
       return {
+        modules: [],
         tenantCode: null,
         settings: null,
         geoPolicy: null,
@@ -75,11 +92,12 @@ export class MasterTenantDataService {
 
     const normalizedTenantId = tenantId.trim();
 
-    const [tenantCode, settings, geoPolicy, theme] = await Promise.all([
+    const [tenantCode, settings, geoPolicy, theme, modules] = await Promise.all([
       this.getTenantCodeByTenantId(normalizedTenantId),
       this.getTenantSettingsByTenantId(normalizedTenantId),
       this.getTenantGeoPolicyByTenantId(normalizedTenantId),
       this.getTenantThemeByTenantId(normalizedTenantId),
+      this.getTenantModulesByTenantId(normalizedTenantId),
     ]);
 
     return {
@@ -87,6 +105,7 @@ export class MasterTenantDataService {
       settings,
       geoPolicy,
       theme,
+      modules,
     };
   }
 }
