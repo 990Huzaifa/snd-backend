@@ -91,7 +91,7 @@ export class UserService {
       },
     });
     const [users, total] = await userRepo.findAndCount({
-      relations: ['role', 'designation'],
+      relations: ['role', 'designation', 'salesmen'],
       where: {
         name: Like(`%${search}%`),
         id: Not(user.userId),
