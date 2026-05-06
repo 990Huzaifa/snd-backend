@@ -148,6 +148,10 @@ export class DistributorService {
       .take(limit)
       .getManyAndCount();
 
+    // attach geo names to distributors
+    const distributorsWithGeoNames = await Promise.all(distributors.map(distributor => this.attachGeoNames(distributor)));
+    
+
     await this.activityLogService.recordActivityLog(tenantDb, {
       actorId: user.userId,
       action: 'DISTRIBUTOR_LISTED',
@@ -155,7 +159,7 @@ export class DistributorService {
       metadata: { total, page, limit, areaId: areaId || null, isActive: activeFilter },
     });
 
-    return { result: distributors, meta: { total, page, limit } };
+    return { result: distributorsWithGeoNames, meta: { total, page, limit } };
   }
 
   async view(tenantDb: DataSource, id: string, user: any) {
