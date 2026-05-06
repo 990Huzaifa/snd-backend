@@ -20,6 +20,7 @@ import { TenantConnection } from 'src/common/tenant/tenant-connection.decorator'
 import { SaleOrderService } from '../service/saleorder.service';
 import { CreateSaleOrderDto } from '../dto/saleorder/create-saleorder.dto';
 import { UpdateSaleOrderDto } from '../dto/saleorder/update-saleorder.dto';
+import { OrderStatus } from 'src/tenant-db/entities/saleorder.entity';
 
 @Controller('tenant/saleorders')
 @UseGuards(
@@ -92,4 +93,24 @@ export class SaleOrderController {
       req.user as { userId: string },
     );
   }
+  
+
+  @Put('update/:id/status')
+  @RequirePermissions('UPDATE_SALE_ORDER_STATUS')
+  updateStatus(
+    @TenantConnection() tenantDb: DataSource,
+    @Param('id') id: string,
+    @Query('status') status: OrderStatus,
+    @Req() req: Request,
+  ) {
+    return this.saleOrderService.updateStatus(
+      tenantDb,
+      id,
+      status as OrderStatus,
+      req.user as { userId: string },
+    );
+  }
+
+
+  
 }
