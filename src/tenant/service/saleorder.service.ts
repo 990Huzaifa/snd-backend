@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Brackets, DataSource } from 'typeorm';
+import { Brackets, DataSource, EntityManager } from 'typeorm';
 import {
   OrderStatus,
   SaleOrder,
@@ -18,10 +18,15 @@ import { Scheme, SchemeSlab } from 'src/tenant-db/entities/scheme.entity';
 import { ActivityLogService } from './activity-log.service';
 import { CreateSaleOrderDto } from '../dto/saleorder/create-saleorder.dto';
 import { UpdateSaleOrderDto } from '../dto/saleorder/update-saleorder.dto';
+import { ReferenceType, StockMovementType } from 'src/tenant-db/entities/stock.entity';
+import { StockService } from './stock.service';
 
 @Injectable()
 export class SaleOrderService {
-  constructor(private readonly activityLogService: ActivityLogService) {}
+  constructor(
+    private readonly activityLogService: ActivityLogService,
+    private readonly stockService: StockService,
+  ) {}
 
   private normalizePage(value: number): number {
     const n = Number(value);
@@ -39,7 +44,7 @@ export class SaleOrderService {
   private async generateOrderNumber(tenantDb: DataSource): Promise<string> {
     const repo = tenantDb.getRepository(SaleOrder);
     while (true) {
-      const orderNumber = `SO-${Math.floor(100000 + Math.random() * 900000)}`;
+      const orderNumber = `SO${new Date().getFullYear()}${Math.floor(100000 + Math.random() * 900000)}`;
       const existing = await repo.findOne({
         where: { orderNumber },
         select: ['id'],
@@ -138,6 +143,40 @@ export class SaleOrderService {
         if (!slab) throw new NotFoundException(`Scheme slab ${item.slabId} not found`);
       }
     }
+  }
+
+  private isExecutionStatus(status: OrderStatus | string | undefined): boolean {
+    if (!status) {
+      return false;
+    }
+    return status === OrderStatus.APPROVED || String(status).toUpperCase() === 'EXECUTE';
+  }
+
+  private async executeSaleOrder(manager: EntityManager, saleOrderId: string) {
+    const order = await manager.getRepository(SaleOrder).findOne({
+      where: { id: saleOrderId },
+      relations: ['items'],
+    });
+
+    if (!order) {
+      throw new NotFoundException('Sale order not found');
+    }
+
+    if (!order.items?.length) {
+      throw new BadRequestException('Sale order has no items to execute');
+    }
+
+    await this.stockService.applyOrderStockMovement(manager, {
+      distributorId: order.distributorId,
+      items: order.items.map((item) => ({
+        productId: item.productId,
+        productFlavourId: item.productFlavourId,
+        productPricingId: item.productPricingId,
+        quantity: item.quantity,
+      })),
+      type: StockMovementType.OUT,
+      referenceType: ReferenceType.SALE,
+    });
   }
 
   async list(
@@ -289,6 +328,10 @@ export class SaleOrderService {
         ),
       );
 
+      if (this.isExecutionStatus(order.orderStatus)) {
+        await this.executeSaleOrder(manager, order.id);
+      }
+
       return order.id;
     });
 
@@ -374,5 +417,51 @@ export class SaleOrderService {
     });
 
     return this.view(tenantDb, id, user);
+  }
+
+  async updateStatus(tenantDb: DataSource, id: string, status: OrderStatus, user: { userId: string }) {
+    let order: Pick<SaleOrder, 'id' | 'orderNumber' | 'orderStatus'> | null = null;
+
+    await tenantDb.transaction(async (manager) => {
+      const orderRepo = manager.getRepository(SaleOrder);
+      const currentOrder = await orderRepo.findOne({
+        where: { id },
+        select: ['id', 'orderNumber', 'orderStatus'],
+      });
+      if (!currentOrder) {
+        throw new NotFoundException('Sale order not found');
+      }
+
+      const wasExecutionStatus = this.isExecutionStatus(currentOrder.orderStatus);
+
+      currentOrder.orderStatus = status;
+      await orderRepo.save(currentOrder);
+
+      if (this.isExecutionStatus(status) && !wasExecutionStatus) {
+        await this.executeSaleOrder(manager, currentOrder.id);
+      }
+
+      order = currentOrder;
+    });
+
+    if (!order) {
+      throw new NotFoundException('Sale order not found');
+    }
+
+    await this.activityLogService.recordActivityLog(tenantDb, {
+      actorId: user.userId,
+      action: 'SALE_ORDER_STATUS_UPDATED',
+      description: `Sale order ${order.orderNumber} status updated to ${status}`,
+      metadata: { saleOrderId: order.id, status },
+    });
+
+    return {
+      message: 'Sale order status updated successfully',
+      order: {
+        id: order.id,
+        orderNumber: order.orderNumber,
+        orderStatus: order.orderStatus,
+      },
+    };
   }
 }
