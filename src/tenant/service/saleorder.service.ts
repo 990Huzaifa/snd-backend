@@ -201,9 +201,9 @@ export class SaleOrderService {
     const qb = tenantDb
       .getRepository(SaleOrder)
       .createQueryBuilder('so')
-      .leftJoin('so.retailer', 'retailer')
-      .leftJoin('so.distributor', 'distributor')
-      .leftJoin('so.salesman', 'salesman');
+      .leftJoinAndSelect('so.retailer', 'retailer')
+      .leftJoinAndSelect('so.distributor', 'distributor')
+      .leftJoinAndSelect('so.salesman', 'salesman');
 
     const normalizedSearch = (search ?? '').trim();
     if (normalizedSearch) {
