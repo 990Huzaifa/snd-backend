@@ -211,7 +211,7 @@ export class SaleOrderService {
         new Brackets((sub) => {
           sub
             .where('so."orderNumber" ILIKE :search', { search: `%${normalizedSearch}%` })
-            .orWhere('retailer."name" ILIKE :search', { search: `%${normalizedSearch}%` })
+            .orWhere('retailer."shopName" ILIKE :search', { search: `%${normalizedSearch}%` })
             .orWhere('distributor.name ILIKE :search', { search: `%${normalizedSearch}%` })
             .orWhere('salesman.name ILIKE :search', { search: `%${normalizedSearch}%` });
         }),
@@ -224,7 +224,7 @@ export class SaleOrderService {
       .select([
         'so.id',
         'so.orderNumber',
-        'retailers.name',
+        'retailer.shopName',
         'retailer.id',
         // 'salesman.name',
         // 'distributor.name',
