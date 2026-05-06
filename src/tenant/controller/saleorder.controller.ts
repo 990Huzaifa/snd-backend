@@ -21,6 +21,7 @@ import { SaleOrderService } from '../service/saleorder.service';
 import { CreateSaleOrderDto } from '../dto/saleorder/create-saleorder.dto';
 import { UpdateSaleOrderDto } from '../dto/saleorder/update-saleorder.dto';
 import { OrderStatus } from 'src/tenant-db/entities/saleorder.entity';
+import { GetProductSchemesDto } from '../dto/saleorder/get-product-schemes.dto';
 
 @Controller('tenant/saleorders')
 @UseGuards(
@@ -111,6 +112,12 @@ export class SaleOrderController {
     );
   }
 
-
-  
+  @Post('product-schemes')
+  @RequirePermissions('VIEW_SALE_ORDER')
+  getProductSchemes(
+    @TenantConnection() tenantDb: DataSource,
+    @Body() dto: GetProductSchemesDto,
+  ) {
+    return this.saleOrderService.getEligibleProductSchemes(tenantDb, dto);
+  }
 }

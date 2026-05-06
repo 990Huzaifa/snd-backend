@@ -18,8 +18,54 @@ export interface RetailerSchemeResult {
   status: 'CALCULATED';
 }
 
+export interface RetailerSchemeListResult {
+  schemeId: string;
+  schemeName: string;
+  schemeType: SchemeType;
+  benefitType: BenefitType;
+  retailerId: string;
+  retailerChannelId: string;
+  slabs: SchemeSlab[];
+}
+
 @Injectable()
 export class RetailerSchemeEngineService {
+  async listEligibleSchemesForRetailer(
+    tenantDb: DataSource,
+    input: { retailerId: string; orderDate: Date },
+  ): Promise<RetailerSchemeListResult[]> {
+    const orderDate = new Date(input.orderDate);
+    if (Number.isNaN(orderDate.getTime())) {
+      throw new BadRequestException('Invalid orderDate');
+    }
+
+    const retailer = await tenantDb.getRepository(Retailer).findOne({
+      where: { id: input.retailerId },
+      select: ['id', 'retailerChannelId'],
+    });
+    if (!retailer) {
+      throw new NotFoundException('Retailer not found');
+    }
+
+    const schemes = await this.getActiveRetailerSchemes(tenantDb, orderDate);
+    if (!schemes.length) {
+      return [];
+    }
+
+    return schemes
+      .filter((scheme) => this.checkRetailerEligibility(scheme, retailer.id))
+      .filter((scheme) => this.checkRetailerChannelEligibility(scheme, retailer.retailerChannelId))
+      .map((scheme) => ({
+        schemeId: scheme.id,
+        schemeName: scheme.name,
+        schemeType: scheme.schemeType,
+        benefitType: scheme.benefitType,
+        retailerId: retailer.id,
+        retailerChannelId: retailer.retailerChannelId,
+        slabs: scheme.slabs ?? [],
+      }));
+  }
+
   async calculateRetailerEligibleSchemes(
     tenantDb: DataSource,
     order: SaleOrder,

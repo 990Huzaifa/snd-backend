@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { DataSource } from 'typeorm';
 import { SaleOrder, SaleOrderItem } from 'src/tenant-db/entities/saleorder.entity';
 import { BenefitType, Scheme, SchemeSlab, SchemeType } from 'src/tenant-db/entities/scheme.entity';
+import { Product, ProductPricing } from 'src/tenant-db/entities/product.entity';
 
 export interface ProductSchemeResult {
   schemeId: string;
@@ -16,8 +17,105 @@ export interface ProductSchemeResult {
   status: 'CALCULATED';
 }
 
+export interface ProductSchemeEvaluationInput {
+  productId: string;
+  productPricingId: string;
+  quantity: number;
+  orderDate: Date;
+}
+
+export interface ProductSchemeListResult {
+  schemeId: string;
+  schemeName: string;
+  schemeType: SchemeType;
+  benefitType: BenefitType;
+  eligibleQty: number;
+  eligibleAmount: number;
+  matchedSlabId: string;
+  benefitValue: string;
+  calculatedBenefitAmount: number;
+  slabs: SchemeSlab[];
+}
+
 @Injectable()
 export class ProductSchemeEngineService {
+  async listEligibleSchemesForProduct(
+    tenantDb: DataSource,
+    input: ProductSchemeEvaluationInput,
+  ): Promise<ProductSchemeListResult[]> {
+    const orderDate = new Date(input.orderDate);
+    if (Number.isNaN(orderDate.getTime())) {
+      throw new BadRequestException('Invalid orderDate');
+    }
+
+    const quantity = Number(input.quantity);
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      throw new BadRequestException('Quantity must be greater than zero');
+    }
+
+    const [product, pricing] = await Promise.all([
+      tenantDb.getRepository(Product).findOne({
+        where: { id: input.productId, isDelete: false, isActive: true },
+        select: ['id', 'categoryId'],
+      }),
+      tenantDb.getRepository(ProductPricing).findOne({
+        where: { id: input.productPricingId, productId: input.productId },
+        select: ['id', 'productId', 'tradePrice'],
+      }),
+    ]);
+
+    if (!product) {
+      throw new NotFoundException('Product not found');
+    }
+
+    if (!pricing) {
+      throw new NotFoundException('Product pricing not found for this product');
+    }
+
+    const schemes = await this.getActiveProductSchemes(tenantDb, orderDate);
+    if (!schemes.length) {
+      return [];
+    }
+
+    const eligibleAmount = Number(pricing.tradePrice ?? 0) * quantity;
+    const results: ProductSchemeListResult[] = [];
+
+    for (const scheme of schemes) {
+      if (!this.isSchemeApplicableForProduct(scheme, input.productId, input.productPricingId, product.categoryId)) {
+        continue;
+      }
+
+      const matchedSlab = this.matchHighestSlab(scheme.schemeType, scheme.slabs, {
+        eligibleQty: quantity,
+        eligibleAmount,
+      });
+      if (!matchedSlab) {
+        continue;
+      }
+
+      const calculatedBenefitAmount = this.calculateBenefit(
+        scheme.benefitType,
+        matchedSlab.benefitValue,
+        eligibleAmount,
+      );
+
+      results.push({
+        schemeId: scheme.id,
+        schemeName: scheme.name,
+        schemeType: scheme.schemeType,
+        benefitType: scheme.benefitType,
+        eligibleQty: quantity,
+        eligibleAmount,
+        matchedSlabId: matchedSlab.id,
+        benefitValue: matchedSlab.benefitValue,
+        calculatedBenefitAmount,
+        slabs: scheme.slabs ?? [],
+      });
+    }
+
+    return results;
+  }
+
   async calculateProductEligibleSchemes(
     tenantDb: DataSource,
     order: SaleOrder,
@@ -71,6 +169,29 @@ export class ProductSchemeEngineService {
     }
 
     return results;
+  }
+
+  private isSchemeApplicableForProduct(
+    scheme: Scheme,
+    productId: string,
+    productPricingId: string,
+    categoryId: string,
+  ): boolean {
+    const targetedCategoryIds = new Set(
+      (scheme.productCategories ?? []).map((entry) => entry.productCategory?.id).filter(Boolean),
+    );
+    if (targetedCategoryIds.size > 0 && !targetedCategoryIds.has(categoryId)) {
+      return false;
+    }
+
+    const targetedProducts = scheme.products ?? [];
+    if (!targetedProducts.length) {
+      return targetedCategoryIds.size > 0;
+    }
+
+    return targetedProducts.some(
+      (entry) => entry.product?.id === productId && entry.productPricing?.id === productPricingId,
+    );
   }
 
   async getActiveProductSchemes(tenantDb: DataSource, orderDate: Date): Promise<Scheme[]> {
