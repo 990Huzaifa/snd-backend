@@ -353,10 +353,14 @@ export class SaleOrderService {
   ) {
     const existing = await tenantDb.getRepository(SaleOrder).findOne({
       where: { id },
-      select: ['id', 'orderNumber'],
+      select: ['id', 'orderNumber','orderStatus'],
     });
     if (!existing) {
       throw new NotFoundException('Sale order not found');
+    }
+
+    if (existing.orderStatus !== OrderStatus.PENDING) {
+      throw new BadRequestException('Sale order is not pending');
     }
 
     await this.assertForeignKeys(tenantDb, dto);
