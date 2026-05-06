@@ -11,6 +11,7 @@ import {
   EntityManager,
   In,
   Like,
+  QueryFailedError,
   SelectQueryBuilder,
 } from 'typeorm';
 import {
@@ -492,15 +493,43 @@ export class ProductService {
         if (flavourIds.length) {
           await this.ensureFlavoursExist(tenantDb, flavourIds);
         }
-        await manager.getRepository(ProductFlavour).delete({ productId: product.id });
-        if (flavourIds.length) {
-          const rows = [...new Set(flavourIds)].map((flavourId) =>
-            manager.getRepository(ProductFlavour).create({
+        const requestedFlavourIds = [...new Set(flavourIds)];
+        const productFlavourRepo = manager.getRepository(ProductFlavour);
+        const existingFlavours = await productFlavourRepo.find({
+          where: { productId: product.id },
+        });
+        const existingFlavourIdSet = new Set(existingFlavours.map((item) => item.flavourId));
+
+        const newFlavourRows = requestedFlavourIds
+          .filter((flavourId) => !existingFlavourIdSet.has(flavourId))
+          .map((flavourId) =>
+            productFlavourRepo.create({
               productId: product.id,
               flavourId,
             }),
           );
-          await manager.getRepository(ProductFlavour).save(rows);
+
+        if (newFlavourRows.length) {
+          await productFlavourRepo.save(newFlavourRows);
+        }
+
+        const flavourRowsToRemove = existingFlavours.filter(
+          (item) => !requestedFlavourIds.includes(item.flavourId),
+        );
+        for (const row of flavourRowsToRemove) {
+          try {
+            await productFlavourRepo.delete({ id: row.id });
+          } catch (error) {
+            if (
+              error instanceof QueryFailedError &&
+              (error as any).driverError?.code === '23503'
+            ) {
+              throw new BadRequestException(
+                `Flavour is already in use and cannot be removed from this product.`,
+              );
+            }
+            throw error;
+          }
         }
       }
 
@@ -511,18 +540,64 @@ export class ProductService {
             dto.pricing.map((item) => item.uomId.trim()),
           );
         }
-        await manager.getRepository(ProductPricing).delete({ productId: product.id });
-        if (dto.pricing.length) {
-          const rows = dto.pricing.map((item) =>
-            manager.getRepository(ProductPricing).create({
-              productId: product.id,
-              uomId: item.uomId.trim(),
+        const requestedPricingByUom = new Map(
+          dto.pricing.map((item) => [
+            item.uomId.trim(),
+            {
               tradePrice: item.tradePrice,
               retailPrice: item.retailPrice,
               quantity: Number(item.quantity),
+            },
+          ]),
+        );
+        const requestedUomIds = [...requestedPricingByUom.keys()];
+        const productPricingRepo = manager.getRepository(ProductPricing);
+        const existingPricing = await productPricingRepo.find({
+          where: { productId: product.id },
+        });
+
+        const existingPricingByUom = new Map(
+          existingPricing.map((item) => [item.uomId, item]),
+        );
+
+        for (const [uomId, requestedPricing] of requestedPricingByUom) {
+          const currentPricing = existingPricingByUom.get(uomId);
+          if (currentPricing) {
+            currentPricing.tradePrice = requestedPricing.tradePrice;
+            currentPricing.retailPrice = requestedPricing.retailPrice;
+            currentPricing.quantity = requestedPricing.quantity;
+            await productPricingRepo.save(currentPricing);
+            continue;
+          }
+
+          await productPricingRepo.save(
+            productPricingRepo.create({
+              productId: product.id,
+              uomId,
+              tradePrice: requestedPricing.tradePrice,
+              retailPrice: requestedPricing.retailPrice,
+              quantity: requestedPricing.quantity,
             }),
           );
-          await manager.getRepository(ProductPricing).save(rows);
+        }
+
+        const pricingRowsToRemove = existingPricing.filter(
+          (item) => !requestedUomIds.includes(item.uomId),
+        );
+        for (const row of pricingRowsToRemove) {
+          try {
+            await productPricingRepo.delete({ id: row.id });
+          } catch (error) {
+            if (
+              error instanceof QueryFailedError &&
+              (error as any).driverError?.code === '23503'
+            ) {
+              throw new BadRequestException(
+                `Pricing is already in use and cannot be removed from this product.`,
+              );
+            }
+            throw error;
+          }
         }
       }
 
