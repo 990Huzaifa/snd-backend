@@ -73,15 +73,15 @@ export class SaleOrder {
     @Column({ default: 0 })
     totalAmount: number;
 
-    @Column()
-    schemeId: string | null;
+    @Column({nullable: true})
+    schemeId: string;
 
     @ManyToOne(() => Scheme, { onDelete: 'RESTRICT' })
     @JoinColumn({ name: 'schemeId' })
     scheme: Scheme;
 
     @Column({nullable: true})
-    schemeSlabId: string | null;
+    schemeSlabId: string;
 
     @ManyToOne(() => SchemeSlab, { onDelete: 'RESTRICT' })
     @JoinColumn({ name: 'schemeSlabId' })
