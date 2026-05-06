@@ -23,6 +23,7 @@ import { StockService } from './stock.service';
 import { RefType } from 'src/tenant-db/entities/retailer.entity';
 import { RetailerLedgerService } from './retailer-ledger.service';
 import { ProductSchemeEngineService } from './product-scheme-engine.service';
+import { RetailerSchemeEngineService } from './retailer-scheme-engine.service';
 
 @Injectable()
 export class SaleOrderService {
@@ -31,6 +32,7 @@ export class SaleOrderService {
     private readonly stockService: StockService,
     private readonly retailerLedgerService: RetailerLedgerService,
     private readonly productSchemeEngineService: ProductSchemeEngineService,
+    private readonly retailerSchemeEngineService: RetailerSchemeEngineService,
   ) {}
 
   private normalizePage(value: number): number {
@@ -494,6 +496,19 @@ export class SaleOrderService {
       productId: input.productId,
       productPricingId: input.productPricingId,
       quantity: input.quantity,
+      orderDate: new Date(input.orderDate),
+    });
+  }
+
+  async getEligibleRetailerSchemes(
+    tenantDb: DataSource,
+    input: {
+      retailerId: string;
+      orderDate: string | Date;
+    },
+  ) {
+    return this.retailerSchemeEngineService.listEligibleSchemesForRetailer(tenantDb, {
+      retailerId: input.retailerId,
       orderDate: new Date(input.orderDate),
     });
   }
