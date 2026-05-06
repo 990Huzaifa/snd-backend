@@ -206,6 +206,10 @@ export class UserService {
       cityId: dto.cityId ?? null,
       deviceId: dto.deviceId ?? null,
       fcmToken: dto.fcmToken ?? null,
+      locationTitle: dto.locationTitle?.trim() ?? null,
+      latitude: dto.latitude ?? dto.lat ?? null,
+      longitude: dto.longitude ?? dto.lng ?? null,
+      maxRadius: dto.maxRadius ?? dto.radius ?? null,
       isActive: dto.isActive ?? true,
       isDeleted: false,
     });

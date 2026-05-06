@@ -75,6 +75,8 @@ import { AssetController } from './controller/asset.controller';
 import { AssetService } from './service/asset.service';
 import { SchemeService } from './service/scheme.service';
 import { StockImportService } from './service/stock-import.service';
+import { RetailerSchemeEngineService } from './service/retailer-scheme-engine.service';
+import { ProductSchemeEngineService } from './service/product-scheme-engine.service';
 
 
 @Module({
@@ -160,6 +162,8 @@ import { StockImportService } from './service/stock-import.service';
     AssetService,
     SchemeService,
     StockImportService,
+    RetailerSchemeEngineService,
+    ProductSchemeEngineService,
   ],
 })
 export class TenantModule { }

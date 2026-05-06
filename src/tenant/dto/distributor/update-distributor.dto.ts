@@ -62,4 +62,8 @@ export class UpdateDistributorDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  stockLock?: boolean;
 }

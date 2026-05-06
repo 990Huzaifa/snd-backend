@@ -71,6 +71,9 @@ export class Distributor {
     @Column({ default: false })
     isDeleted: boolean;
 
+    @Column({ default: false })
+    stockLock: boolean;
+
     @OneToMany(() => SalesmanDistributor, (salesmanDistributor) => salesmanDistributor.distributor)
     distributorUsers: SalesmanDistributor[];
 

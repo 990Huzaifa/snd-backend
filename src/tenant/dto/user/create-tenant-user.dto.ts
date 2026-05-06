@@ -73,6 +73,34 @@ export class CreateTenantUserDto {
   fcmToken?: string;
 
   @IsOptional()
+  @IsString()
+  locationTitle?: string;
+
+  @IsOptional()
+  @IsString()
+  latitude?: string;
+
+  @IsOptional()
+  @IsString()
+  longitude?: string;
+
+  @IsOptional()
+  @IsString()
+  maxRadius?: string;
+
+  @IsOptional()
+  @IsString()
+  lat?: string;
+
+  @IsOptional()
+  @IsString()
+  lng?: string;
+
+  @IsOptional()
+  @IsString()
+  radius?: string;
+
+  @IsOptional()
   @IsBoolean()
   isActive?: boolean;
 }

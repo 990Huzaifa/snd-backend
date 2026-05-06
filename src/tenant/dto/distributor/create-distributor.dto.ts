@@ -53,4 +53,8 @@ export class CreateDistributorDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  stockLock?: boolean;
 }

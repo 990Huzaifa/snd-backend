@@ -91,6 +91,7 @@ export class DistributorService {
       longitude: dto.longitude,
       maxRadius: this.normalize(dto.maxRadius) ?? '0.5',
       isActive: dto.isActive ?? true,
+      stockLock: dto.stockLock ?? false,
     });
 
     const createdDistributor = await distributorRepo.save(distributor);
@@ -216,6 +217,7 @@ export class DistributorService {
     if (dto.locationTitle !== undefined) {
       distributor.locationTitle = this.normalize(dto.locationTitle);
     }
+    if (dto.stockLock !== undefined) distributor.stockLock = dto.stockLock;
     if (dto.latitude !== undefined) distributor.latitude = dto.latitude;
     if (dto.longitude !== undefined) distributor.longitude = dto.longitude;
     if (dto.maxRadius !== undefined) distributor.maxRadius = this.normalize(dto.maxRadius);

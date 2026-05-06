@@ -125,6 +125,18 @@ export class User {
     @Column({nullable: true})
     fcmToken: string;
 
+    @Column({ nullable: true })
+    locationTitle: string;
+
+    @Column({ nullable: true })
+    latitude: string;
+
+    @Column({ nullable: true })
+    longitude: string;
+
+    @Column({ nullable: true })
+    maxRadius: string;
+
     @CreateDateColumn()
     createdAt: Date;
 

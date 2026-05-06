@@ -21,6 +21,9 @@ import { TenantConnection } from 'src/common/tenant/tenant-connection.decorator'
 import { CreateSchemeDto } from '../dto/scheme/create-scheme.dto';
 import { UpdateSchemeDto } from '../dto/scheme/update-scheme.dto';
 import { SchemeService } from '../service/scheme.service';
+import { RetailerSchemeEngineService } from '../service/retailer-scheme-engine.service';
+import { ProductSchemeEngineService } from '../service/product-scheme-engine.service';
+import { SaleOrder } from 'src/tenant-db/entities/saleorder.entity';
 
 @Controller('tenant/schemes')
 @UseGuards(
@@ -30,7 +33,11 @@ import { SchemeService } from '../service/scheme.service';
   TenantPermissionGuard,
 )
 export class SchemeController {
-  constructor(private readonly schemeService: SchemeService) {}
+  constructor(
+    private readonly schemeService: SchemeService,
+    private readonly retailerSchemeEngineService: RetailerSchemeEngineService,
+    private readonly productSchemeEngineService: ProductSchemeEngineService,
+  ) {}
 
   @Post('create')
   @RequirePermissions('CREATE_SCHEME')
@@ -95,5 +102,24 @@ export class SchemeController {
     @Req() req: Request,
   ) {
     return this.schemeService.updateStatus(tenantDb, id, status, req.user);
+  }
+
+  @Post('calculate/order/:orderId')
+  @RequirePermissions('VIEW_SCHEME')
+  async calculateOrderSchemes(
+    @TenantConnection() tenantDb: DataSource,
+    @Param('orderId') orderId: string,
+  ) {
+    const orderRef = { id: orderId } as SaleOrder;
+    const [retailerSchemes, productSchemes] = await Promise.all([
+      this.retailerSchemeEngineService.calculateRetailerEligibleSchemes(tenantDb, orderRef),
+      this.productSchemeEngineService.calculateProductEligibleSchemes(tenantDb, orderRef),
+    ]);
+
+    return {
+      orderId,
+      retailerSchemes,
+      productSchemes,
+    };
   }
 }
