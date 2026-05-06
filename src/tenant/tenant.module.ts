@@ -79,6 +79,7 @@ import { StockImportService } from './service/stock-import.service';
 import { RetailerSchemeEngineService } from './service/retailer-scheme-engine.service';
 import { ProductSchemeEngineService } from './service/product-scheme-engine.service';
 import { SaleOrderService } from './service/saleorder.service';
+import { RetailerLedgerService } from './service/retailer-ledger.service';
 
 
 @Module({
@@ -168,6 +169,7 @@ import { SaleOrderService } from './service/saleorder.service';
     RetailerSchemeEngineService,
     ProductSchemeEngineService,
     SaleOrderService,
+    RetailerLedgerService,
   ],
 })
 export class TenantModule { }

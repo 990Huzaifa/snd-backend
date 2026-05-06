@@ -178,6 +178,9 @@ export class RetailerLedger {
     @Column({nullable: true})
     debit: string;
 
+    @Column({ default: '0.00' })
+    currentBalance: string;
+
     @CreateDateColumn()
     createdAt: Date;
 

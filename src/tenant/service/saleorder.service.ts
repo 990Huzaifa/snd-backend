@@ -20,12 +20,15 @@ import { CreateSaleOrderDto } from '../dto/saleorder/create-saleorder.dto';
 import { UpdateSaleOrderDto } from '../dto/saleorder/update-saleorder.dto';
 import { ReferenceType, StockMovementType } from 'src/tenant-db/entities/stock.entity';
 import { StockService } from './stock.service';
+import { RefType } from 'src/tenant-db/entities/retailer.entity';
+import { RetailerLedgerService } from './retailer-ledger.service';
 
 @Injectable()
 export class SaleOrderService {
   constructor(
     private readonly activityLogService: ActivityLogService,
     private readonly stockService: StockService,
+    private readonly retailerLedgerService: RetailerLedgerService,
   ) {}
 
   private normalizePage(value: number): number {
@@ -176,6 +179,12 @@ export class SaleOrderService {
       })),
       type: StockMovementType.OUT,
       referenceType: ReferenceType.SALE,
+    });
+
+    await this.retailerLedgerService.createDebitEntry(manager, {
+      retailerId: order.retailerId,
+      refType: RefType.SALE,
+      amount: Number(order.totalAmount ?? 0),
     });
   }
 
