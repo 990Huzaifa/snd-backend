@@ -95,4 +95,14 @@ export class TenantUtilityController {
     async getMerchandiserUsers(@TenantConnection() tenantDb: DataSource,) {
         return this.utilityService.getMerchandiserUsers(tenantDb);
     }
+
+    @Get('pjps-by-user-id/:userId')
+    async getPJPsByUserId(@TenantConnection() tenantDb: DataSource, @Param('userId') userId: string) {
+        return this.utilityService.getPJPsByUserId(tenantDb, userId);
+    }
+
+    @Get('routes-by-user-id/:userId')
+    async getRoutesByUserId(@TenantConnection() tenantDb: DataSource, @Param('userId') userId: string) {
+        return this.utilityService.getRoutesByUserId(tenantDb, userId);
+    }
 }

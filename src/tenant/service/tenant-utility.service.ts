@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, In } from 'typeorm';
 import { Designation } from 'src/tenant-db/entities/user.entity';
 import { Role } from 'src/tenant-db/entities/role.entity';
 import { Permission } from 'src/tenant-db/entities/permission.entity';
@@ -10,6 +10,7 @@ import { Flavour, Product, ProductBrand, ProductCategory, Uom } from 'src/tenant
 import { RetailerCategory, RetailerChannel } from 'src/tenant-db/entities/retailer.entity';
 import { Route } from 'src/tenant-db/entities/route.entity';
 import { User } from 'src/tenant-db/entities/user.entity';
+import { PJP, PJPStatus } from 'src/tenant-db/entities/pjp.entity';
 
 @Injectable()
 export class TenantUtilityService {
@@ -214,5 +215,27 @@ export class TenantUtilityService {
     });
 
     return { result: routes };
+  }
+
+  async getPJPsByUserId(tenantDb: DataSource, userId: string) {
+    const pjps = await tenantDb.getRepository(PJP).find({
+      where: { salesmanId: userId, status: PJPStatus.ACTIVE },
+      relations: { salesman: true },
+      order: { weekStartDate: 'DESC' },
+    });
+
+    return { result: pjps };
+  }
+
+  async getRoutesByUserId(tenantDb: DataSource, userId: string) {
+    // fetch pjps by user id
+    const pjpsResult = await this.getPJPsByUserId(tenantDb, userId);
+    // fetch routes by pjp ids
+    const routesResult = await tenantDb.getRepository(Route).find({
+      where: { pjpRoutes: { pjpId: In(pjpsResult.result.map((pjp: PJP) => pjp.id)) } },
+      relations: { pjpRoutes: true },
+      order: { name: 'ASC' },
+    });
+    return { result: routesResult };  
   }
 }
