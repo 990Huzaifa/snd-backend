@@ -16,6 +16,7 @@ import { OpeningStock } from './opening-stock.entity';
 import { StockTransfer } from './stock-transfer.entity';
 import { StockBalance, StockMovement } from './stock.entity';
 import { Attendence } from './attendence.entity';
+import { SaleOrder } from './saleorder.entity';
 
 @Entity('distributors')
 export class Distributor {
@@ -106,4 +107,7 @@ export class Distributor {
 
     @OneToMany(() => Attendence, (attendence) => attendence.distributor)
     attendences: Attendence[];
+
+    @OneToMany(() => SaleOrder, (saleOrder) => saleOrder.distributor)
+    saleOrders: SaleOrder[];
 }

@@ -12,6 +12,7 @@ import { Role } from './role.entity';
 import { Notification } from './notification.entity';
 import { Distributor } from './distributor.entity';
 import { Attendence } from './attendence.entity';
+import { SaleOrder } from './saleorder.entity';
 
 
 @Entity('designations')
@@ -145,6 +146,9 @@ export class User {
 
     @OneToMany(() => Attendence, (attendence) => attendence.user)
     attendences: Attendence[];
+
+    @OneToMany(() => SaleOrder, (saleOrder) => saleOrder.salesman)
+    saleOrders: SaleOrder[];
 
 }
 

@@ -2,6 +2,7 @@ import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, OneToMany, Pri
 import { Route } from "./route.entity";
 import { User } from "./user.entity";
 import { SchemeRetailer, SchemeRetailerChannel } from "./scheme.entity";
+import { SaleOrder } from "./saleorder.entity";
 
 @Entity('retailer_categories')
 export class RetailerCategory {
@@ -155,6 +156,9 @@ export class Retailer {
 
     @OneToMany(() => SchemeRetailer, (schemeRetailer) => schemeRetailer.retailer)
     schemes: SchemeRetailer[];
+
+    @OneToMany(() => SaleOrder, (saleOrder) => saleOrder.retailer)
+    saleOrders: SaleOrder[];
 }   
 
 @Entity('retailer_ledgers')
