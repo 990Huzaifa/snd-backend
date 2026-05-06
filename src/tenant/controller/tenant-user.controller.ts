@@ -95,4 +95,10 @@ export class TenantUserController {
     );
   }
 
+  @Post('assign-distributors/:id')
+  @RequirePermissions('UPDATE_USER')
+  assignDistributors(@TenantConnection() tenantDb: DataSource, @Param('id') id: string, @Body() distributorIds: string[], @Req() req: Request) {
+    return this.userService.assignDistributorsToUser(tenantDb, id, distributorIds, req.user);
+  } 
+
 }
