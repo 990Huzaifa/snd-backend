@@ -173,6 +173,7 @@ export class ProductService {
     const skuCode = dto.skuCode.trim();
     const name = dto.name.trim();
     const description = dto.description?.trim() || null;
+    const hsCode = dto.hsCode?.trim() || null;
     const flavourIds = dto.flavourIds.map((id) => id.trim()).filter(Boolean);
 
     await this.ensureCategoryExists(tenantDb, categoryId);
@@ -215,6 +216,7 @@ export class ProductService {
         skuCode,
         name,
         description,
+        hsCode,
         image: productImage,
         isActive: dto.isActive,
         createdBy: user.userId,
@@ -438,6 +440,10 @@ export class ProductService {
 
       if (dto.description !== undefined) {
         product.description = dto.description?.trim() || null;
+      }
+
+      if (dto.hsCode !== undefined) {
+        product.hsCode = dto.hsCode?.trim() || null;
       }
 
       const assetRepo = manager.getRepository(Asset);

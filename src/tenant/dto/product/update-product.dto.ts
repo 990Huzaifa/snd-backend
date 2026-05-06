@@ -41,6 +41,10 @@ export class UpdateProductDto {
   description?: string;
 
   @IsOptional()
+  @IsString()
+  hsCode?: string;
+
+  @IsOptional()
   @IsUUID()
   brandId?: string | null;
 

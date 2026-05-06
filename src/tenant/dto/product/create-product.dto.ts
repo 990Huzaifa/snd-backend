@@ -41,6 +41,10 @@ export class CreateProductDto {
   description?: string;
 
   @IsOptional()
+  @IsString()
+  hsCode?: string;
+
+  @IsOptional()
   @IsUUID()
   brandId?: string;
 
