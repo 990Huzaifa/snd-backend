@@ -108,4 +108,17 @@ export class RetailerController {
   ) {
     return this.retailerService.updateStatus(tenantDb, id, dto.status, req.user);
   }
+
+
+  @Get('ledger/:id')
+  @RequirePermissions('VIEW_RETAILER')
+  getLedger(
+    @TenantConnection() tenantDb: DataSource,
+    @Param('id') id: string,
+    @Req() req: Request,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.retailerService.getLedger(tenantDb, id, req.user, startDate, endDate);
+  }
 }

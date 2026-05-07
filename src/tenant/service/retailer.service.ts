@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Brackets, DataSource, EntityManager } from 'typeorm';
+import { Between, Brackets, DataSource, EntityManager } from 'typeorm';
 import { Asset, AssetStatus } from 'src/tenant-db/entities/asset.entity';
 import {
   Retailer,
@@ -13,6 +13,7 @@ import {
   RetailerClass,
   RefType,
   Status,
+  RetailerLedger,
 } from 'src/tenant-db/entities/retailer.entity';
 import { Route } from 'src/tenant-db/entities/route.entity';
 import { User } from 'src/tenant-db/entities/user.entity';
@@ -515,6 +516,30 @@ export class RetailerService {
         shopName: retailer.shopName,
         status: retailer.status,
       },
+    };
+  }
+
+  async getLedger(tenantDb: DataSource, id: string, user: any, startDate?: string, endDate?: string) {
+    const retailer = await tenantDb.getRepository(Retailer).findOne({ where: { id } });
+    if (!retailer) {
+      throw new NotFoundException('Retailer not found');
+    }
+    const ledger = await tenantDb.getRepository(RetailerLedger).find({ where: { retailerId: id, createdAt: Between(new Date(startDate), new Date(endDate)) } });
+    const totalDebit = ledger.reduce((acc, curr) => acc + Number(curr.debit), 0);
+    const totalCredit = ledger.reduce((acc, curr) => acc + Number(curr.credit), 0);
+    const result = await tenantDb.transaction(async (manager) => {
+      const openingBalance = await this.retailerLedgerService.getOpeningBalance(manager, id);
+      const closingBalance = await this.retailerLedgerService.getClosingBalance(manager, id);
+      return {
+        openingBalance,
+        totalDebit,
+        totalCredit,
+        closingBalance
+      };
+    });
+    return {
+      result,
+      ledger
     };
   }
 }

@@ -82,4 +82,28 @@ export class RetailerLedgerService {
   ) {
     return this.postEntry(manager, { ...input, entryType: 'CREDIT' });
   }
+
+  async getOpeningBalance(
+    manager: EntityManager,
+    retailerId: string,
+  ): Promise<number> {
+    const lastEntry = await manager.getRepository(RetailerLedger).findOne({
+      where: { retailerId, refType: RefType.OPENING_BALANCE },
+      order: { createdAt: 'DESC' },
+      select: ['id', 'credit','createdAt'],
+    });
+    return this.parseAmount(lastEntry?.credit);
+  }
+
+  async getClosingBalance(
+    manager: EntityManager,
+    retailerId: string,
+  ): Promise<number> {
+    const lastEntry = await manager.getRepository(RetailerLedger).findOne({
+      where: { retailerId },
+      order: { createdAt: 'ASC' },
+      select: ['id', 'currentBalance','createdAt'],
+    });
+    return this.parseAmount(lastEntry?.currentBalance);
+  }
 }
