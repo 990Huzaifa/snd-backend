@@ -13,6 +13,7 @@ import { Notification } from './notification.entity';
 import { Distributor } from './distributor.entity';
 import { Attendence } from './attendence.entity';
 import { SaleOrder } from './saleorder.entity';
+import { SaleVoucher } from './sale-voucher.entity';
 
 
 @Entity('designations')
@@ -150,6 +151,14 @@ export class User {
     @OneToMany(() => SaleOrder, (saleOrder) => saleOrder.salesman)
     saleOrders: SaleOrder[];
 
+    @OneToMany(() => SaleVoucher, (saleVoucher) => saleVoucher.executedByUser)
+    executedSaleVouchers: SaleVoucher[];
+
+    @OneToMany(() => SaleVoucher, (saleVoucher) => saleVoucher.createdByUser)
+    createdSaleVouchers: SaleVoucher[];
+
+    @OneToMany(() => SaleOrder, (saleOrder) => saleOrder.executedByUser)
+    executedSaleOrders: SaleOrder[];
 }
 
 @Entity('salesman_distributors')

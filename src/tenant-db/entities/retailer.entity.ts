@@ -3,6 +3,7 @@ import { Route } from "./route.entity";
 import { User } from "./user.entity";
 import { SchemeRetailer, SchemeRetailerChannel } from "./scheme.entity";
 import { SaleOrder } from "./saleorder.entity";
+import { SaleVoucher } from "./sale-voucher.entity";
 
 @Entity('retailer_categories')
 export class RetailerCategory {
@@ -160,6 +161,9 @@ export class Retailer {
 
     @OneToMany(() => SaleOrder, (saleOrder) => saleOrder.retailer)
     saleOrders: SaleOrder[];
+
+    @OneToMany(() => SaleVoucher, (saleVoucher) => saleVoucher.retailer)
+    saleVouchers: SaleVoucher[];
 }   
 
 @Entity('retailer_ledgers')
