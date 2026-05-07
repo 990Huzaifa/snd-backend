@@ -209,7 +209,7 @@ export class RetailerService {
 
       // create a retailer ledger with the opening balance if opening balance is provided
       if (dto.openingBalance && Number(dto.openingBalance) > 0) {
-        await this.retailerLedgerService.createCreditEntry(manager, {
+        await this.retailerLedgerService.createDebitEntry(manager, {
           retailerId: savedRetailer.id,
           refType: RefType.OPENING_BALANCE,
           amount: dto.openingBalance,
@@ -524,7 +524,11 @@ export class RetailerService {
     if (!retailer) {
       throw new NotFoundException('Retailer not found');
     }
-    const ledger = await tenantDb.getRepository(RetailerLedger).find({ where: { retailerId: id, createdAt: Between(new Date(startDate), new Date(endDate)) } });
+    const whereCondition: any = { retailerId: id };
+    if (startDate && endDate) {
+      whereCondition.createdAt = Between(new Date(startDate), new Date(endDate));
+    }
+    const ledger = await tenantDb.getRepository(RetailerLedger).find({ where: whereCondition });
     const totalDebit = ledger.reduce((acc, curr) => acc + Number(curr.debit), 0);
     const totalCredit = ledger.reduce((acc, curr) => acc + Number(curr.credit), 0);
     const result = await tenantDb.transaction(async (manager) => {
