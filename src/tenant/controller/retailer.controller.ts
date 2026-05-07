@@ -16,7 +16,10 @@ import { TenantPermissionGuard } from 'src/auth/tenant-permission.guard';
 import { RequirePermissions } from 'src/auth/require-permission.decorator';
 import { TenantConnectionGuard } from 'src/common/guards/tenant-connection.guard';
 import { TenantJwtGuard } from 'src/common/guards/tenant-jwt.guard';
-import { TenantConnection } from 'src/common/tenant/tenant-connection.decorator';
+import {
+  TenantCode,
+  TenantConnection,
+} from 'src/common/tenant/tenant-connection.decorator';
 import { RetailerService } from '../service/retailer.service';
 import { CreateRetailerDto } from '../dto/retailer/create-retailer.dto';
 import { UpdateRetailerDto } from '../dto/retailer/update-retailer.dto';
@@ -38,8 +41,9 @@ export class RetailerController {
     @TenantConnection() tenantDb: DataSource,
     @Body() dto: CreateRetailerDto,
     @Req() req: Request,
+    @TenantCode() tenantCode: string,
   ) {
-    return this.retailerService.create(tenantDb, dto, req.user);
+    return this.retailerService.create(tenantDb, tenantCode, dto, req.user);
   }
 
   @Get()
@@ -89,8 +93,9 @@ export class RetailerController {
     @Param('id') id: string,
     @Body() dto: UpdateRetailerDto,
     @Req() req: Request,
+    @TenantCode() tenantCode: string,
   ) {
-    return this.retailerService.edit(tenantDb, id, dto, req.user);
+    return this.retailerService.edit(tenantDb, tenantCode, id, dto, req.user);
   }
 
   @Put('update/:id/status')

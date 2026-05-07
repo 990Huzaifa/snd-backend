@@ -1,4 +1,5 @@
 import {
+  IsArray,
   IsEmail,
   IsEnum,
   IsOptional,
@@ -17,6 +18,11 @@ export class CreateRetailerDto {
   @IsOptional()
   @IsString()
   image?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsUUID('4', { each: true })
+  assetIds?: string[];
 
   @IsOptional()
   @IsString()

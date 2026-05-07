@@ -1,8 +1,11 @@
 import {
+  BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Brackets, DataSource } from 'typeorm';
+import { Brackets, DataSource, EntityManager } from 'typeorm';
+import { Asset, AssetStatus } from 'src/tenant-db/entities/asset.entity';
 import {
   Retailer,
   RetailerCategory,
@@ -15,10 +18,19 @@ import { User } from 'src/tenant-db/entities/user.entity';
 import { ActivityLogService } from './activity-log.service';
 import { CreateRetailerDto } from '../dto/retailer/create-retailer.dto';
 import { UpdateRetailerDto } from '../dto/retailer/update-retailer.dto';
+import {
+  ASSET_RULES,
+  AssetEntityType,
+  AssetPurpose,
+} from '../config/asset-rules.config';
+import { S3Service } from 'src/common/s3/s3.service';
 
 @Injectable()
 export class RetailerService {
-  constructor(private readonly activityLogService: ActivityLogService) {}
+  constructor(
+    private readonly activityLogService: ActivityLogService,
+    private readonly s3Service: S3Service,
+  ) {}
 
   private normalize(value: string) {
     return value.trim();
@@ -30,6 +42,58 @@ export class RetailerService {
     }
     const t = value.trim();
     return t === '' ? undefined : t;
+  }
+
+  private dedupeAssetIdsPreserveOrder(ids: string[]): string[] {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const id of ids) {
+      if (!seen.has(id)) {
+        seen.add(id);
+        out.push(id);
+      }
+    }
+    return out;
+  }
+
+  private async collectApprovedRetailerImageUrls(
+    manager: EntityManager,
+    tenantCode: string,
+    assetIds: string[],
+    user: { userId: string },
+  ): Promise<string[]> {
+    const assetRepo = manager.getRepository(Asset);
+    const urls: string[] = [];
+
+    for (const assetId of assetIds) {
+      const asset = await assetRepo.findOne({ where: { id: assetId } });
+      if (!asset) {
+        throw new NotFoundException(`Asset ${assetId} not found`);
+      }
+      if (asset.uploadedById !== user.userId) {
+        throw new ForbiddenException(`Not allowed to use asset ${assetId}`);
+      }
+      if (asset.status !== AssetStatus.APPROVED) {
+        throw new BadRequestException(
+          `Asset ${assetId} must be confirmed (APPROVED) before attaching to a retailer`,
+        );
+      }
+      if (asset.purpose !== AssetPurpose.RETAILER_IMAGE) {
+        throw new BadRequestException(`Asset ${assetId} is not a retailer image`);
+      }
+      if (asset.entityId != null || asset.attachedAt != null) {
+        throw new BadRequestException(`Asset ${assetId} is already linked to an entity`);
+      }
+      const retailerImageRules = ASSET_RULES[AssetPurpose.RETAILER_IMAGE];
+      const tempPrefix = `tenants/${tenantCode}/temp/uploads/${asset.id}.`;
+      const finalPrefix = `tenants/${tenantCode}/${retailerImageRules.folder}/${asset.id}.`;
+      if (!asset.s3Key.startsWith(tempPrefix) && !asset.s3Key.startsWith(finalPrefix)) {
+        throw new BadRequestException(`Asset ${assetId} has an unexpected storage key`);
+      }
+      urls.push(this.s3Service.getObjectUrl(asset.s3Key));
+    }
+
+    return urls;
   }
 
   private parsePageLimit(page: number, limit: number) {
@@ -48,10 +112,14 @@ export class RetailerService {
     }
   }
 
-  async create(tenantDb: DataSource, dto: CreateRetailerDto, user: any) {
+  async create(
+    tenantDb: DataSource,
+    tenantCode: string,
+    dto: CreateRetailerDto,
+    user: any,
+  ) {
     await this.ensureUser(tenantDb, user.userId, 'User');
 
-    const retailerRepo = tenantDb.getRepository(Retailer);
     const route = await tenantDb.getRepository(Route).findOne({
       where: { id: dto.routeId },
     });
@@ -70,35 +138,73 @@ export class RetailerService {
     if (!channel) {
       throw new NotFoundException('Retailer channel not found');
     }
-  //if status is pending, then approvedBy is null else approvedBy is the user id
+    //if status is pending, then approvedBy is null else approvedBy is the user id
     const approvedBy = dto.status === Status.PENDING ? null : user.userId;
+    const uniqueAssetIds = dto.assetIds?.length
+      ? this.dedupeAssetIdsPreserveOrder(
+          dto.assetIds.map((id) => id.trim()).filter(Boolean),
+        )
+      : [];
 
-    const retailer = retailerRepo.create({
-      shopName: this.normalize(dto.shopName),
-      ownerName: this.normalize(dto.ownerName),
-      image: this.normalizeOptional(dto.image) ?? null,
-      Phone: this.normalizeOptional(dto.Phone) ?? null,
-      Email: dto.Email !== undefined && dto.Email !== null
-        ? this.normalize(dto.Email).toLowerCase()
-        : null,
-      CNIC: this.normalizeOptional(dto.CNIC) ?? null,
-      STRN: this.normalizeOptional(dto.STRN) ?? null,
-      NTN: this.normalizeOptional(dto.NTN) ?? null,
-      Address: this.normalize(dto.Address),
-      latitude: this.normalize(dto.latitude),
-      longitude: this.normalize(dto.longitude),
-      maxRadius: this.normalize(dto.maxRadius),
-      creditLimit: this.normalize(dto.creditLimit),
-      class: dto.class,
-      status: dto.status ?? Status.PENDING,
-      createdBy: user.userId,
-      approvedBy: approvedBy,
-      routeId: dto.routeId,
-      retailerCategoryId: dto.retailerCategoryId,
-      retailerChannelId: dto.retailerChannelId,
+    const created = await tenantDb.transaction(async (manager) => {
+      const retailerRepo = manager.getRepository(Retailer);
+      const assetRepo = manager.getRepository(Asset);
+
+      let retailerImage = this.normalizeOptional(dto.image) ?? null;
+      if (uniqueAssetIds.length) {
+        const urls = await this.collectApprovedRetailerImageUrls(
+          manager,
+          tenantCode,
+          uniqueAssetIds,
+          user,
+        );
+        retailerImage = urls.join(',');
+      }
+
+      const retailer = retailerRepo.create({
+        shopName: this.normalize(dto.shopName),
+        ownerName: this.normalize(dto.ownerName),
+        image: retailerImage,
+        Phone: this.normalizeOptional(dto.Phone) ?? null,
+        Email:
+          dto.Email !== undefined && dto.Email !== null
+            ? this.normalize(dto.Email).toLowerCase()
+            : null,
+        CNIC: this.normalizeOptional(dto.CNIC) ?? null,
+        STRN: this.normalizeOptional(dto.STRN) ?? null,
+        NTN: this.normalizeOptional(dto.NTN) ?? null,
+        Address: this.normalize(dto.Address),
+        latitude: this.normalize(dto.latitude),
+        longitude: this.normalize(dto.longitude),
+        maxRadius: this.normalize(dto.maxRadius),
+        creditLimit: this.normalize(dto.creditLimit),
+        class: dto.class,
+        status: dto.status ?? Status.PENDING,
+        createdBy: user.userId,
+        approvedBy: approvedBy,
+        routeId: dto.routeId,
+        retailerCategoryId: dto.retailerCategoryId,
+        retailerChannelId: dto.retailerChannelId,
+      });
+
+      const savedRetailer = await retailerRepo.save(retailer);
+
+      if (uniqueAssetIds.length) {
+        const now = new Date();
+        for (const assetId of uniqueAssetIds) {
+          await assetRepo.update(
+            { id: assetId },
+            {
+              entityType: AssetEntityType.RETAILER,
+              entityId: savedRetailer.id,
+              attachedAt: now,
+            },
+          );
+        }
+      }
+
+      return savedRetailer;
     });
-
-    const created = await retailerRepo.save(retailer);
 
     await this.activityLogService.recordActivityLog(tenantDb, {
       actorId: user.userId,
@@ -232,82 +338,145 @@ export class RetailerService {
     return retailer;
   }
 
-  async edit(tenantDb: DataSource, id: string, dto: UpdateRetailerDto, user: any) {
-    const retailerRepo = tenantDb.getRepository(Retailer);
-    const retailer = await retailerRepo.findOne({ where: { id } });
-    if (!retailer) {
-      throw new NotFoundException('Retailer not found');
-    }
-
-    if (dto.routeId !== undefined) {
-      const route = await tenantDb.getRepository(Route).findOne({
-        where: { id: dto.routeId },
-      });
-      if (!route) {
-        throw new NotFoundException('Route not found');
+  async edit(
+    tenantDb: DataSource,
+    tenantCode: string,
+    id: string,
+    dto: UpdateRetailerDto,
+    user: any,
+  ) {
+    const updatedRetailer = await tenantDb.transaction(async (manager) => {
+      const retailerRepo = manager.getRepository(Retailer);
+      const assetRepo = manager.getRepository(Asset);
+      const retailer = await retailerRepo.findOne({ where: { id } });
+      if (!retailer) {
+        throw new NotFoundException('Retailer not found');
       }
-      retailer.routeId = dto.routeId;
-    }
-    if (dto.retailerCategoryId !== undefined) {
-      const category = await tenantDb.getRepository(RetailerCategory).findOne({
-        where: { id: dto.retailerCategoryId },
-      });
-      if (!category) {
-        throw new NotFoundException('Retailer category not found');
-      }
-      retailer.retailerCategoryId = dto.retailerCategoryId;
-    }
-    if (dto.retailerChannelId !== undefined) {
-      const channel = await tenantDb.getRepository(RetailerChannel).findOne({
-        where: { id: dto.retailerChannelId },
-      });
-      if (!channel) {
-        throw new NotFoundException('Retailer channel not found');
-      }
-      retailer.retailerChannelId = dto.retailerChannelId;
-    }
-    if (dto.approvedBy !== undefined) {
-      await this.ensureUser(tenantDb, dto.approvedBy, 'Approver user');
-      retailer.approvedBy = dto.approvedBy;
-    }
 
-    if (dto.shopName !== undefined) retailer.shopName = this.normalize(dto.shopName);
-    if (dto.ownerName !== undefined) retailer.ownerName = this.normalize(dto.ownerName);
-    if (dto.image !== undefined) {
-      retailer.image = this.normalizeOptional(dto.image) ?? null;
-    }
-    if (dto.Phone !== undefined) {
-      retailer.Phone = this.normalizeOptional(dto.Phone) ?? null;
-    }
-    if (dto.Email !== undefined) {
-      retailer.Email =
-        dto.Email === null || dto.Email === ''
-          ? null
-          : this.normalize(dto.Email).toLowerCase();
-    }
-    if (dto.CNIC !== undefined) retailer.CNIC = this.normalizeOptional(dto.CNIC) ?? null;
-    if (dto.STRN !== undefined) retailer.STRN = this.normalizeOptional(dto.STRN) ?? null;
-    if (dto.NTN !== undefined) retailer.NTN = this.normalizeOptional(dto.NTN) ?? null;
-    if (dto.Address !== undefined) retailer.Address = this.normalize(dto.Address);
-    if (dto.latitude !== undefined) retailer.latitude = this.normalize(dto.latitude);
-    if (dto.longitude !== undefined) retailer.longitude = this.normalize(dto.longitude);
-    if (dto.maxRadius !== undefined) retailer.maxRadius = this.normalize(dto.maxRadius);
-    if (dto.creditLimit !== undefined) {
-      retailer.creditLimit = this.normalize(dto.creditLimit);
-    }
-    if (dto.class !== undefined) retailer.class = dto.class;
-    if (dto.status !== undefined) retailer.status = dto.status;
+      if (dto.routeId !== undefined) {
+        const route = await tenantDb.getRepository(Route).findOne({
+          where: { id: dto.routeId },
+        });
+        if (!route) {
+          throw new NotFoundException('Route not found');
+        }
+        retailer.routeId = dto.routeId;
+      }
+      if (dto.retailerCategoryId !== undefined) {
+        const category = await tenantDb.getRepository(RetailerCategory).findOne({
+          where: { id: dto.retailerCategoryId },
+        });
+        if (!category) {
+          throw new NotFoundException('Retailer category not found');
+        }
+        retailer.retailerCategoryId = dto.retailerCategoryId;
+      }
+      if (dto.retailerChannelId !== undefined) {
+        const channel = await tenantDb.getRepository(RetailerChannel).findOne({
+          where: { id: dto.retailerChannelId },
+        });
+        if (!channel) {
+          throw new NotFoundException('Retailer channel not found');
+        }
+        retailer.retailerChannelId = dto.retailerChannelId;
+      }
+      if (dto.approvedBy !== undefined) {
+        await this.ensureUser(tenantDb, dto.approvedBy, 'Approver user');
+        retailer.approvedBy = dto.approvedBy;
+      }
 
-    await retailerRepo.save(retailer);
+      if (dto.shopName !== undefined) retailer.shopName = this.normalize(dto.shopName);
+      if (dto.ownerName !== undefined) retailer.ownerName = this.normalize(dto.ownerName);
+      if (dto.assetIds !== undefined) {
+        await assetRepo.update(
+          {
+            entityType: AssetEntityType.RETAILER,
+            entityId: retailer.id,
+            purpose: AssetPurpose.RETAILER_IMAGE,
+          },
+          {
+            entityType: null,
+            entityId: null,
+            attachedAt: null,
+          },
+        );
+
+        const uniqueAssetIds = dto.assetIds.length
+          ? this.dedupeAssetIdsPreserveOrder(
+              dto.assetIds.map((aid) => aid.trim()).filter(Boolean),
+            )
+          : [];
+
+        if (uniqueAssetIds.length) {
+          const urls = await this.collectApprovedRetailerImageUrls(
+            manager,
+            tenantCode,
+            uniqueAssetIds,
+            user,
+          );
+          retailer.image = urls.join(',');
+        } else {
+          retailer.image = this.normalizeOptional(dto.image) ?? null;
+        }
+      } else if (dto.image !== undefined) {
+        retailer.image = this.normalizeOptional(dto.image) ?? null;
+      }
+      if (dto.Phone !== undefined) {
+        retailer.Phone = this.normalizeOptional(dto.Phone) ?? null;
+      }
+      if (dto.Email !== undefined) {
+        retailer.Email =
+          dto.Email === null || dto.Email === ''
+            ? null
+            : this.normalize(dto.Email).toLowerCase();
+      }
+      if (dto.CNIC !== undefined) retailer.CNIC = this.normalizeOptional(dto.CNIC) ?? null;
+      if (dto.STRN !== undefined) retailer.STRN = this.normalizeOptional(dto.STRN) ?? null;
+      if (dto.NTN !== undefined) retailer.NTN = this.normalizeOptional(dto.NTN) ?? null;
+      if (dto.Address !== undefined) retailer.Address = this.normalize(dto.Address);
+      if (dto.latitude !== undefined) retailer.latitude = this.normalize(dto.latitude);
+      if (dto.longitude !== undefined) retailer.longitude = this.normalize(dto.longitude);
+      if (dto.maxRadius !== undefined) retailer.maxRadius = this.normalize(dto.maxRadius);
+      if (dto.creditLimit !== undefined) {
+        retailer.creditLimit = this.normalize(dto.creditLimit);
+      }
+      if (dto.class !== undefined) retailer.class = dto.class;
+      if (dto.status !== undefined) retailer.status = dto.status;
+
+      await retailerRepo.save(retailer);
+
+      if (dto.assetIds !== undefined) {
+        const uniqueAssetIds = dto.assetIds.length
+          ? this.dedupeAssetIdsPreserveOrder(
+              dto.assetIds.map((aid) => aid.trim()).filter(Boolean),
+            )
+          : [];
+        if (uniqueAssetIds.length) {
+          const now = new Date();
+          for (const assetId of uniqueAssetIds) {
+            await assetRepo.update(
+              { id: assetId },
+              {
+                entityType: AssetEntityType.RETAILER,
+                entityId: retailer.id,
+                attachedAt: now,
+              },
+            );
+          }
+        }
+      }
+
+      return retailer;
+    });
 
     await this.activityLogService.recordActivityLog(tenantDb, {
       actorId: user.userId,
       action: 'RETAILER_UPDATED',
-      description: `Retailer ${retailer.shopName} updated`,
-      metadata: { retailerId: retailer.id },
+      description: `Retailer ${updatedRetailer.shopName} updated`,
+      metadata: { retailerId: updatedRetailer.id },
     });
 
-    return retailer;
+    return updatedRetailer;
   }
 
   async updateStatus(tenantDb: DataSource, id: string, status: Status, user: any) {
