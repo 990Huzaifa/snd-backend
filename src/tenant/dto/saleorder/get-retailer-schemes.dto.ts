@@ -1,4 +1,4 @@
-import { IsDateString, IsUUID } from 'class-validator';
+import { IsDateString, IsNumber, IsUUID, Min } from 'class-validator';
 
 export class GetRetailerSchemesDto {
   @IsUUID()
@@ -6,4 +6,8 @@ export class GetRetailerSchemesDto {
 
   @IsDateString()
   orderDate: string;
+
+  @IsNumber()
+  @Min(0)
+  orderTotal: number;
 }

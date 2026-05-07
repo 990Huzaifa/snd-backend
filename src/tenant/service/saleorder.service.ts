@@ -505,11 +505,13 @@ export class SaleOrderService {
     input: {
       retailerId: string;
       orderDate: string | Date;
+      orderTotal: number;
     },
   ) {
     return this.retailerSchemeEngineService.listEligibleSchemesForRetailer(tenantDb, {
       retailerId: input.retailerId,
       orderDate: new Date(input.orderDate),
+      orderTotal: input.orderTotal,
     });
   }
 }

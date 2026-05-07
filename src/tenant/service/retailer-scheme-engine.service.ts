@@ -32,11 +32,16 @@ export interface RetailerSchemeListResult {
 export class RetailerSchemeEngineService {
   async listEligibleSchemesForRetailer(
     tenantDb: DataSource,
-    input: { retailerId: string; orderDate: Date },
-  ): Promise<RetailerSchemeListResult[]> {
+    input: { retailerId: string; orderDate: Date; orderTotal: number },
+  ): Promise<RetailerSchemeResult[]> {
     const orderDate = new Date(input.orderDate);
     if (Number.isNaN(orderDate.getTime())) {
       throw new BadRequestException('Invalid orderDate');
+    }
+
+    const eligibleAmount = Number(input.orderTotal ?? 0);
+    if (!Number.isFinite(eligibleAmount) || eligibleAmount <= 0) {
+      return [];
     }
 
     const retailer = await tenantDb.getRepository(Retailer).findOne({
@@ -52,18 +57,42 @@ export class RetailerSchemeEngineService {
       return [];
     }
 
-    return schemes
-      .filter((scheme) => this.checkRetailerEligibility(scheme, retailer.id))
-      .filter((scheme) => this.checkRetailerChannelEligibility(scheme, retailer.retailerChannelId))
-      .map((scheme) => ({
+    const results: RetailerSchemeResult[] = [];
+    for (const scheme of schemes) {
+      if (!this.checkRetailerEligibility(scheme, retailer.id)) {
+        continue;
+      }
+
+      if (!this.checkRetailerChannelEligibility(scheme, retailer.retailerChannelId)) {
+        continue;
+      }
+
+      const matchedSlab = this.matchHighestAmountSlab(scheme.slabs, eligibleAmount);
+      if (!matchedSlab) {
+        continue;
+      }
+
+      const calculatedBenefitAmount = this.calculateBenefit(
+        scheme.benefitType,
+        matchedSlab.benefitValue,
+        eligibleAmount,
+      );
+
+      results.push({
         schemeId: scheme.id,
         schemeName: scheme.name,
         schemeType: scheme.schemeType,
-        benefitType: scheme.benefitType,
         retailerId: retailer.id,
-        retailerChannelId: retailer.retailerChannelId,
-        slabs: scheme.slabs ?? [],
-      }));
+        eligibleAmount,
+        matchedSlabId: matchedSlab.id,
+        benefitType: scheme.benefitType,
+        benefitValue: matchedSlab.benefitValue,
+        calculatedBenefitAmount,
+        status: 'CALCULATED',
+      });
+    }
+
+    return results;
   }
 
   async calculateRetailerEligibleSchemes(
