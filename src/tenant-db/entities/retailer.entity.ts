@@ -59,6 +59,7 @@ export enum RefType {
     SALE = 'SALE',
     RETURN = 'RETURN',
     PAYMENT = 'PAYMENT',
+    OPENING_BALANCE = 'OPENING_BALANCE',
 }
 
 @Entity('retailers')

@@ -11,6 +11,7 @@ import {
   RetailerCategory,
   RetailerChannel,
   RetailerClass,
+  RefType,
   Status,
 } from 'src/tenant-db/entities/retailer.entity';
 import { Route } from 'src/tenant-db/entities/route.entity';
@@ -24,12 +25,14 @@ import {
   AssetPurpose,
 } from '../config/asset-rules.config';
 import { S3Service } from 'src/common/s3/s3.service';
+import { RetailerLedgerService } from './retailer-ledger.service';
 
 @Injectable()
 export class RetailerService {
   constructor(
     private readonly activityLogService: ActivityLogService,
     private readonly s3Service: S3Service,
+    private readonly retailerLedgerService: RetailerLedgerService,
   ) {}
 
   private normalize(value: string) {
@@ -203,8 +206,18 @@ export class RetailerService {
         }
       }
 
+      // create a retailer ledger with the opening balance if opening balance is provided
+      if (dto.openingBalance && Number(dto.openingBalance) > 0) {
+        await this.retailerLedgerService.createCreditEntry(manager, {
+          retailerId: savedRetailer.id,
+          refType: RefType.OPENING_BALANCE,
+          amount: dto.openingBalance,
+        });
+      }
+
       return savedRetailer;
     });
+
 
     await this.activityLogService.recordActivityLog(tenantDb, {
       actorId: user.userId,

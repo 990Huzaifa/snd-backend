@@ -2,9 +2,11 @@ import {
   IsArray,
   IsEmail,
   IsEnum,
+  IsNumber,
   IsOptional,
   IsString,
   IsUUID,
+  Min,
 } from 'class-validator';
 import { RetailerClass, Status } from 'src/tenant-db/entities/retailer.entity';
 
@@ -78,4 +80,9 @@ export class CreateRetailerDto {
   @IsOptional()
   @IsUUID()
   approvedBy?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  openingBalance?: number;
 }
