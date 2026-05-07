@@ -1,8 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import { ProductPricing } from 'src/tenant-db/entities/product.entity';
 import { Retailer } from 'src/tenant-db/entities/retailer.entity';
-import { OrderStatus, SaleOrder, SaleOrderItem } from 'src/tenant-db/entities/saleorder.entity';
+import { SaleOrder, SaleOrderItem } from 'src/tenant-db/entities/saleorder.entity';
 import { BenefitType, Scheme, SchemeSlab, SchemeType } from 'src/tenant-db/entities/scheme.entity';
 
 export interface RetailerSchemeResult {
@@ -25,6 +24,10 @@ export interface RetailerSchemeListResult {
   benefitType: BenefitType;
   retailerId: string;
   retailerChannelId: string;
+  eligibleAmount: number;
+  matchedSlabId: string;
+  benefitValue: string;
+  calculatedBenefitAmount: number;
   slabs: SchemeSlab[];
 }
 
@@ -33,7 +36,7 @@ export class RetailerSchemeEngineService {
   async listEligibleSchemesForRetailer(
     tenantDb: DataSource,
     input: { retailerId: string; orderDate: Date; orderTotal: number },
-  ): Promise<RetailerSchemeResult[]> {
+  ): Promise<RetailerSchemeListResult[]> {
     const orderDate = new Date(input.orderDate);
     if (Number.isNaN(orderDate.getTime())) {
       throw new BadRequestException('Invalid orderDate');
@@ -57,13 +60,9 @@ export class RetailerSchemeEngineService {
       return [];
     }
 
-    const results: RetailerSchemeResult[] = [];
+    const results: RetailerSchemeListResult[] = [];
     for (const scheme of schemes) {
-      if (!this.checkRetailerEligibility(scheme, retailer.id)) {
-        continue;
-      }
-
-      if (!this.checkRetailerChannelEligibility(scheme, retailer.retailerChannelId)) {
+      if (!this.isRetailerEligibleWithChannelPriority(scheme, retailer.id, retailer.retailerChannelId)) {
         continue;
       }
 
@@ -82,13 +81,14 @@ export class RetailerSchemeEngineService {
         schemeId: scheme.id,
         schemeName: scheme.name,
         schemeType: scheme.schemeType,
+        benefitType: scheme.benefitType,
         retailerId: retailer.id,
+        retailerChannelId: retailer.retailerChannelId,
         eligibleAmount,
         matchedSlabId: matchedSlab.id,
-        benefitType: scheme.benefitType,
         benefitValue: matchedSlab.benefitValue,
         calculatedBenefitAmount,
-        status: 'CALCULATED',
+        slabs: scheme.slabs ?? [],
       });
     }
 
@@ -122,11 +122,7 @@ export class RetailerSchemeEngineService {
 
     const results: RetailerSchemeResult[] = [];
     for (const scheme of schemes) {
-      if (!this.checkRetailerEligibility(scheme, retailer.id)) {
-        continue;
-      }
-
-      if (!this.checkRetailerChannelEligibility(scheme, retailer.retailerChannelId)) {
+      if (!this.isRetailerEligibleWithChannelPriority(scheme, retailer.id, retailer.retailerChannelId)) {
         continue;
       }
 
@@ -165,7 +161,13 @@ export class RetailerSchemeEngineService {
         isDeleted: false,
         schemeType: SchemeType.AMOUNT_BASED,
       },
-      relations: ['slabs', 'retailers', 'retailers.retailer', 'retailerChannels'],
+      relations: [
+        'slabs',
+        'retailers',
+        'retailers.retailer',
+        'retailerChannels',
+        'retailerChannels.retailerChannel',
+      ],
     }).then((schemes) =>
       schemes.filter(
         (scheme) =>
@@ -195,6 +197,18 @@ export class RetailerSchemeEngineService {
     return targetedChannels.some(
       (schemeChannel) => schemeChannel.retailerChannel?.id === retailerChannelId,
     );
+  }
+
+  isRetailerEligibleWithChannelPriority(
+    scheme: Scheme,
+    retailerId: string,
+    retailerChannelId: string,
+  ): boolean {
+    if (this.checkRetailerChannelEligibility(scheme, retailerChannelId)) {
+      return true;
+    }
+
+    return this.checkRetailerEligibility(scheme, retailerId);
   }
 
   calculateEligibleOrderAmount(items: SaleOrderItem[]): number {
@@ -263,18 +277,6 @@ export class RetailerSchemeEngineService {
     }
 
     return foundOrder;
-  }
-
-  private assertSubmittedOrder(order: SaleOrder): void {
-    if ((order.orderStatus as unknown as string) === 'SUBMITTED') {
-      return;
-    }
-
-    if (order.orderStatus === OrderStatus.APPROVED) {
-      return;
-    }
-
-    throw new BadRequestException('Only submitted orders are eligible for retailer schemes');
   }
 
   private getSlabMinAmount(slab: SchemeSlab): number {
