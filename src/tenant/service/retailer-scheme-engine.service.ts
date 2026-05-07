@@ -204,11 +204,26 @@ export class RetailerSchemeEngineService {
     retailerId: string,
     retailerChannelId: string,
   ): boolean {
-    if (this.checkRetailerChannelEligibility(scheme, retailerChannelId)) {
+    const targetedChannels = scheme.retailerChannels ?? [];
+    const targetedRetailers = scheme.retailers ?? [];
+
+    const hasChannelTargets = targetedChannels.length > 0;
+    const hasRetailerTargets = targetedRetailers.length > 0;
+
+    // A retailer scheme must target at least one retailer or channel.
+    if (!hasChannelTargets && !hasRetailerTargets) {
+      return false;
+    }
+
+    if (hasChannelTargets && this.checkRetailerChannelEligibility(scheme, retailerChannelId)) {
       return true;
     }
 
-    return this.checkRetailerEligibility(scheme, retailerId);
+    if (hasRetailerTargets && this.checkRetailerEligibility(scheme, retailerId)) {
+      return true;
+    }
+
+    return false;
   }
 
   calculateEligibleOrderAmount(items: SaleOrderItem[]): number {
