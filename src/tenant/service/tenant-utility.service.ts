@@ -7,7 +7,7 @@ import { Region } from 'src/tenant-db/entities/region.entity';
 import { Area } from 'src/tenant-db/entities/area.entity';
 import { Distributor } from 'src/tenant-db/entities/distributor.entity';
 import { Flavour, Product, ProductBrand, ProductCategory, Uom } from 'src/tenant-db/entities/product.entity';
-import { RetailerCategory, RetailerChannel } from 'src/tenant-db/entities/retailer.entity';
+import { Retailer, RetailerCategory, RetailerChannel } from 'src/tenant-db/entities/retailer.entity';
 import { Route } from 'src/tenant-db/entities/route.entity';
 import { User } from 'src/tenant-db/entities/user.entity';
 import { PJP, PJPStatus } from 'src/tenant-db/entities/pjp.entity';
@@ -237,5 +237,14 @@ export class TenantUtilityService {
       order: { name: 'ASC' },
     });
     return { result: routesResult };  
+  }
+
+  async getRetailers(tenantDb: DataSource) {
+    const retailers = await tenantDb.getRepository(Retailer).find({
+      select: ['id', 'shopName'],
+      order: { shopName: 'ASC' },
+    });
+
+    return { result: retailers };
   }
 }

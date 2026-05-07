@@ -105,4 +105,9 @@ export class TenantUtilityController {
     async getRoutesByUserId(@TenantConnection() tenantDb: DataSource, @Param('userId') userId: string) {
         return this.utilityService.getRoutesByUserId(tenantDb, userId);
     }
+
+    @Get('retailers')
+    async getRetailers(@TenantConnection() tenantDb: DataSource,) {
+        return this.utilityService.getRetailers(tenantDb);
+    }
 }
