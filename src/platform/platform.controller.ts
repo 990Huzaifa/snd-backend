@@ -1,5 +1,6 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, NotFoundException, UseGuards, Put, UseInterceptors, UploadedFile, Query } from '@nestjs/common';
 import { PlatformService } from './platform.service';
+import { TenantMigrationService } from './services/tenant-migration.service';
 import { ResolveTenantDto } from './dto/resolve-tenant.dto';
 import { CreateTenantDto } from './dto/create-tenant.dto';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
@@ -18,6 +19,7 @@ import { UpdateTenantGeoPolicyDto } from './dto/update-tenant-geo-policy.dto';
 export class PlatformController {
   constructor(
     private readonly platformService: PlatformService,
+    private readonly tenantMigrationService: TenantMigrationService,
   ) {}
 
   @Post('resolve')
@@ -60,6 +62,16 @@ export class PlatformController {
   @Get('/provisioning')
   async provisioning(@Req() req: any) {
     return this.platformService.getProvisioningList(req.user);
+  }
+
+  @RequirePermissions('TENANT_MIGRATE')
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @Post('migrations')
+  async runTenantMigrations(
+    @Query('tenantId') tenantId: string | undefined,
+    @CurrentPlatformUser() user: any,
+  ) {
+    return this.tenantMigrationService.runTenantMigrations(tenantId, user);
   }
 
   @RequirePermissions('TENANT_VIEW')
