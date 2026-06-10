@@ -1,5 +1,4 @@
 import { Column, Entity, ManyToOne, JoinColumn, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn } from "typeorm";
-import { Distributor } from "./distributor.entity";
 import { User } from "./user.entity";
 import { Retailer } from "./retailer.entity";
 
@@ -9,6 +8,13 @@ export enum PaymentMethod {
     TRANSFER = 'TRANSFER',
     ONLINE = 'ONLINE',
     OTHER = 'OTHER',
+}
+
+export enum SaleVoucherStatus {
+    PENDING = 'PENDING',
+    PAID = 'PAID',
+    PARTIALLY_PAID = 'PARTIALLY_PAID',
+    CANCELLED = 'CANCELLED',
 }
 
 @Entity({ name: 'sale_vouchers' })
@@ -64,6 +70,13 @@ export class SaleVoucher {
     @ManyToOne(() => User, { onDelete: 'RESTRICT' })
     @JoinColumn({ name: 'createdBy' })
     createdByUser: User | null;  
+
+    @Column({
+        type: 'enum',
+        enum: SaleVoucherStatus,
+        default: SaleVoucherStatus.PENDING,
+    })
+    status: SaleVoucherStatus;
 
     @CreateDateColumn()
     createdAt: Date;

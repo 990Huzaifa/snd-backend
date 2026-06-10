@@ -1,5 +1,7 @@
 import {
+  BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -10,11 +12,18 @@ import { MailService } from 'src/common/mail/mail.service';
 import { SalesmanDistributor, User } from 'src/tenant-db/entities/user.entity';
 import { Role } from 'src/tenant-db/entities/role.entity';
 import { Designation } from 'src/tenant-db/entities/user.entity';
+import { Asset, AssetStatus } from 'src/tenant-db/entities/asset.entity';
 import { CreateTenantUserDto } from '../dto/user/create-tenant-user.dto';
 import { InviteTenantUserDto } from '../dto/user/invite-tenant-user.dto';
 import { ActivityLogService } from './activity-log.service';
 import { MasterGeoHelperService } from './master-geo-helper.service';
+import {
+  ASSET_RULES,
+  AssetEntityType,
+  AssetPurpose,
+} from '../config/asset-rules.config';
 import { Distributor } from 'src/tenant-db/entities/distributor.entity';
+import { S3Service } from 'src/common/s3/s3.service';
 
 @Injectable()
 export class UserService {
@@ -23,6 +32,7 @@ export class UserService {
     private readonly jwtService: JwtService,
     private readonly activityLogService: ActivityLogService,
     private readonly masterGeoHelperService: MasterGeoHelperService,
+    private readonly s3Service: S3Service,
   ) {}
 
   private async generateUniqueUserCode(userRepo: Repository<User>): Promise<string> {
@@ -67,6 +77,86 @@ export class UserService {
       stateName,
       cityName,
     };
+  }
+
+  private async resolveAvatarAsset(
+    tenantDb: DataSource,
+    tenantCode: string,
+    assetId: string,
+    user: { userId: string },
+  ): Promise<string> {
+    const assetRepo = tenantDb.getRepository(Asset);
+    const asset = await assetRepo.findOne({ where: { id: assetId } });
+
+    if (!asset) {
+      throw new NotFoundException(`Asset ${assetId} not found`);
+    }
+    if (asset.uploadedById !== user.userId) {
+      throw new ForbiddenException(`Not allowed to use asset ${assetId}`);
+    }
+    if (asset.status !== AssetStatus.APPROVED) {
+      throw new BadRequestException(
+        `Asset ${assetId} must be confirmed (APPROVED) before use as avatar`,
+      );
+    }
+    if (asset.purpose !== AssetPurpose.USER_AVATAR) {
+      throw new BadRequestException(`Asset ${assetId} is not a user avatar`);
+    }
+    if (asset.entityId != null || asset.attachedAt != null) {
+      throw new BadRequestException(`Asset ${assetId} is already linked to an entity`);
+    }
+
+    const avatarRules = ASSET_RULES[AssetPurpose.USER_AVATAR];
+    const tempPrefix = `tenants/${tenantCode}/temp/uploads/${asset.id}.`;
+    const finalPrefix = `tenants/${tenantCode}/${avatarRules.folder}/${asset.id}.`;
+    if (!asset.s3Key.startsWith(tempPrefix) && !asset.s3Key.startsWith(finalPrefix)) {
+      throw new BadRequestException(`Asset ${assetId} has an unexpected storage key`);
+    }
+
+    return this.s3Service.getObjectUrl(asset.s3Key);
+  }
+
+  async updateUserAvatar(
+    tenantDb: DataSource,
+    tenantCode: string,
+    userId: string,
+    assetId: string | null,
+    authUser: { userId: string },
+  ) {
+    const userRepo = tenantDb.getRepository(User);
+    const user = await userRepo.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    let avatarUrl: string | null = null;
+
+    if (assetId) {
+      avatarUrl = await this.resolveAvatarAsset(tenantDb, tenantCode, assetId, authUser);
+
+      const assetRepo = tenantDb.getRepository(Asset);
+      await assetRepo.update(
+        { id: assetId },
+        {
+          entityType: AssetEntityType.USER,
+          entityId: userId,
+          attachedAt: new Date(),
+        },
+      );
+    }
+
+    user.avatar = avatarUrl;
+    await userRepo.save(user);
+
+    await this.activityLogService.recordActivityLog(tenantDb, {
+      actorId: authUser.userId,
+      action: 'USER_AVATAR_UPDATED',
+      description: `User ${user.email} avatar updated`,
+      metadata: { userId: user.id, assetId },
+    });
+
+    delete user.password;
+    return user;
   }
 
   async listUsers(tenantDb: DataSource, page: number, limit: number, search: string, sort: string, sortDirection: string, roleId: string, designationId: string, user: any) {
@@ -149,7 +239,7 @@ export class UserService {
     return userWithGeoNames;
   }
 
-  async createUser(tenantDb: DataSource, dto: CreateTenantUserDto, Authuser: any) {
+  async createUser(tenantDb: DataSource, tenantCode: string, dto: CreateTenantUserDto, Authuser: any) {
     const userRepo = tenantDb.getRepository(User);
     const roleRepo = tenantDb.getRepository(Role);
     const designationRepo = tenantDb.getRepository(Designation);
@@ -189,6 +279,16 @@ export class UserService {
       }
     }
 
+    let avatarUrl: string | null = null;
+    if (dto.avatarAssetId) {
+      avatarUrl = await this.resolveAvatarAsset(
+        tenantDb,
+        tenantCode,
+        dto.avatarAssetId,
+        Authuser,
+      );
+    }
+
     const user = userRepo.create({
       code,
       name: dto.name.trim(),
@@ -197,6 +297,7 @@ export class UserService {
       phone: dto.phone?.trim(),
       role,
       designation,
+      avatar: avatarUrl,
       joiningDate: dto.joiningDate ?? new Date(),
       leavingDate: dto.leavingDate ?? null,
       cnic: dto.cnic?.trim() ?? null,
@@ -215,6 +316,18 @@ export class UserService {
     });
 
     const createdUser = await userRepo.save(user);
+
+    if (dto.avatarAssetId) {
+      const assetRepo = tenantDb.getRepository(Asset);
+      await assetRepo.update(
+        { id: dto.avatarAssetId },
+        {
+          entityType: AssetEntityType.USER,
+          entityId: createdUser.id,
+          attachedAt: new Date(),
+        },
+      );
+    }
 
     await this.activityLogService.recordActivityLog(tenantDb, {
       actorId: Authuser.userId,

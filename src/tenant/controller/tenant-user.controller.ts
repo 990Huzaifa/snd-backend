@@ -1,11 +1,11 @@
-import { Body, Controller, Get, Param, Post, Put, Query, Req, UnauthorizedException, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import { TenantJwtAuthGuard } from 'src/auth/tenant-jwt-auth.guard';
 import { TenantPermissionGuard } from 'src/auth/tenant-permission.guard';
 import { RequirePermissions } from 'src/auth/require-permission.decorator';
 import { TenantConnectionGuard } from 'src/common/guards/tenant-connection.guard';
 import { TenantJwtGuard } from 'src/common/guards/tenant-jwt.guard';
-import { TenantConnection } from 'src/common/tenant/tenant-connection.decorator';
+import { TenantCode, TenantConnection } from 'src/common/tenant/tenant-connection.decorator';
 import { DataSource } from 'typeorm';
 import { CreateTenantUserDto } from '../dto/user/create-tenant-user.dto';
 import { InviteTenantUserDto } from '../dto/user/invite-tenant-user.dto';
@@ -62,8 +62,25 @@ export class TenantUserController {
 
   @Post('')
   @RequirePermissions('CREATE_USER')
-  create(@TenantConnection() tenantDb: DataSource, @Body() dto: CreateTenantUserDto, @Req() req: Request) {
-    return this.userService.createUser(tenantDb, dto, req.user);
+  create(
+    @TenantConnection() tenantDb: DataSource,
+    @TenantCode() tenantCode: string,
+    @Body() dto: CreateTenantUserDto,
+    @Req() req: Request,
+  ) {
+    return this.userService.createUser(tenantDb, tenantCode, dto, req.user);
+  }
+
+  @Patch(':id/avatar')
+  @RequirePermissions('UPDATE_USER')
+  updateAvatar(
+    @TenantConnection() tenantDb: DataSource,
+    @TenantCode() tenantCode: string,
+    @Param('id') id: string,
+    @Body('assetId') assetId: string | null,
+    @Req() req: Request,
+  ) {
+    return this.userService.updateUserAvatar(tenantDb, tenantCode, id, assetId, req.user as { userId: string });
   }
 
   @Put('update/:id/status')

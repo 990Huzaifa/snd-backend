@@ -42,6 +42,10 @@ export class CreateTenantUserDto {
 
   @IsOptional()
   @IsString()
+  avatarAssetId?: string;
+
+  @IsOptional()
+  @IsString()
   address?: string;
 
   @IsOptional()
