@@ -1,4 +1,4 @@
-import { ProductFlavour, Product, ProductPricing } from "./product.entity";
+import { ProductFlavour, Product, ProductPricing, Uom } from "./product.entity";
 import { CreateDateColumn, Entity,PrimaryGeneratedColumn, UpdateDateColumn, Column, ManyToOne, JoinColumn } from "typeorm";
 import { Distributor } from "./distributor.entity";
 
@@ -45,12 +45,12 @@ export class StockMovement {
     @JoinColumn({ name: 'productFlavourId' })
     productFlavour: ProductFlavour;
 
-    @Column()
-    productPricingId: string;
+    @Column({ type: 'uuid' })
+    uomId: string;
 
-    @ManyToOne(() => ProductPricing, { onDelete: 'CASCADE' })
-    @JoinColumn({ name: 'productPricingId' })
-    productPricing: ProductPricing;
+    @ManyToOne(() => Uom, (uom) => uom.stockMovements, { onDelete: 'RESTRICT' })
+    @JoinColumn({ name: 'uomId' })
+    uom: Uom;
 
     @Column()
     quantity: number;
@@ -100,15 +100,24 @@ export class StockBalance {
     @JoinColumn({ name: 'productFlavourId' })
     productFlavour: ProductFlavour;
 
-    @Column()
-    productPricingId: string;
+    @Column({ type: 'uuid' })
+    uomId: string;
 
-    @ManyToOne(() => ProductPricing, { onDelete: 'CASCADE' })
-    @JoinColumn({ name: 'productPricingId' })
-    productPricing: ProductPricing;
+    @ManyToOne(() => Uom, (uom) => uom.stockBalances, { onDelete: 'RESTRICT' })
+    @JoinColumn({ name: 'uomId' })
+    uom: Uom;
 
-    @Column()
-    quantity: number;
+    @Column({ default: 0 })
+    quantityAvailable: number;
+
+    @Column({ default: 0 })
+    quantityOnHand: number;
+
+    @Column({ default: 0 })
+    quantityReserved: number;
+
+    @Column({ default: 0 })
+    quantityDamaged: number;
 
     @CreateDateColumn()
     createdAt: Date;

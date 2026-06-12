@@ -78,6 +78,12 @@ export class Uom {
 
     @OneToMany(() => ProductPricing, (productPricing) => productPricing.uom)
     pricings: ProductPricing[];
+
+    @OneToMany(() => StockBalance, (stockBalance) => stockBalance.uom)
+    stockBalances: StockBalance[];
+
+    @OneToMany(() => StockMovement, (stockMovement) => stockMovement.uom)
+    stockMovements: StockMovement[];
 }
 
 @Entity('product_brands')
@@ -248,10 +254,7 @@ export class ProductPricing {
 
     @OneToMany(() => OpeningStockItem, (openingStockItem) => openingStockItem.productPricing)
     openingStockItems: OpeningStockItem[];
-    @OneToMany(() => StockMovement, (stockMovement) => stockMovement.productPricing)
-    stockMovements: StockMovement[];
-    @OneToMany(() => StockBalance, (stockBalance) => stockBalance.productPricing)
-    stockBalances: StockBalance[];
+
     @OneToMany(() => StockTransferItem, (stockTransferItem) => stockTransferItem.productPricing)
     stockTransferItems: StockTransferItem[];
     @OneToMany(() => ProductPricingJob, (productPricingJob) => productPricingJob.productPricing)

@@ -313,7 +313,7 @@ export class StockTransferService {
       relations: {
         product: true,
         productFlavour: { flavour: true },
-        productPricing: { uom: true },
+        uom: true,
       },
     });
 

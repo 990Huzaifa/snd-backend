@@ -18,7 +18,7 @@ import { Scheme, SchemeSlab } from 'src/tenant-db/entities/scheme.entity';
 import { ActivityLogService } from './activity-log.service';
 import { CreateSaleOrderDto } from '../dto/saleorder/create-saleorder.dto';
 import { UpdateSaleOrderDto } from '../dto/saleorder/update-saleorder.dto';
-import { ReferenceType, StockMovementType } from 'src/tenant-db/entities/stock.entity';
+import { ReferenceType } from 'src/tenant-db/entities/stock.entity';
 import { StockService } from './stock.service';
 import { RefType } from 'src/tenant-db/entities/retailer.entity';
 import { RetailerLedgerService } from './retailer-ledger.service';
@@ -159,6 +159,107 @@ export class SaleOrderService {
     return status === OrderStatus.APPROVED || String(status).toUpperCase() === 'EXECUTE';
   }
 
+  private isReservationStatus(status: OrderStatus | string | undefined): boolean {
+    return status === OrderStatus.PENDING;
+  }
+
+  private isReleaseStatus(status: OrderStatus): boolean {
+    return status === OrderStatus.REJECTED || status === OrderStatus.CANCELLED;
+  }
+
+  private stockLineKey(item: {
+    productId: string;
+    productFlavourId: string | number;
+    productPricingId: string;
+  }): string {
+    return `${item.productId}:${item.productFlavourId}:${item.productPricingId}`;
+  }
+
+  private mapItemsForStock(
+    items: Array<{
+      productId: string;
+      productFlavourId: string | number;
+      productPricingId: string;
+      quantity: number;
+    }>,
+  ) {
+    return items.map((item) => ({
+      productId: item.productId.toString(),
+      productFlavourId: item.productFlavourId.toString(),
+      productPricingId: item.productPricingId.toString(),
+      quantity: item.quantity,
+    }));
+  }
+
+  private diffOrderItems(
+    oldItems: Array<{
+      productId: string;
+      productFlavourId: string;
+      productPricingId: string;
+      quantity: number;
+    }>,
+    newItems: Array<{
+      productId: string;
+      productFlavourId: string;
+      productPricingId: string;
+      quantity: number;
+    }>,
+  ) {
+    const oldMap = new Map<string, number>();
+    for (const item of oldItems) {
+      const key = this.stockLineKey(item);
+      oldMap.set(key, (oldMap.get(key) ?? 0) + item.quantity);
+    }
+
+    const newMap = new Map<string, number>();
+    for (const item of newItems) {
+      const key = this.stockLineKey(item);
+      newMap.set(key, (newMap.get(key) ?? 0) + item.quantity);
+    }
+
+    const toRelease: Array<{
+      productId: string;
+      productFlavourId: string;
+      productPricingId: string;
+      quantity: number;
+    }> = [];
+    const toReserve: Array<{
+      productId: string;
+      productFlavourId: string;
+      productPricingId: string;
+      quantity: number;
+    }> = [];
+
+    const allKeys = new Set([...oldMap.keys(), ...newMap.keys()]);
+    for (const key of allKeys) {
+      const oldQty = oldMap.get(key) ?? 0;
+      const newQty = newMap.get(key) ?? 0;
+      const diff = newQty - oldQty;
+      if (diff === 0) {
+        continue;
+      }
+
+      const [productId, productFlavourId, productPricingId] = key.split(':');
+      if (diff < 0) {
+        toRelease.push({
+          productId,
+          productFlavourId,
+          productPricingId,
+          quantity: -diff,
+        });
+      } else {
+        toReserve.push({
+          productId,
+          productFlavourId,
+          productPricingId,
+          quantity: diff,
+        });
+      }
+    }
+
+    return { toRelease, toReserve };
+  }
+
   private async executeSaleOrder(manager: EntityManager, saleOrderId: string) {
     const order = await manager.getRepository(SaleOrder).findOne({
       where: { id: saleOrderId },
@@ -173,15 +274,9 @@ export class SaleOrderService {
       throw new BadRequestException('Sale order has no items to execute');
     }
 
-    await this.stockService.applyOrderStockMovement(manager, {
+    await this.stockService.fulfillReservedStock(manager, {
       distributorId: order.distributorId,
-      items: order.items.map((item) => ({
-        productId: item.productId,
-        productFlavourId: item.productFlavourId,
-        productPricingId: item.productPricingId,
-        quantity: item.quantity,
-      })),
-      type: StockMovementType.OUT,
+      items: this.mapItemsForStock(order.items),
       referenceType: ReferenceType.SALE,
     });
 
@@ -342,7 +437,20 @@ export class SaleOrderService {
         ),
       );
 
+      const stockItems = this.mapItemsForStock(dto.items);
+
+      if (this.isReservationStatus(order.orderStatus)) {
+        await this.stockService.reserveStock(manager, {
+          distributorId: order.distributorId,
+          items: stockItems,
+        });
+      }
+
       if (this.isExecutionStatus(order.orderStatus)) {
+        await this.stockService.reserveStock(manager, {
+          distributorId: order.distributorId,
+          items: stockItems,
+        });
         await this.executeSaleOrder(manager, order.id);
       }
 
@@ -367,7 +475,7 @@ export class SaleOrderService {
   ) {
     const existing = await tenantDb.getRepository(SaleOrder).findOne({
       where: { id },
-      select: ['id', 'orderNumber','orderStatus'],
+      relations: ['items'],
     });
     if (!existing) {
       throw new NotFoundException('Sale order not found');
@@ -375,6 +483,10 @@ export class SaleOrderService {
 
     if (existing.orderStatus !== OrderStatus.PENDING) {
       throw new BadRequestException('Sale order is not pending');
+    }
+
+    if (dto.orderStatus !== undefined && dto.orderStatus !== existing.orderStatus) {
+      throw new BadRequestException('Order status can only be changed via updateStatus');
     }
 
     await this.assertForeignKeys(tenantDb, dto);
@@ -386,12 +498,55 @@ export class SaleOrderService {
       const orderRepo = manager.getRepository(SaleOrder);
       const itemRepo = manager.getRepository(SaleOrderItem);
 
+      const distributorChanged =
+        dto.distributorId !== undefined && dto.distributorId !== existing.distributorId;
+      const newDistributorId = dto.distributorId ?? existing.distributorId;
+
+      if (distributorChanged) {
+        await this.stockService.releaseStock(manager, {
+          distributorId: existing.distributorId,
+          items: this.mapItemsForStock(existing.items),
+        });
+      }
+
+      if (dto.items) {
+        if (distributorChanged) {
+          await this.stockService.reserveStock(manager, {
+            distributorId: newDistributorId,
+            items: this.mapItemsForStock(dto.items),
+          });
+        } else {
+          const { toRelease, toReserve } = this.diffOrderItems(
+            this.mapItemsForStock(existing.items),
+            this.mapItemsForStock(dto.items),
+          );
+
+          if (toRelease.length) {
+            await this.stockService.releaseStock(manager, {
+              distributorId: existing.distributorId,
+              items: toRelease,
+            });
+          }
+
+          if (toReserve.length) {
+            await this.stockService.reserveStock(manager, {
+              distributorId: existing.distributorId,
+              items: toReserve,
+            });
+          }
+        }
+      } else if (distributorChanged) {
+        await this.stockService.reserveStock(manager, {
+          distributorId: newDistributorId,
+          items: this.mapItemsForStock(existing.items),
+        });
+      }
+
       await orderRepo.update(id, {
         distributorId: dto.distributorId,
         salesmanId: dto.salesmanId,
         retailerId: dto.retailerId,
         routeId: dto.routeId,
-        orderStatus: dto.orderStatus,
         orderTotal: dto.orderTotal,
         taxPercentage: dto.taxPercentage,
         taxAmount: dto.taxAmount,
@@ -451,6 +606,20 @@ export class SaleOrderService {
       }
 
       const wasExecutionStatus = this.isExecutionStatus(currentOrder.orderStatus);
+      const wasReservationStatus = this.isReservationStatus(currentOrder.orderStatus);
+
+      if (this.isReleaseStatus(status) && wasReservationStatus) {
+        const orderWithItems = await orderRepo.findOne({
+          where: { id: currentOrder.id },
+          relations: ['items'],
+        });
+        if (orderWithItems?.items?.length) {
+          await this.stockService.releaseStock(manager, {
+            distributorId: orderWithItems.distributorId,
+            items: this.mapItemsForStock(orderWithItems.items),
+          });
+        }
+      }
 
       currentOrder.orderStatus = status;
       await orderRepo.save(currentOrder);
