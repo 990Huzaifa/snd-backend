@@ -477,7 +477,7 @@ export class SaleVoucherService {
 
     const rows = await qb
       .clone()
-      .orderBy('sv.createdAt', 'DESC')
+      .orderBy('sv.paymentDate', 'DESC')
       .skip((page - 1) * limit)
       .take(limit)
       .getMany();
