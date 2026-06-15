@@ -5,12 +5,12 @@ export class CreateSaleOrderItemDto {
   @IsUUID()
   productId: string;
 
-  @Type(() => Number)
-  @IsInt()
+  @IsUUID()
   @Min(1)
   productFlavourId: number;
 
   @IsUUID()
+  @Min(1)
   productPricingId: string;
 
   @IsOptional()

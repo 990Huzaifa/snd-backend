@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { DataSource, In } from 'typeorm';
 import { Designation } from 'src/tenant-db/entities/user.entity';
 import { Role } from 'src/tenant-db/entities/role.entity';
@@ -6,7 +6,15 @@ import { Permission } from 'src/tenant-db/entities/permission.entity';
 import { Region } from 'src/tenant-db/entities/region.entity';
 import { Area } from 'src/tenant-db/entities/area.entity';
 import { Distributor } from 'src/tenant-db/entities/distributor.entity';
-import { Flavour, Product, ProductBrand, ProductCategory, Uom } from 'src/tenant-db/entities/product.entity';
+import {
+  Flavour,
+  Product,
+  ProductBrand,
+  ProductCategory,
+  ProductPricing,
+  Uom,
+} from 'src/tenant-db/entities/product.entity';
+import { StockBalance } from 'src/tenant-db/entities/stock.entity';
 import { Retailer, RetailerCategory, RetailerChannel } from 'src/tenant-db/entities/retailer.entity';
 import { Route } from 'src/tenant-db/entities/route.entity';
 import { User } from 'src/tenant-db/entities/user.entity';
@@ -246,5 +254,83 @@ export class TenantUtilityService {
     });
 
     return { result: retailers };
+  }
+
+  async getStockProductsList(
+    tenantDb: DataSource,
+    distributorId: string,
+    search?: string,
+  ) {
+    const normalizedDistributorId = (distributorId ?? '').trim();
+    if (!normalizedDistributorId) {
+      throw new BadRequestException('distributorId is required');
+    }
+
+    const qb = tenantDb
+      .getRepository(StockBalance)
+      .createQueryBuilder('sb')
+      .innerJoinAndSelect('sb.product', 'product')
+      .innerJoinAndSelect('sb.productFlavour', 'productFlavour')
+      .innerJoinAndSelect('productFlavour.flavour', 'flavour')
+      .innerJoinAndSelect('sb.uom', 'uom')
+      .where('sb.distributorId = :distributorId', { distributorId: normalizedDistributorId })
+      .andWhere('product.isDelete = :isDelete', { isDelete: false })
+      .andWhere('product.isActive = :isActive', { isActive: true });
+
+    const normalizedSearch = (search ?? '').trim();
+    if (normalizedSearch) {
+      qb.andWhere('(product.name ILIKE :search OR product."skuCode" ILIKE :search)', {
+        search: `%${normalizedSearch}%`,
+      });
+    }
+
+    qb.orderBy('product.name', 'ASC')
+      .addOrderBy('flavour.name', 'ASC')
+      .addOrderBy('uom.name', 'ASC');
+
+    const balances = await qb.getMany();
+    if (!balances.length) {
+      return { result: [] };
+    }
+
+    const productIds = [...new Set(balances.map((balance) => balance.productId))];
+    const pricings = await tenantDb.getRepository(ProductPricing).find({
+      where: { productId: In(productIds) },
+      select: ['productId', 'uomId', 'tradePrice', 'retailPrice'],
+    });
+
+    const pricingMap = new Map(
+      pricings.map((pricing) => [`${pricing.productId}:${pricing.uomId}`, pricing]),
+    );
+
+    const result = balances.map((balance) => {
+      const pricing = pricingMap.get(`${balance.productId}:${balance.uomId}`);
+
+      return {
+        id: balance.product.id,
+        name: balance.product.name,
+        skuCode: balance.product.skuCode,
+        uomId: balance.uomId,
+        uom: balance.uom
+          ? {
+              id: balance.uom.id,
+              name: balance.uom.name,
+            }
+          : null,
+        productFlavourId: balance.productFlavourId,
+        productFlavour: balance.productFlavour?.flavour
+          ? {
+              id: balance.productFlavour.flavour.id,
+              name: balance.productFlavour.flavour.name,
+            }
+          : null,
+        quantityAvailable: balance.quantityAvailable,
+        quantityOnHand: balance.quantityOnHand,
+        purchaseUnitPrice: Number(pricing?.tradePrice ?? 0),
+        saleUnitPrice: Number(pricing?.retailPrice ?? 0),
+      };
+    });
+
+    return { result };
   }
 }

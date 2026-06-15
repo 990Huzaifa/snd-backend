@@ -110,4 +110,13 @@ export class TenantUtilityController {
     async getRetailers(@TenantConnection() tenantDb: DataSource,) {
         return this.utilityService.getRetailers(tenantDb);
     }
+
+    @Get('stock-products')
+    async getStockProductsList(
+        @TenantConnection() tenantDb: DataSource,
+        @Query('distributorId') distributorId: string,
+        @Query('search') search?: string,
+    ) {
+        return this.utilityService.getStockProductsList(tenantDb, distributorId, search);
+    }
 }
