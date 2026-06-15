@@ -47,7 +47,6 @@ import { TenantDesignationService } from './service/tenant-designation.service';
 import { NotificationService } from './service/notification.service';
 import { DistributorService } from './service/distributor.service';
 import { AreaService } from './service/area.service';
-import { FlavourService } from './service/flavour.service';
 import { ProductBrandService } from './service/product/product-brand.service';
 import { ProductCategoryService } from './service/product/product-category.service';
 import { ProductService } from './service/product/product.service';
@@ -55,7 +54,6 @@ import { PjpService } from './service/pjp.service';
 import { RegionService } from './service/region.service';
 import { RouteService } from './service/route.service';
 import { TenantRoleService } from './service/tenant-role.service';
-import { UomService } from './service/uom.service';
 import { UserService } from './service/user.service';
 import { TenantPermissionGuard } from 'src/auth/tenant-permission.guard';
 import { TenantUtilityController } from './controller/utility.controller';
@@ -84,6 +82,8 @@ import { SaleOrderService } from './service/saleorder.service';
 import { SaleVoucherService } from './service/sale-voucher.service';
 import { SaleReturnService } from './service/sale-return.service';
 import { RetailerLedgerService } from './service/retailer/retailer-ledger.service';
+import { UomService } from './service/product/uom.service';
+import { FlavourService } from './service/product/flavour.service';
 
 
 @Module({
