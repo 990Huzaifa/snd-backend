@@ -42,6 +42,7 @@ export class SaleOrderController {
     @Query('limit') limit: number = 10,
     @Query('search') search: string = '',
     @Req() req: Request,
+    @Query('status') status: string = '',
   ) {
     return this.saleOrderService.list(
       tenantDb,
@@ -49,6 +50,7 @@ export class SaleOrderController {
       limit,
       search,
       req.user as { userId: string },
+      status,
     );
   }
 

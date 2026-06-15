@@ -293,6 +293,7 @@ export class SaleOrderService {
     limitInput: number,
     search: string,
     user: { userId: string },
+    status: string,
   ) {
     const page = this.normalizePage(pageInput);
     const limit = this.normalizeLimit(limitInput);
@@ -315,6 +316,10 @@ export class SaleOrderService {
             .orWhere('salesman.name ILIKE :search', { search: `%${normalizedSearch}%` });
         }),
       );
+    }
+
+    if (status) {
+      qb.andWhere('so."orderStatus" = :status', { status: status.trim() });
     }
 
     const total = await qb.clone().getCount();
