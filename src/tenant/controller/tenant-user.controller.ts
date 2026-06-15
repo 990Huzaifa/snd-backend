@@ -9,6 +9,7 @@ import { TenantCode, TenantConnection } from 'src/common/tenant/tenant-connectio
 import { DataSource } from 'typeorm';
 import { CreateTenantUserDto } from '../dto/user/create-tenant-user.dto';
 import { InviteTenantUserDto } from '../dto/user/invite-tenant-user.dto';
+import { UpdateTenantUserDto } from '../dto/user/update-tenant-user.dto';
 import { UserService } from '../service/user.service';
 
 @Controller('tenant/users')
@@ -117,5 +118,12 @@ export class TenantUserController {
   assignDistributors(@TenantConnection() tenantDb: DataSource, @Param('id') id: string, @Body() distributorIds: string[], @Req() req: Request) {
     return this.userService.assignDistributorsToUser(tenantDb, id, distributorIds, req.user);
   } 
+
+
+  @Put(':id/update')
+  @RequirePermissions('UPDATE_USER')
+  update(@TenantConnection() tenantDb: DataSource, @Param('id') id: string, @Body() dto: UpdateTenantUserDto, @Req() req: Request) {
+    return this.userService.updateUser(tenantDb, id, dto, req.user as { userId: string });
+  }
 
 }

@@ -15,6 +15,7 @@ import { Designation } from 'src/tenant-db/entities/user.entity';
 import { Asset, AssetStatus } from 'src/tenant-db/entities/asset.entity';
 import { CreateTenantUserDto } from '../dto/user/create-tenant-user.dto';
 import { InviteTenantUserDto } from '../dto/user/invite-tenant-user.dto';
+import { UpdateTenantUserDto } from '../dto/user/update-tenant-user.dto';
 import { ActivityLogService } from './activity-log.service';
 import { MasterGeoHelperService } from './master-geo-helper.service';
 import {
@@ -361,6 +362,80 @@ export class UserService {
       message: 'User status updated successfully',
       user,
     };
+  }
+
+  async updateUser(
+    tenantDb: DataSource,
+    id: string,
+    dto: UpdateTenantUserDto,
+    authUser: { userId: string },
+  ) {
+    const userRepo = tenantDb.getRepository(User);
+    const roleRepo = tenantDb.getRepository(Role);
+    const designationRepo = tenantDb.getRepository(Designation);
+
+    const user = await userRepo.findOne({
+      where: { id, isDeleted: false },
+      relations: ['role', 'designation'],
+    });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (dto.email !== undefined) {
+      const email = dto.email.trim().toLowerCase();
+      const existingByEmail = await userRepo.findOne({
+        where: { email },
+        select: ['id'],
+      });
+      if (existingByEmail && existingByEmail.id !== id) {
+        throw new ConflictException('User with this email already exists');
+      }
+      user.email = email;
+    }
+
+    if (dto.roleId !== undefined) {
+      const role = await roleRepo.findOne({ where: { id: dto.roleId } });
+      if (!role) {
+        throw new NotFoundException('Role not found');
+      }
+      user.role = role;
+    }
+
+    if (dto.designationId !== undefined) {
+      if (dto.designationId === null) {
+        user.designation = null;
+      } else {
+        const designation = await designationRepo.findOne({
+          where: { id: dto.designationId },
+        });
+        if (!designation) {
+          throw new NotFoundException('Designation not found');
+        }
+        user.designation = designation;
+      }
+    }
+
+    if (dto.name !== undefined) user.name = dto.name.trim();
+    if (dto.phone !== undefined) user.phone = dto.phone?.trim() ?? null;
+    if (dto.cnic !== undefined) user.cnic = dto.cnic?.trim() ?? null;
+    if (dto.address !== undefined) user.address = dto.address?.trim() ?? null;
+    if (dto.countryId !== undefined) user.countryId = dto.countryId?.trim() || null;
+    if (dto.stateId !== undefined) user.stateId = dto.stateId?.trim() || null;
+    if (dto.cityId !== undefined) user.cityId = dto.cityId?.trim() || null;
+
+    const updatedUser = await userRepo.save(user);
+
+    await this.activityLogService.recordActivityLog(tenantDb, {
+      actorId: authUser.userId,
+      action: 'USER_UPDATED',
+      description: `User ${updatedUser.email} updated`,
+      metadata: { userId: updatedUser.id },
+    });
+
+    const userWithGeoNames = await this.attachGeoNames(updatedUser);
+    delete userWithGeoNames.password;
+    return userWithGeoNames;
   }
   
   async inviteUser(
