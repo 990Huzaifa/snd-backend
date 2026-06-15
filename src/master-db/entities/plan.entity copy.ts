@@ -3,6 +3,8 @@ import { Column, CreateDateColumn, PrimaryGeneratedColumn, Entity, UpdateDateCol
 export enum LIMIT_KEY {
     USER = 'USER',
     STORAGE = 'STORAGE',
+    BUSINESS = 'BUSINESS',
+    EMPLOYEES = 'EMPLOYEES',
     SQL_AGENT_DAILY = 'SQL_AGENT_DAILY',
     SQL_AGENT_MONTHLY = 'SQL_AGENT_MONTHLY',
     WHATSAPP = 'WHATSAPP',

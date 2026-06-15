@@ -9,6 +9,8 @@ import { TenantSettings } from 'src/master-db/entities/tenant-settings.entity';
 import { TenantGeoPolicy } from 'src/master-db/entities/tenant-geo-policy.entity';
 import { TenantModule as TenantModuleEntity } from 'src/master-db/entities/tenant-modules.entity';
 import { TenantTheme } from 'src/master-db/entities/tenant-themes.entity';
+import { Subscription } from 'src/master-db/entities/subscription.entity';
+import { TenantDbConfig } from 'src/master-db/entities/tenant-db-config.entity';
 import { AuthModule } from 'src/auth/auth.module';
 import { TenantRuntimeModule } from 'src/tenant-db/tenant-runtime.module';
 import { TenantAuthController } from './controller/tenant-auth.controller';
@@ -84,6 +86,9 @@ import { SaleReturnService } from './service/sale-return.service';
 import { RetailerLedgerService } from './service/retailer/retailer-ledger.service';
 import { UomService } from './service/product/uom.service';
 import { FlavourService } from './service/product/flavour.service';
+import { DatabaseBackupController } from './controller/database-backup.controller';
+import { TenantDatabaseBackupService } from './service/tenant-database-backup.service';
+import { PgDumpService } from './service/pg-dump.service';
 
 
 @Module({
@@ -101,7 +106,9 @@ import { FlavourService } from './service/product/flavour.service';
       TenantSettings,
       TenantGeoPolicy,
       TenantTheme,
-      TenantModuleEntity
+      TenantModuleEntity,
+      Subscription,
+      TenantDbConfig,
     ]),
   ],
   controllers: [
@@ -137,6 +144,7 @@ import { FlavourService } from './service/product/flavour.service';
     SaleOrderController,
     SaleVoucherController,
     SaleReturnController,
+    DatabaseBackupController,
   ],
   providers: [
     TenantAuthService,
@@ -178,6 +186,8 @@ import { FlavourService } from './service/product/flavour.service';
     SaleVoucherService,
     SaleReturnService,
     RetailerLedgerService,
+    TenantDatabaseBackupService,
+    PgDumpService,
   ],
 })
 export class TenantModule { }
