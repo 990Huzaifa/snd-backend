@@ -187,12 +187,22 @@ export class TenantUtilityService {
         id: true,
         name: true,
         skuCode: true,
+        flavours: {
+          id: true,
+          flavourId: true,
+          flavour: {
+            id: true,
+            name: true,
+          },
+        },
       },
       relations: {
         pricing: {
           uom: true,
         },
-        flavours: true,
+        flavours: {
+          flavour: true,
+        },
       },
       order: { name: 'ASC' },
     });
