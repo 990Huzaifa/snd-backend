@@ -1,4 +1,4 @@
-import { Column, CreateDateColumn, Entity, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn } from "typeorm";
+import { Column, CreateDateColumn, Entity, ManyToOne, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn } from "typeorm";
 import { SaleOrder } from "./saleorder.entity";
 import { JoinColumn } from "typeorm";
 import { Product, ProductFlavour, ProductPricing } from "./product.entity";
@@ -66,6 +66,9 @@ export class SaleReturn {
 
     @UpdateDateColumn()
     updatedAt: Date;
+
+    @OneToMany(() => SaleReturnItem, (item) => item.saleReturn)
+    items: SaleReturnItem[];
 }
 
 @Entity('sale_return_items')

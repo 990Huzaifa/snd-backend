@@ -40,6 +40,7 @@ import { SchemeController } from './controller/scheme.controller';
 import { StockController } from './controller/stock.controller';
 import { SaleOrderController } from './controller/saleorder.controller';
 import { SaleVoucherController } from './controller/sale-voucher.controller';
+import { SaleReturnController } from './controller/sale-return.controller';
 import { TenantAuthService } from './service/tenant-auth.service';
 import { ActivityLogService } from './service/activity-log.service';
 import { TenantDesignationService } from './service/tenant-designation.service';
@@ -81,6 +82,7 @@ import { RetailerSchemeEngineService } from './service/retailer/retailer-scheme-
 import { ProductSchemeEngineService } from './service/product/product-scheme-engine.service';
 import { SaleOrderService } from './service/saleorder.service';
 import { SaleVoucherService } from './service/sale-voucher.service';
+import { SaleReturnService } from './service/sale-return.service';
 import { RetailerLedgerService } from './service/retailer/retailer-ledger.service';
 
 
@@ -134,6 +136,7 @@ import { RetailerLedgerService } from './service/retailer/retailer-ledger.servic
     StockController,
     SaleOrderController,
     SaleVoucherController,
+    SaleReturnController,
   ],
   providers: [
     TenantAuthService,
@@ -173,6 +176,7 @@ import { RetailerLedgerService } from './service/retailer/retailer-ledger.servic
     ProductSchemeEngineService,
     SaleOrderService,
     SaleVoucherService,
+    SaleReturnService,
     RetailerLedgerService,
   ],
 })
