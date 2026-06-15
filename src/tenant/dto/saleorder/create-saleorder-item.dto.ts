@@ -6,11 +6,9 @@ export class CreateSaleOrderItemDto {
   productId: string;
 
   @IsInt()
-  @Min(1)
   productFlavourId: number;
 
   @IsUUID()
-  @Min(1)
   productPricingId: string;
 
   @IsOptional()
