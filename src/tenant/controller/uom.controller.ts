@@ -20,7 +20,7 @@ import { RequirePermissions } from 'src/auth/require-permission.decorator';
 import { TenantConnectionGuard } from 'src/common/guards/tenant-connection.guard';
 import { TenantJwtGuard } from 'src/common/guards/tenant-jwt.guard';
 import { TenantCode, TenantConnection } from 'src/common/tenant/tenant-connection.decorator';
-import { UomService } from '../service/uom.service';
+import { UomService } from '../service/product/uom.service';
 import { CreateUomDto } from '../dto/uom/create-uom.dto';
 import { UpdateUomDto } from '../dto/uom/update-uom.dto';
 

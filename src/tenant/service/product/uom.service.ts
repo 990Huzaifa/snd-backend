@@ -6,12 +6,12 @@ import {
 } from '@nestjs/common';
 import { DataSource, Like } from 'typeorm';
 import { Uom } from 'src/tenant-db/entities/product.entity';
-import { ActivityLogService } from './activity-log.service';
-import { CreateUomDto } from '../dto/uom/create-uom.dto';
-import { UpdateUomDto } from '../dto/uom/update-uom.dto';
+import { ActivityLogService } from '../activity-log.service';
+import { CreateUomDto } from '../../dto/uom/create-uom.dto';
+import { UpdateUomDto } from '../../dto/uom/update-uom.dto';
 import * as XLSX from 'xlsx';
-import { NotificationService } from './notification.service';
-import { TenantJob, TenantJobService } from './tenant-job.service';
+import { NotificationService } from '../notification.service';
+import { TenantJob, TenantJobService } from '../tenant-job.service';
 
 @Injectable()
 export class UomService {

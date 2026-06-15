@@ -21,9 +21,9 @@ import { RequirePermissions } from 'src/auth/require-permission.decorator';
 import { TenantConnectionGuard } from 'src/common/guards/tenant-connection.guard';
 import { TenantJwtGuard } from 'src/common/guards/tenant-jwt.guard';
 import { TenantCode, TenantConnection } from 'src/common/tenant/tenant-connection.decorator';
-import { FlavourService } from '../service/flavour.service';
 import { CreateFlavourDto } from '../dto/flavour/create-flavour.dto';
 import { UpdateFlavourDto } from '../dto/flavour/update-flavour.dto';
+import { FlavourService } from '../service/product/flavour.service';
 
 @Controller('tenant/flavours')
 @UseGuards(
