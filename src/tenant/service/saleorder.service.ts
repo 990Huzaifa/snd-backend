@@ -21,9 +21,9 @@ import { UpdateSaleOrderDto } from '../dto/saleorder/update-saleorder.dto';
 import { ReferenceType } from 'src/tenant-db/entities/stock.entity';
 import { StockService } from './stock.service';
 import { RefType } from 'src/tenant-db/entities/retailer.entity';
-import { RetailerLedgerService } from './retailer-ledger.service';
-import { ProductSchemeEngineService } from './product-scheme-engine.service';
-import { RetailerSchemeEngineService } from './retailer-scheme-engine.service';
+import { RetailerLedgerService } from './retailer/retailer-ledger.service';
+import { ProductSchemeEngineService } from './product/product-scheme-engine.service';
+import { RetailerSchemeEngineService } from './retailer/retailer-scheme-engine.service';
 
 @Injectable()
 export class SaleOrderService {

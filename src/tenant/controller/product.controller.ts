@@ -25,7 +25,7 @@ import {
 } from 'src/common/tenant/tenant-connection.decorator';
 import { CreateProductDto } from '../dto/product/create-product.dto';
 import { UpdateProductDto } from '../dto/product/update-product.dto';
-import { ProductService } from '../service/product.service';
+import { ProductService } from '../service/product/product.service';
 import { FilesInterceptor } from '@nestjs/platform-express';
 
 @Controller('tenant/products')

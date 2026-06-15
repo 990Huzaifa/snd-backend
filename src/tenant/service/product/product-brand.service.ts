@@ -6,12 +6,12 @@ import {
 } from '@nestjs/common';
 import { DataSource, Like } from 'typeorm';
 import { ProductBrand } from 'src/tenant-db/entities/product.entity';
-import { ActivityLogService } from './activity-log.service';
-import { CreateProductBrandDto } from '../dto/product-brand/create-product-brand.dto';
-import { UpdateProductBrandDto } from '../dto/product-brand/update-product-brand.dto';
+import { ActivityLogService } from '../activity-log.service';
+import { CreateProductBrandDto } from '../../dto/product-brand/create-product-brand.dto';
+import { UpdateProductBrandDto } from '../../dto/product-brand/update-product-brand.dto';
 import * as XLSX from 'xlsx';
-import { NotificationService } from './notification.service';
-import { TenantJob, TenantJobService } from './tenant-job.service';
+import { NotificationService } from '../notification.service';
+import { TenantJob, TenantJobService } from '../tenant-job.service';
 
 @Injectable()
 export class ProductBrandService {

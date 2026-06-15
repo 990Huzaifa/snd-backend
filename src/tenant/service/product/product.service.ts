@@ -28,10 +28,10 @@ import {
   ASSET_RULES,
   AssetEntityType,
   AssetPurpose,
-} from '../config/asset-rules.config';
-import { CreateProductDto } from '../dto/product/create-product.dto';
-import { UpdateProductDto } from '../dto/product/update-product.dto';
-import { ActivityLogService } from './activity-log.service';
+} from '../../config/asset-rules.config';
+import { CreateProductDto } from '../../dto/product/create-product.dto';
+import { UpdateProductDto } from '../../dto/product/update-product.dto';
+import { ActivityLogService } from '../activity-log.service';
 import { S3Service } from 'src/common/s3/s3.service';
 import { randomUUID } from 'node:crypto';
 import { extname } from 'node:path';

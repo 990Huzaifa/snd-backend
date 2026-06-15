@@ -4,6 +4,7 @@ import { User } from "./user.entity";
 import { SchemeRetailer, SchemeRetailerChannel } from "./scheme.entity";
 import { SaleOrder } from "./saleorder.entity";
 import { SaleVoucher } from "./sale-voucher.entity";
+import { SaleReturn } from "./sale-return.entity";
 
 @Entity('retailer_categories')
 export class RetailerCategory {
@@ -164,6 +165,9 @@ export class Retailer {
 
     @OneToMany(() => SaleVoucher, (saleVoucher) => saleVoucher.retailer)
     saleVouchers: SaleVoucher[];
+
+    @OneToMany(() => SaleReturn, (saleReturn) => saleReturn.retailer)
+    saleReturns: SaleReturn[];  
 }   
 
 @Entity('retailer_ledgers')

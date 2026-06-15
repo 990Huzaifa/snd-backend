@@ -20,7 +20,7 @@ import { RequirePermissions } from 'src/auth/require-permission.decorator';
 import { TenantConnectionGuard } from 'src/common/guards/tenant-connection.guard';
 import { TenantJwtGuard } from 'src/common/guards/tenant-jwt.guard';
 import { TenantCode, TenantConnection } from 'src/common/tenant/tenant-connection.decorator';
-import { RetailerCategoryService } from '../service/retailer-category.service';
+import { RetailerCategoryService } from '../service/retailer/retailer-category.service';
 import { CreateRetailerCategoryDto } from '../dto/retailer-category/create-retailer-category.dto';
 import { UpdateRetailerCategoryDto } from '../dto/retailer-category/update-retailer-category.dto';
 

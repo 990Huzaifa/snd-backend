@@ -7,8 +7,8 @@ import {
   ProductPricing,
   ProductPricingJob,
 } from 'src/tenant-db/entities/product.entity';
-import { ActivityLogService } from './activity-log.service';
-import { CreateProductPricingJobDto } from '../dto/product-pricing-job/create-product-pricing-job.dto';
+import { ActivityLogService } from '../activity-log.service';
+import { CreateProductPricingJobDto } from '../../dto/product-pricing-job/create-product-pricing-job.dto';
 import { Tenant } from 'src/master-db/entities/tenant.entity';
 import { TenantConnectionManager } from 'src/tenant-db/services/tenant-connection-manager.service';
 

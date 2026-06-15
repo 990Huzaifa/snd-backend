@@ -14,6 +14,7 @@ import { OpeningStockItem } from './opening-stock.entity';
 import { StockBalance, StockMovement } from './stock.entity';
 import { StockTransferItem } from './stock-transfer.entity';
 import { SchemeProduct, SchemeProductCategory } from './scheme.entity';
+import { SaleReturnItem } from './sale-return.entity';
 
 @Entity('product_categories')
 export class ProductCategory {
@@ -181,6 +182,9 @@ export class Product {
 
     @OneToMany(() => SchemeProduct, (schemeProduct) => schemeProduct.product, { onDelete: 'CASCADE' })
     schemes: SchemeProduct[];
+
+    @OneToMany(() => SaleReturnItem, (saleReturnItem) => saleReturnItem.product)
+    saleReturnItems: SaleReturnItem[];
 }
 
 @Entity('product_flavours')

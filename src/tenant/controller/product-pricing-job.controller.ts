@@ -7,7 +7,7 @@ import { RequirePermissions } from 'src/auth/require-permission.decorator';
 import { TenantConnectionGuard } from 'src/common/guards/tenant-connection.guard';
 import { TenantJwtGuard } from 'src/common/guards/tenant-jwt.guard';
 import { TenantConnection } from 'src/common/tenant/tenant-connection.decorator';
-import { ProductPricingJobService } from '../service/product-pricing-job.service';
+import { ProductPricingJobService } from '../service/product/product-pricing-job.service';
 import { CreateProductPricingJobDto } from '../dto/product-pricing-job/create-product-pricing-job.dto';
 
 @Controller('tenant/product-pricing-jobs')

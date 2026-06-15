@@ -21,8 +21,8 @@ import { TenantConnection } from 'src/common/tenant/tenant-connection.decorator'
 import { CreateSchemeDto } from '../dto/scheme/create-scheme.dto';
 import { UpdateSchemeDto } from '../dto/scheme/update-scheme.dto';
 import { SchemeService } from '../service/scheme.service';
-import { RetailerSchemeEngineService } from '../service/retailer-scheme-engine.service';
-import { ProductSchemeEngineService } from '../service/product-scheme-engine.service';
+import { RetailerSchemeEngineService } from '../service/retailer/retailer-scheme-engine.service';
+import { ProductSchemeEngineService } from '../service/product/product-scheme-engine.service';
 import { SaleOrder } from 'src/tenant-db/entities/saleorder.entity';
 
 @Controller('tenant/schemes')

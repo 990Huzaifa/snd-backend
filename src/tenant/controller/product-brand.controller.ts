@@ -8,7 +8,7 @@ import { RequirePermissions } from 'src/auth/require-permission.decorator';
 import { TenantConnectionGuard } from 'src/common/guards/tenant-connection.guard';
 import { TenantJwtGuard } from 'src/common/guards/tenant-jwt.guard';
 import { TenantCode, TenantConnection } from 'src/common/tenant/tenant-connection.decorator';
-import { ProductBrandService } from '../service/product-brand.service';
+import { ProductBrandService } from '../service/product/product-brand.service';
 import { CreateProductBrandDto } from '../dto/product-brand/create-product-brand.dto';
 import { UpdateProductBrandDto } from '../dto/product-brand/update-product-brand.dto';
 

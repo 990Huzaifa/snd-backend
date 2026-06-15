@@ -20,7 +20,7 @@ import { RequirePermissions } from 'src/auth/require-permission.decorator';
 import { TenantConnectionGuard } from 'src/common/guards/tenant-connection.guard';
 import { TenantJwtGuard } from 'src/common/guards/tenant-jwt.guard';
 import { TenantCode, TenantConnection } from 'src/common/tenant/tenant-connection.decorator';
-import { RetailerChannelService } from '../service/retailer-channel.service';
+import { RetailerChannelService } from '../service/retailer/retailer-channel.service';
 import { CreateRetailerChannelDto } from '../dto/retailer-channel/create-retailer-channel.dto';
 
 @Controller('tenant/retailer-channels')

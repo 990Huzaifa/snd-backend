@@ -20,7 +20,7 @@ import {
   TenantCode,
   TenantConnection,
 } from 'src/common/tenant/tenant-connection.decorator';
-import { RetailerService } from '../service/retailer.service';
+import { RetailerService } from '../service/retailer/retailer.service';
 import { CreateRetailerDto } from '../dto/retailer/create-retailer.dto';
 import { UpdateRetailerDto } from '../dto/retailer/update-retailer.dto';
 import { UpdateRetailerStatusDto } from '../dto/retailer/update-retailer-status.dto';

@@ -17,14 +17,14 @@ import {
 } from 'src/tenant-db/entities/retailer.entity';
 import { Route } from 'src/tenant-db/entities/route.entity';
 import { User } from 'src/tenant-db/entities/user.entity';
-import { ActivityLogService } from './activity-log.service';
-import { CreateRetailerDto } from '../dto/retailer/create-retailer.dto';
-import { UpdateRetailerDto } from '../dto/retailer/update-retailer.dto';
+import { ActivityLogService } from '../activity-log.service';
+import { CreateRetailerDto } from '../../dto/retailer/create-retailer.dto';
+import { UpdateRetailerDto } from '../../dto/retailer/update-retailer.dto';
 import {
   ASSET_RULES,
   AssetEntityType,
   AssetPurpose,
-} from '../config/asset-rules.config';
+} from '../../config/asset-rules.config';
 import { S3Service } from 'src/common/s3/s3.service';
 import { RetailerLedgerService } from './retailer-ledger.service';
 

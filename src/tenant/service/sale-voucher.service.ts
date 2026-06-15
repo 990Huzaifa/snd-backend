@@ -13,7 +13,7 @@ import {
 } from 'src/tenant-db/entities/sale-voucher.entity';
 import { User } from 'src/tenant-db/entities/user.entity';
 import { ActivityLogService } from './activity-log.service';
-import { RetailerLedgerService } from './retailer-ledger.service';
+import { RetailerLedgerService } from './retailer/retailer-ledger.service';
 import { CreateSaleVoucherDto } from '../dto/sale-voucher/create-sale-voucher.dto';
 import { UpdateSaleVoucherDto } from '../dto/sale-voucher/update-sale-voucher.dto';
 import { UpdateSaleVoucherStatusDto } from '../dto/sale-voucher/update-sale-voucher-status.dto';

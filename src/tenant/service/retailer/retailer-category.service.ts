@@ -6,14 +6,15 @@ import {
 } from '@nestjs/common';
 import { DataSource, Like } from 'typeorm';
 import * as XLSX from 'xlsx';
-import { Retailer, RetailerChannel } from 'src/tenant-db/entities/retailer.entity';
-import { ActivityLogService } from './activity-log.service';
-import { CreateRetailerChannelDto } from '../dto/retailer-channel/create-retailer-channel.dto';
-import { NotificationService } from './notification.service';
-import { TenantJob, TenantJobService } from './tenant-job.service';
+import { RetailerCategory } from 'src/tenant-db/entities/retailer.entity';
+import { ActivityLogService } from '../activity-log.service';
+import { CreateRetailerCategoryDto } from '../../dto/retailer-category/create-retailer-category.dto';
+import { UpdateRetailerCategoryDto } from '../../dto/retailer-category/update-retailer-category.dto';
+import { NotificationService } from '../notification.service';
+import { TenantJob, TenantJobService } from '../tenant-job.service';
 
 @Injectable()
-export class RetailerChannelService {
+export class RetailerCategoryService {
   constructor(
     private readonly activityLogService: ActivityLogService,
     private readonly notificationService: NotificationService,
@@ -75,8 +76,8 @@ export class RetailerChannelService {
   ) {
     const title =
       status === 'completed'
-        ? 'Retailer channel import completed'
-        : 'Retailer channel import failed';
+        ? 'Retailer category import completed'
+        : 'Retailer category import failed';
     const message =
       status === 'completed'
         ? `Import finished. Inserted: ${job.inserted}, Failed: ${job.failed}, Total: ${job.totalRows}`
@@ -88,7 +89,7 @@ export class RetailerChannelService {
         userId: user.userId,
         title,
         message,
-        type: 'retailer_channel_import',
+        type: 'retailer_category_import',
       },
       tenantCode,
       {
@@ -116,10 +117,10 @@ export class RetailerChannelService {
   ) {
     this.tenantJobService.startJob(jobId);
 
-    const channelRepo = tenantDb.getRepository(RetailerChannel);
+    const categoryRepo = tenantDb.getRepository(RetailerCategory);
     for (const row of rows) {
       try {
-        const exists = await channelRepo.findOne({ where: { name: row.name } });
+        const exists = await categoryRepo.findOne({ where: { name: row.name } });
         if (exists) {
           this.tenantJobService.appendLog(jobId, {
             row: row.row,
@@ -130,12 +131,12 @@ export class RetailerChannelService {
           continue;
         }
 
-        const created = await channelRepo.save(channelRepo.create({ name: row.name }));
+        const created = await categoryRepo.save(categoryRepo.create({ name: row.name }));
         this.tenantJobService.appendLog(jobId, {
           row: row.row,
           name: row.name,
           status: 'success',
-          metadata: { retailerChannelId: created.id },
+          metadata: { retailerCategoryId: created.id },
         });
       } catch (error) {
         this.tenantJobService.appendLog(jobId, {
@@ -152,7 +153,7 @@ export class RetailerChannelService {
     await this.activityLogService.recordActivityLog(tenantDb, {
       actorId: user.userId,
       action: 'TENANT_JOB_COMPLETED',
-      description: `Retailer channel import completed for ${completedJob.fileName}`,
+      description: `Retailer category import completed for ${completedJob.fileName}`,
       metadata: {
         jobId: completedJob.id,
         jobType: completedJob.jobType,
@@ -166,7 +167,7 @@ export class RetailerChannelService {
     await this.notifyImportCompletion(tenantDb, completedJob, user, tenantCode, 'completed');
   }
 
-  async importChannels(
+  async importCategories(
     tenantDb: DataSource,
     file: Express.Multer.File,
     user: any,
@@ -178,12 +179,12 @@ export class RetailerChannelService {
 
     const rows = this.parseNamesFromFile(file);
     if (!rows.length) {
-      throw new BadRequestException('No retailer channel names found in file');
+      throw new BadRequestException('No retailer category names found in file');
     }
 
     const job = this.tenantJobService.createJob({
       tenantCode,
-      jobType: 'RETAILER_CHANNEL_IMPORT',
+      jobType: 'RETAILER_CATEGORY_IMPORT',
       fileName: file.originalname,
       createdBy: user.userId,
       totalRows: rows.length,
@@ -192,7 +193,7 @@ export class RetailerChannelService {
     await this.activityLogService.recordActivityLog(tenantDb, {
       actorId: user.userId,
       action: 'TENANT_JOB_STARTED',
-      description: `Retailer channel import started for ${file.originalname}`,
+      description: `Retailer category import started for ${file.originalname}`,
       metadata: {
         jobId: job.id,
         jobType: job.jobType,
@@ -214,7 +215,7 @@ export class RetailerChannelService {
       await this.activityLogService.recordActivityLog(tenantDb, {
         actorId: user.userId,
         action: 'TENANT_JOB_FAILED',
-        description: `Retailer channel import failed for ${file.originalname}`,
+        description: `Retailer category import failed for ${file.originalname}`,
         metadata: {
           jobId: job.id,
           jobType: job.jobType,
@@ -226,34 +227,34 @@ export class RetailerChannelService {
     });
 
     return {
-      message: 'Retailer channel import started',
+      message: 'Retailer category import started',
       jobId: job.id,
       status: job.status,
       totalRows: job.totalRows,
     };
   }
 
-  async create(tenantDb: DataSource, dto: CreateRetailerChannelDto, user: any) {
+  async create(tenantDb: DataSource, dto: CreateRetailerCategoryDto, user: any) {
     const name = this.normalize(dto.name);
 
-    const existing = await tenantDb.getRepository(RetailerChannel).findOne({
+    const existing = await tenantDb.getRepository(RetailerCategory).findOne({
       where: { name },
     });
     if (existing) {
-      throw new ConflictException('Retailer channel with this name already exists');
+      throw new ConflictException('Shop category with this name already exists');
     }
 
-    const channel = tenantDb.getRepository(RetailerChannel).create({ name });
-    const created = await tenantDb.getRepository(RetailerChannel).save(channel);
+    const category = tenantDb.getRepository(RetailerCategory).create({ name });
+    const createdCategory = await tenantDb.getRepository(RetailerCategory).save(category);
 
     await this.activityLogService.recordActivityLog(tenantDb, {
       actorId: user.userId,
-      action: 'RETAILER_CHANNEL_CREATED',
-      description: `Retailer channel ${created.name} created`,
-      metadata: { retailerChannelId: created.id },
+      action: 'RETAILER_CATEGORY_CREATED',
+      description: `Shop category ${createdCategory.name} created`,
+      metadata: { shopCategoryId: createdCategory.id },
     });
 
-    return created;
+    return createdCategory;
   }
 
   async list(
@@ -263,7 +264,7 @@ export class RetailerChannelService {
     search: string,
     user: any,
   ) {
-    const [channels, total] = await tenantDb.getRepository(RetailerChannel).findAndCount({
+    const [categories, total] = await tenantDb.getRepository(RetailerCategory).findAndCount({
       where: { name: Like(`%${search}%`) },
       order: { createdAt: 'DESC' },
       skip: (page - 1) * limit,
@@ -272,59 +273,61 @@ export class RetailerChannelService {
 
     await this.activityLogService.recordActivityLog(tenantDb, {
       actorId: user.userId,
-      action: 'RETAILER_CHANNEL_LISTED',
-      description: 'Retailer channels listed',
+      action: 'RETAILER_CATEGORY_LISTED',
+      description: 'Shop categories listed',
       metadata: { total, page, limit },
     });
 
-    return { result: channels, meta: { total, page, limit } };
+    return { result: categories, meta: { total, page, limit } };
   }
 
   async view(tenantDb: DataSource, id: string, user: any) {
-    const channel = await tenantDb.getRepository(RetailerChannel).findOne({
+    const category = await tenantDb.getRepository(RetailerCategory).findOne({
       where: { id },
     });
 
-    if (!channel) {
-      throw new NotFoundException('Retailer channel not found');
+    if (!category) {
+      throw new NotFoundException('Shop category not found');
     }
 
     await this.activityLogService.recordActivityLog(tenantDb, {
       actorId: user.userId,
-      action: 'RETAILER_CHANNEL_VIEWED',
-      description: `Retailer channel ${channel.name} viewed`,
-      metadata: { retailerChannelId: channel.id },
+      action: 'RETAILER_CATEGORY_VIEWED',
+      description: `Shop category ${category.name} viewed`,
+      metadata: { shopCategoryId: category.id },
     });
 
-    return channel;
+    return category;
   }
 
-  async delete(tenantDb: DataSource, id: string, user: any) {
-    const channelRepo = tenantDb.getRepository(RetailerChannel);
-    const retailerRepo = tenantDb.getRepository(Retailer);
+    async edit(tenantDb: DataSource, id: string, dto: UpdateRetailerCategoryDto, user: any) {
+    const repo = tenantDb.getRepository(RetailerCategory);
+    const category = await repo.findOne({ where: { id } });
 
-    const channel = await channelRepo.findOne({ where: { id } });
-    if (!channel) {
-      throw new NotFoundException('Retailer channel not found');
+    if (!category) {
+      throw new NotFoundException('Shop category not found');
     }
 
-    const inUseCount = await retailerRepo.count({
-      where: { retailerChannelId: channel.id },
-    });
-
-    if (inUseCount > 0) {
-      throw new ConflictException('Retailer channel is in use by retailers and cannot be deleted');
+    if (dto.name !== undefined) {
+      const nextName = this.normalize(dto.name);
+      if (nextName !== category.name) {
+        const nameTaken = await repo.findOne({ where: { name: nextName } });
+        if (nameTaken) {
+          throw new ConflictException('Shop category with this name already exists');
+        }
+        category.name = nextName;
+      }
     }
 
-    await channelRepo.remove(channel);
+    const updated = await repo.save(category);
 
     await this.activityLogService.recordActivityLog(tenantDb, {
       actorId: user.userId,
-      action: 'RETAILER_CHANNEL_DELETED',
-      description: `Retailer channel ${channel.name} deleted`,
-      metadata: { retailerChannelId: channel.id },
+      action: 'RETAILER_CATEGORY_UPDATED',
+      description: `Shop category ${updated.name} updated`,
+      metadata: { shopCategoryId: updated.id },
     });
 
-    return { message: 'Retailer channel deleted successfully' };
+    return updated;
   }
 }
