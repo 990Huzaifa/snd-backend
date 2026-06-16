@@ -241,7 +241,7 @@ export class LoadsheetService {
     }
 
     const total = await qb.clone().getCount();
-    const result = await qb
+    const sheets = await qb
       .clone()
       .select([
         'ls.id',
@@ -261,6 +261,59 @@ export class LoadsheetService {
       .skip((page - 1) * limit)
       .take(limit)
       .getMany();
+
+    const loadSheetIds = sheets.map((sheet) => sheet.id);
+    const orderCountByLoadSheetId = new Map<string, number>();
+    const productStatsByLoadSheetId = new Map<
+      string,
+      { productCount: number; totalQty: number }
+    >();
+
+    if (loadSheetIds.length) {
+      const orderCounts = await tenantDb
+        .getRepository(LoadSheetOrder)
+        .createQueryBuilder('lso')
+        .select('lso.loadSheetId', 'loadSheetId')
+        .addSelect('COUNT(lso.id)', 'orderCount')
+        .where('lso.loadSheetId IN (:...loadSheetIds)', { loadSheetIds })
+        .groupBy('lso.loadSheetId')
+        .getRawMany<{ loadSheetId: string; orderCount: string }>();
+
+      for (const row of orderCounts) {
+        orderCountByLoadSheetId.set(row.loadSheetId, Number(row.orderCount));
+      }
+
+      const productStats = await tenantDb
+        .getRepository(LoadSheetItem)
+        .createQueryBuilder('lsi')
+        .select('lsi.loadSheetId', 'loadSheetId')
+        .addSelect('COUNT(lsi.id)', 'productCount')
+        .addSelect('COALESCE(SUM(lsi.quantity), 0)', 'totalQty')
+        .where('lsi.loadSheetId IN (:...loadSheetIds)', { loadSheetIds })
+        .groupBy('lsi.loadSheetId')
+        .getRawMany<{
+          loadSheetId: string;
+          productCount: string;
+          totalQty: string;
+        }>();
+
+      for (const row of productStats) {
+        productStatsByLoadSheetId.set(row.loadSheetId, {
+          productCount: Number(row.productCount),
+          totalQty: Number(row.totalQty),
+        });
+      }
+    }
+
+    const result = sheets.map((sheet) => {
+      const productStats = productStatsByLoadSheetId.get(sheet.id);
+      return {
+        ...sheet,
+        orderCount: orderCountByLoadSheetId.get(sheet.id) ?? 0,
+        productCount: productStats?.productCount ?? 0,
+        totalQty: productStats?.totalQty ?? 0,
+      };
+    });
 
     await this.activityLogService.recordActivityLog(tenantDb, {
       actorId: user.userId,
@@ -586,7 +639,6 @@ export class LoadsheetService {
     return {
       loadSheet: sheet,
       loadSheetItems: sheet.loadSheetItems ?? [],
-      loadSheetOrders: sheet.loadSheetOrders ?? [],
     };
   }
 }

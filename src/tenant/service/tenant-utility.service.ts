@@ -19,6 +19,7 @@ import { Retailer, RetailerCategory, RetailerChannel } from 'src/tenant-db/entit
 import { Route } from 'src/tenant-db/entities/route.entity';
 import { User } from 'src/tenant-db/entities/user.entity';
 import { PJP, PJPStatus } from 'src/tenant-db/entities/pjp.entity';
+import { OrderStatus, SaleOrder } from 'src/tenant-db/entities/saleorder.entity';
 
 @Injectable()
 export class TenantUtilityService {
@@ -337,6 +338,54 @@ export class TenantUtilityService {
     });
 
     return { result: retailers };
+  }
+
+  async getSaleOrders(
+    tenantDb: DataSource,
+    status?: string,
+    distributorId?: string,
+  ) {
+    const normalizedStatus = (status ?? '').trim();
+    if (normalizedStatus && !Object.values(OrderStatus).includes(normalizedStatus as OrderStatus)) {
+      throw new BadRequestException('Invalid sale order status');
+    }
+
+    const normalizedDistributorId = (distributorId ?? '').trim();
+
+    const qb = tenantDb
+      .getRepository(SaleOrder)
+      .createQueryBuilder('so')
+      .leftJoin('so.retailer', 'retailer')
+      .leftJoin('so.distributor', 'distributor')
+      .select([
+        'so.id',
+        'so.orderNumber',
+        'so.orderStatus',
+        'so.orderDate',
+        'so.totalAmount',
+        'so.distributorId',
+        'distributor.id',
+        'distributor.name',
+        'retailer.id',
+        'retailer.shopName',
+      ]);
+
+    if (normalizedStatus) {
+      qb.andWhere('so."orderStatus" = :status', { status: normalizedStatus });
+    }
+
+    if (normalizedDistributorId) {
+      qb.andWhere('so."distributorId" = :distributorId', {
+        distributorId: normalizedDistributorId,
+      });
+    }
+
+    const saleOrders = await qb
+      .orderBy('so.orderDate', 'DESC')
+      .addOrderBy('so.orderNumber', 'DESC')
+      .getMany();
+
+    return { result: saleOrders };
   }
 
   async getStockProductsList(
