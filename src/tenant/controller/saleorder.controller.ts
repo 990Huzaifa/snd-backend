@@ -84,6 +84,24 @@ export class SaleOrderController {
     );
   }
 
+  @Get('product-schemes')
+  @RequirePermissions('VIEW_SALE_ORDER')
+  getProductSchemes(
+    @TenantConnection() tenantDb: DataSource,
+    @Query() dto: GetProductSchemesDto,
+  ) {
+    return this.saleOrderService.getEligibleProductSchemes(tenantDb, dto);
+  }
+
+  @Get('retailer-schemes')
+  @RequirePermissions('VIEW_SALE_ORDER')
+  getRetailerSchemes(
+    @TenantConnection() tenantDb: DataSource,
+    @Query() dto: GetRetailerSchemesDto,
+  ) {
+    return this.saleOrderService.getEligibleRetailerSchemes(tenantDb, dto);
+  }
+
   @Get(':id')
   @RequirePermissions('VIEW_SALE_ORDER')
   view(
@@ -97,7 +115,6 @@ export class SaleOrderController {
       req.user as { userId: string },
     );
   }
-  
 
   @Put('update/:id/status')
   @RequirePermissions('UPDATE_SALE_ORDER_STATUS')
@@ -115,21 +132,4 @@ export class SaleOrderController {
     );
   }
 
-  @Post('product-schemes')
-  @RequirePermissions('VIEW_SALE_ORDER')
-  getProductSchemes(
-    @TenantConnection() tenantDb: DataSource,
-    @Body() dto: GetProductSchemesDto,
-  ) {
-    return this.saleOrderService.getEligibleProductSchemes(tenantDb, dto);
-  }
-
-  @Post('retailer-schemes')
-  @RequirePermissions('VIEW_SALE_ORDER')
-  getRetailerSchemes(
-    @TenantConnection() tenantDb: DataSource,
-    @Body() dto: GetRetailerSchemesDto,
-  ) {
-    return this.saleOrderService.getEligibleRetailerSchemes(tenantDb, dto);
-  }
 }
