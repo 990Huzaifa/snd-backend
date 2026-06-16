@@ -386,6 +386,7 @@ export class TenantUtilityService {
         'distributor.name',
         'retailer.id',
         'retailer.shopName',
+        'retailer.address',
         'salesman.id',
         'salesman.name',
         'route.id',
