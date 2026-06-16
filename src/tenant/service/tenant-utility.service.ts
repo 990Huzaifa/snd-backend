@@ -19,7 +19,11 @@ import { Retailer, RetailerCategory, RetailerChannel } from 'src/tenant-db/entit
 import { Route } from 'src/tenant-db/entities/route.entity';
 import { User, UserType } from 'src/tenant-db/entities/user.entity';
 import { PJP, PJPStatus } from 'src/tenant-db/entities/pjp.entity';
-import { OrderStatus, SaleOrder } from 'src/tenant-db/entities/saleorder.entity';
+import {
+  OrderStatus,
+  SaleOrder,
+  SaleOrderItem,
+} from 'src/tenant-db/entities/saleorder.entity';
 
 @Injectable()
 export class TenantUtilityService {
@@ -375,6 +379,8 @@ export class TenantUtilityService {
       .createQueryBuilder('so')
       .leftJoin('so.retailer', 'retailer')
       .leftJoin('so.distributor', 'distributor')
+      .leftJoin('so.salesman', 'salesman')
+      .leftJoin('so.route', 'route')
       .select([
         'so.id',
         'so.orderNumber',
@@ -408,6 +414,44 @@ export class TenantUtilityService {
       .addOrderBy('so.orderNumber', 'DESC')
       .getMany();
 
-    return { result: saleOrders };
+    const saleOrderIds = saleOrders.map((order) => order.id);
+    const itemStatsByOrderId = new Map<
+      string,
+      { totalProducts: number; totalQuantity: number }
+    >();
+
+    if (saleOrderIds.length) {
+      const itemStats = await tenantDb
+        .getRepository(SaleOrderItem)
+        .createQueryBuilder('soi')
+        .select('soi.saleOrderId', 'saleOrderId')
+        .addSelect('COUNT(DISTINCT soi."productId")', 'totalProducts')
+        .addSelect('COALESCE(SUM(soi.quantity), 0)', 'totalQuantity')
+        .where('soi.saleOrderId IN (:...saleOrderIds)', { saleOrderIds })
+        .groupBy('soi.saleOrderId')
+        .getRawMany<{
+          saleOrderId: string;
+          totalProducts: string;
+          totalQuantity: string;
+        }>();
+
+      for (const row of itemStats) {
+        itemStatsByOrderId.set(row.saleOrderId, {
+          totalProducts: Number(row.totalProducts),
+          totalQuantity: Number(row.totalQuantity),
+        });
+      }
+    }
+
+    const result = saleOrders.map((order) => {
+      const stats = itemStatsByOrderId.get(order.id);
+      return {
+        ...order,
+        totalProducts: stats?.totalProducts ?? 0,
+        totalQuantity: stats?.totalQuantity ?? 0,
+      };
+    });
+
+    return { result };
   }
 }
