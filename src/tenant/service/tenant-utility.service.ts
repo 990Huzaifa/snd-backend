@@ -187,12 +187,47 @@ export class TenantUtilityService {
         id: true,
         name: true,
         skuCode: true,
+        pricing: {
+          id: true,
+          productId: true,
+          uomId: true,
+          tradePrice: true,
+          retailPrice: true,
+          uom: {
+            id: true,
+            name: true,
+            isBase: true,
+          },
+        },
         flavours: {
           id: true,
           flavourId: true,
           flavour: {
             id: true,
             name: true,
+          },
+        },
+        stockBalances: {
+          id: true,
+          distributorId: true,
+          productFlavourId: true,
+          uomId: true,
+          quantityAvailable: true,
+          quantityOnHand: true,
+          quantityReserved: true,
+          quantityDamaged: true,
+          uom: {
+            id: true,
+            name: true,
+            isBase: true,
+          },
+          productFlavour: {
+            id: true,
+            flavourId: true,
+            flavour: {
+              id: true,
+              name: true,
+            },
           },
         },
       },
@@ -203,11 +238,49 @@ export class TenantUtilityService {
         flavours: {
           flavour: true,
         },
+        stockBalances: {
+          uom: true,
+          productFlavour: {
+            flavour: true,
+          },
+        },
       },
       order: { name: 'ASC' },
     });
 
-    return { result: productList };
+    const result = productList.map((product) => ({
+      id: product.id,
+      skuCode: product.skuCode,
+      name: product.name,
+      flavours: product.flavours,
+      pricing: (product.pricing ?? []).map((price) => ({
+        id: price.id,
+        productId: price.productId,
+        uomId: price.uomId,
+        uom: price.uom,
+        tradePrice: price.tradePrice,
+        retailPrice: price.retailPrice,
+      })),
+      stock: (product.stockBalances ?? []).map((stockBalance) => ({
+        id: stockBalance.id,
+        distributorId: stockBalance.distributorId,
+        productFlavourId: stockBalance.productFlavourId,
+        productFlavour: stockBalance.productFlavour?.flavour
+          ? {
+              id: stockBalance.productFlavour.flavour.id,
+              name: stockBalance.productFlavour.flavour.name,
+            }
+          : null,
+        uomId: stockBalance.uomId,
+        uom: stockBalance.uom,
+        quantityAvailable: stockBalance.quantityAvailable,
+        quantityOnHand: stockBalance.quantityOnHand,
+        quantityReserved: stockBalance.quantityReserved,
+        quantityDamaged: stockBalance.quantityDamaged,
+      })),
+    }));
+
+    return { result };
   }
 
   async getRoutes(tenantDb: DataSource) {
