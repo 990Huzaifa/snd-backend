@@ -627,7 +627,28 @@ export class LoadsheetService {
   }
 
   async printData(tenantDb: DataSource, id: string, user: { userId: string }) {
-    const sheet = await this.view(tenantDb, id, user, { recordActivityLog: false });
+    const sheet = await tenantDb.getRepository(LoadSheet).findOne({
+      where: { id },
+      relations: [
+        'distributor',
+        'rider',
+        'createdByUser',
+        'loadSheetItems',
+        'loadSheetItems.product',
+        'loadSheetItems.productFlavour',
+        'loadSheetItems.productFlavour.flavour',
+        'loadSheetItems.productPricing',
+        'loadSheetItems.productPricing.uom',
+      ],
+      order: {
+        loadSheetItems: { createdAt: 'ASC' },
+      },
+    });
+
+    if (!sheet) {
+      throw new NotFoundException('Load sheet not found');
+    }
+
 
     await this.activityLogService.recordActivityLog(tenantDb, {
       actorId: user.userId,
@@ -638,7 +659,6 @@ export class LoadsheetService {
 
     return {
       loadSheet: sheet,
-      loadSheetItems: sheet.loadSheetItems ?? [],
     };
   }
 }
