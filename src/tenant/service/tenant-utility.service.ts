@@ -188,47 +188,12 @@ export class TenantUtilityService {
         id: true,
         name: true,
         skuCode: true,
-        pricing: {
-          id: true,
-          productId: true,
-          uomId: true,
-          tradePrice: true,
-          retailPrice: true,
-          uom: {
-            id: true,
-            name: true,
-            isBase: true,
-          },
-        },
         flavours: {
           id: true,
           flavourId: true,
           flavour: {
             id: true,
             name: true,
-          },
-        },
-        stockBalances: {
-          id: true,
-          distributorId: true,
-          productFlavourId: true,
-          uomId: true,
-          quantityAvailable: true,
-          quantityOnHand: true,
-          quantityReserved: true,
-          quantityDamaged: true,
-          uom: {
-            id: true,
-            name: true,
-            isBase: true,
-          },
-          productFlavour: {
-            id: true,
-            flavourId: true,
-            flavour: {
-              id: true,
-              name: true,
-            },
           },
         },
       },
@@ -239,49 +204,11 @@ export class TenantUtilityService {
         flavours: {
           flavour: true,
         },
-        stockBalances: {
-          uom: true,
-          productFlavour: {
-            flavour: true,
-          },
-        },
       },
       order: { name: 'ASC' },
     });
 
-    const result = productList.map((product) => ({
-      id: product.id,
-      skuCode: product.skuCode,
-      name: product.name,
-      flavours: product.flavours,
-      pricing: (product.pricing ?? []).map((price) => ({
-        id: price.id,
-        productId: price.productId,
-        uomId: price.uomId,
-        uom: price.uom,
-        tradePrice: price.tradePrice,
-        retailPrice: price.retailPrice,
-      })),
-      stock: (product.stockBalances ?? []).map((stockBalance) => ({
-        id: stockBalance.id,
-        distributorId: stockBalance.distributorId,
-        productFlavourId: stockBalance.productFlavourId,
-        productFlavour: stockBalance.productFlavour?.flavour
-          ? {
-              id: stockBalance.productFlavour.flavour.id,
-              name: stockBalance.productFlavour.flavour.name,
-            }
-          : null,
-        uomId: stockBalance.uomId,
-        uom: stockBalance.uom,
-        quantityAvailable: stockBalance.quantityAvailable,
-        quantityOnHand: stockBalance.quantityOnHand,
-        quantityReserved: stockBalance.quantityReserved,
-        quantityDamaged: stockBalance.quantityDamaged,
-      })),
-    }));
-
-    return { result };
+    return { result: productList };
   }
 
   async getRoutes(tenantDb: DataSource) {
@@ -338,54 +265,6 @@ export class TenantUtilityService {
     });
 
     return { result: retailers };
-  }
-
-  async getSaleOrders(
-    tenantDb: DataSource,
-    status?: string,
-    distributorId?: string,
-  ) {
-    const normalizedStatus = (status ?? '').trim();
-    if (normalizedStatus && !Object.values(OrderStatus).includes(normalizedStatus as OrderStatus)) {
-      throw new BadRequestException('Invalid sale order status');
-    }
-
-    const normalizedDistributorId = (distributorId ?? '').trim();
-
-    const qb = tenantDb
-      .getRepository(SaleOrder)
-      .createQueryBuilder('so')
-      .leftJoin('so.retailer', 'retailer')
-      .leftJoin('so.distributor', 'distributor')
-      .select([
-        'so.id',
-        'so.orderNumber',
-        'so.orderStatus',
-        'so.orderDate',
-        'so.totalAmount',
-        'so.distributorId',
-        'distributor.id',
-        'distributor.name',
-        'retailer.id',
-        'retailer.shopName',
-      ]);
-
-    if (normalizedStatus) {
-      qb.andWhere('so."orderStatus" = :status', { status: normalizedStatus });
-    }
-
-    if (normalizedDistributorId) {
-      qb.andWhere('so."distributorId" = :distributorId', {
-        distributorId: normalizedDistributorId,
-      });
-    }
-
-    const saleOrders = await qb
-      .orderBy('so.orderDate', 'DESC')
-      .addOrderBy('so.orderNumber', 'DESC')
-      .getMany();
-
-    return { result: saleOrders };
   }
 
   async getStockProductsList(
@@ -459,10 +338,59 @@ export class TenantUtilityService {
         quantityAvailable: balance.quantityAvailable,
         quantityOnHand: balance.quantityOnHand,
         purchaseUnitPrice: Number(pricing?.tradePrice ?? 0),
-        saleUnitPrice: Number(pricing?.retailPrice ?? 0),
+        tradeUnitPrice: Number(pricing?.tradePrice ?? 0),
+        retailUnitPrice: Number(pricing?.retailPrice ?? 0),
       };
     });
 
     return { result };
+  }
+
+  async getSaleOrders(
+    tenantDb: DataSource,
+    status?: string,
+    distributorId?: string,
+  ) {
+    const normalizedStatus = (status ?? '').trim();
+    if (normalizedStatus && !Object.values(OrderStatus).includes(normalizedStatus as OrderStatus)) {
+      throw new BadRequestException('Invalid sale order status');
+    }
+
+    const normalizedDistributorId = (distributorId ?? '').trim();
+
+    const qb = tenantDb
+      .getRepository(SaleOrder)
+      .createQueryBuilder('so')
+      .leftJoin('so.retailer', 'retailer')
+      .leftJoin('so.distributor', 'distributor')
+      .select([
+        'so.id',
+        'so.orderNumber',
+        'so.orderStatus',
+        'so.orderDate',
+        'so.totalAmount',
+        'so.distributorId',
+        'distributor.id',
+        'distributor.name',
+        'retailer.id',
+        'retailer.shopName',
+      ]);
+
+    if (normalizedStatus) {
+      qb.andWhere('so."orderStatus" = :status', { status: normalizedStatus });
+    }
+
+    if (normalizedDistributorId) {
+      qb.andWhere('so."distributorId" = :distributorId', {
+        distributorId: normalizedDistributorId,
+      });
+    }
+
+    const saleOrders = await qb
+      .orderBy('so.orderDate', 'DESC')
+      .addOrderBy('so.orderNumber', 'DESC')
+      .getMany();
+
+    return { result: saleOrders };
   }
 }
