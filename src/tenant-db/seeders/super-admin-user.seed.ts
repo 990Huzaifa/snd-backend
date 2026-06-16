@@ -1,7 +1,7 @@
 import * as bcrypt from 'bcrypt';
 import { DataSource } from 'typeorm';
 import { Role } from '../entities/role.entity';
-import { Designation, User } from '../entities/user.entity';
+import { Designation, User, UserType } from '../entities/user.entity';
 
 export const TENANT_SUPER_ADMIN_USER = {
   code: 'SND-TENANT-ADMIN',
@@ -42,6 +42,7 @@ export async function seedTenantSuperAdminUser(dataSource: DataSource) {
   if (!existing) {
     const user = userRepo.create({
       code: TENANT_SUPER_ADMIN_USER.code,
+      type: UserType.ADMIN,
       name: TENANT_SUPER_ADMIN_USER.name,
       email,
       password: await bcrypt.hash(TENANT_SUPER_ADMIN_USER.password, 10),
@@ -70,6 +71,10 @@ export async function seedTenantSuperAdminUser(dataSource: DataSource) {
     }
     if (existing.isDeleted) {
       existing.isDeleted = false;
+      shouldUpdate = true;
+    }
+    if (existing.type !== UserType.ADMIN) {
+      existing.type = UserType.ADMIN;
       shouldUpdate = true;
     }
 

@@ -2,11 +2,13 @@ import {
   IsBoolean,
   IsDate,
   IsEmail,
+  IsEnum,
   IsInt,
   IsOptional,
   IsString,
   MinLength,
 } from 'class-validator';
+import { UserType } from 'src/tenant-db/entities/user.entity';
 
 export class CreateTenantUserDto {
 
@@ -24,6 +26,10 @@ export class CreateTenantUserDto {
   @IsString()
   @MinLength(1)
   roleId: string;
+
+  @IsOptional()
+  @IsEnum(UserType)
+  type?: UserType;
 
   @IsInt()
   designationId?: number;

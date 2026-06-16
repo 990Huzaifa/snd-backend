@@ -15,6 +15,15 @@ import { Attendence } from './attendence.entity';
 import { SaleOrder } from './saleorder.entity';
 import { SaleVoucher } from './sale-voucher.entity';
 
+export enum UserType {
+    ADMIN = 'ADMIN',
+    SALESMAN = 'SALESMAN',
+    RIDER = 'RIDER',
+    MERCHANDISER = 'MERCHANDISER',
+    SPG = 'SPG',
+    USER = 'USER',
+    OTHER = 'OTHER',
+}
 
 @Entity('designations')
 export class Designation {
@@ -52,6 +61,9 @@ export class User {
 
     @Column({unique: true})
     code: string;
+
+    @Column({type: 'enum', enum: UserType, default: UserType.USER})
+    type: UserType;
 
     @Column()
     name: string;

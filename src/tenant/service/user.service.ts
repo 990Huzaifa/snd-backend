@@ -9,7 +9,7 @@ import { JwtService } from '@nestjs/jwt';
 import { DataSource, In, Like, Not, Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { MailService } from 'src/common/mail/mail.service';
-import { SalesmanDistributor, User } from 'src/tenant-db/entities/user.entity';
+import { SalesmanDistributor, User, UserType } from 'src/tenant-db/entities/user.entity';
 import { Role } from 'src/tenant-db/entities/role.entity';
 import { Designation } from 'src/tenant-db/entities/user.entity';
 import { Asset, AssetStatus } from 'src/tenant-db/entities/asset.entity';
@@ -292,6 +292,7 @@ export class UserService {
 
     const user = userRepo.create({
       code,
+      type: dto.type ?? UserType.USER,
       name: dto.name.trim(),
       email,
       password: await bcrypt.hash(dto.password, 10),
