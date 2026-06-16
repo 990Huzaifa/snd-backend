@@ -386,6 +386,10 @@ export class TenantUtilityService {
         'distributor.name',
         'retailer.id',
         'retailer.shopName',
+        'salesman.id',
+        'salesman.name',
+        'route.id',
+        'route.name',
       ]);
 
     if (normalizedStatus) {
