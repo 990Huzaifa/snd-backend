@@ -28,11 +28,11 @@ export class CreateRetailerDto {
 
   @IsOptional()
   @IsString()
-  Phone?: string;
+  phone?: string;
 
   @IsOptional()
   @IsEmail()
-  Email?: string;
+  email?: string;
 
   @IsOptional()
   @IsString()
@@ -47,7 +47,7 @@ export class CreateRetailerDto {
   NTN?: string;
 
   @IsString()
-  Address: string;
+  address: string;
 
   @IsString()
   latitude: string;

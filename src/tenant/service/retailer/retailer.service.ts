@@ -169,15 +169,15 @@ export class RetailerService {
         shopName: this.normalize(dto.shopName),
         ownerName: this.normalize(dto.ownerName),
         image: retailerImage,
-        Phone: this.normalizeOptional(dto.Phone) ?? null,
-        Email:
-          dto.Email !== undefined && dto.Email !== null
-            ? this.normalize(dto.Email).toLowerCase()
+        phone: this.normalizeOptional(dto.phone) ?? null,
+        email:
+          dto.email !== undefined && dto.email !== null
+            ? this.normalize(dto.email).toLowerCase()
             : null,
         CNIC: this.normalizeOptional(dto.CNIC) ?? null,
         STRN: this.normalizeOptional(dto.STRN) ?? null,
         NTN: this.normalizeOptional(dto.NTN) ?? null,
-        Address: this.normalize(dto.Address),
+        address: this.normalize(dto.address),
         latitude: this.normalize(dto.latitude),
         longitude: this.normalize(dto.longitude),
         maxRadius: this.normalize(dto.maxRadius),
@@ -258,8 +258,8 @@ export class RetailerService {
           sub
             .where('retailer.shopName LIKE :search', { search: `%${normalizedSearch}%` })
             .orWhere('retailer.ownerName LIKE :search', { search: `%${normalizedSearch}%` })
-            .orWhere('retailer.Phone LIKE :search', { search: `%${normalizedSearch}%` })
-            .orWhere('retailer.Email LIKE :search', { search: `%${normalizedSearch}%` })
+            .orWhere('retailer.phone LIKE :search', { search: `%${normalizedSearch}%` })
+            .orWhere('retailer.email LIKE :search', { search: `%${normalizedSearch}%` })
             .orWhere('retailer.CNIC LIKE :search', { search: `%${normalizedSearch}%` });
         }),
       );
@@ -435,19 +435,19 @@ export class RetailerService {
       } else if (dto.image !== undefined) {
         retailer.image = this.normalizeOptional(dto.image) ?? null;
       }
-      if (dto.Phone !== undefined) {
-        retailer.Phone = this.normalizeOptional(dto.Phone) ?? null;
+      if (dto.phone !== undefined) {
+        retailer.phone = this.normalizeOptional(dto.phone) ?? null;
       }
-      if (dto.Email !== undefined) {
-        retailer.Email =
-          dto.Email === null || dto.Email === ''
+      if (dto.email !== undefined) {
+        retailer.email =
+          dto.email === null || dto.email === ''
             ? null
-            : this.normalize(dto.Email).toLowerCase();
+            : this.normalize(dto.email).toLowerCase();
       }
       if (dto.CNIC !== undefined) retailer.CNIC = this.normalizeOptional(dto.CNIC) ?? null;
       if (dto.STRN !== undefined) retailer.STRN = this.normalizeOptional(dto.STRN) ?? null;
       if (dto.NTN !== undefined) retailer.NTN = this.normalizeOptional(dto.NTN) ?? null;
-      if (dto.Address !== undefined) retailer.Address = this.normalize(dto.Address);
+      if (dto.address !== undefined) retailer.address = this.normalize(dto.address);
       if (dto.latitude !== undefined) retailer.latitude = this.normalize(dto.latitude);
       if (dto.longitude !== undefined) retailer.longitude = this.normalize(dto.longitude);
       if (dto.maxRadius !== undefined) retailer.maxRadius = this.normalize(dto.maxRadius);

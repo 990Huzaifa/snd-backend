@@ -79,10 +79,10 @@ export class Retailer {
     image: string;
 
     @Column({nullable: true})
-    Phone: string;
+    phone: string;
 
     @Column({nullable: true})
-    Email: string;
+    email: string;
 
     @Column({nullable: true})
     CNIC: string;
@@ -94,7 +94,7 @@ export class Retailer {
     NTN: string;
 
     @Column()
-    Address: string;
+    address: string;
 
     @Column()
     latitude: string;

@@ -28,11 +28,11 @@ export class UpdateRetailerDto {
 
   @IsOptional()
   @IsString()
-  Phone?: string;
+  phone?: string;
 
   @IsOptional()
   @IsEmail()
-  Email?: string;
+  email?: string;
 
   @IsOptional()
   @IsString()
@@ -48,7 +48,7 @@ export class UpdateRetailerDto {
 
   @IsOptional()
   @IsString()
-  Address?: string;
+  address?: string;
 
   @IsOptional()
   @IsString()
