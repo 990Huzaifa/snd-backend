@@ -96,6 +96,21 @@ export class TenantUtilityController {
         return this.utilityService.getMerchandiserUsers(tenantDb);
     }
 
+    @Get('rider-users')
+    async getRiderUsers(@TenantConnection() tenantDb: DataSource,) {
+        return this.utilityService.getRiderUsers(tenantDb);
+    }
+
+    @Get('spg-users')
+    async getSPGUsers(@TenantConnection() tenantDb: DataSource,) {
+        return this.utilityService.getSPGUsers(tenantDb);
+    }
+
+    @Get('admin-users')
+    async getAdminUsers(@TenantConnection() tenantDb: DataSource,) {
+        return this.utilityService.getAdminUsers(tenantDb);
+    }
+
     @Get('pjps-by-user-id/:userId')
     async getPJPsByUserId(@TenantConnection() tenantDb: DataSource, @Param('userId') userId: string) {
         return this.utilityService.getPJPsByUserId(tenantDb, userId);

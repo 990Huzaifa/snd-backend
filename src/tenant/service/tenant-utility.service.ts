@@ -17,18 +17,18 @@ import {
 import { StockBalance } from 'src/tenant-db/entities/stock.entity';
 import { Retailer, RetailerCategory, RetailerChannel } from 'src/tenant-db/entities/retailer.entity';
 import { Route } from 'src/tenant-db/entities/route.entity';
-import { User } from 'src/tenant-db/entities/user.entity';
+import { User, UserType } from 'src/tenant-db/entities/user.entity';
 import { PJP, PJPStatus } from 'src/tenant-db/entities/pjp.entity';
 import { OrderStatus, SaleOrder } from 'src/tenant-db/entities/saleorder.entity';
 
 @Injectable()
 export class TenantUtilityService {
-  private async getUsersByRoleCode(tenantDb: DataSource, roleCode: string) {
+  private async getUsersByUserType(tenantDb: DataSource, type: UserType) {
     const users = await tenantDb.getRepository(User).find({
       where: {
         isDeleted: false,
         isActive: true,
-        role: { code: roleCode },
+        type: type,
       },
       relations: { role: true },
       select: {
@@ -45,11 +45,23 @@ export class TenantUtilityService {
   }
 
   async getSalesmanUsers(tenantDb: DataSource) {
-    return this.getUsersByRoleCode(tenantDb, 'SALESMAN');
+    return this.getUsersByUserType(tenantDb, UserType.SALESMAN);
   }
 
   async getMerchandiserUsers(tenantDb: DataSource) {
-    return this.getUsersByRoleCode(tenantDb, 'MERCHANDISER');
+    return this.getUsersByUserType(tenantDb, UserType.MERCHANDISER);
+  }
+
+  async getSPGUsers(tenantDb: DataSource) {
+    return this.getUsersByUserType(tenantDb, UserType.SPG);
+  }
+
+  async getRiderUsers(tenantDb: DataSource) {
+    return this.getUsersByUserType(tenantDb, UserType.RIDER);
+  }
+
+  async getAdminUsers(tenantDb: DataSource) {
+    return this.getUsersByUserType(tenantDb, UserType.ADMIN);
   }
 
   async getDesignations(tenantDb: DataSource) {
