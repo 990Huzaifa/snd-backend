@@ -128,8 +128,8 @@ export class TenantUserController {
 
   @Put(':id/approve-device')
   @RequirePermissions('UPDATE_USER')
-  approveDevice(@TenantConnection() tenantDb: DataSource, @Param('id') id: string, @Req() req: Request) {
-    return this.userService.approveDevice(tenantDb, id, req.user as { userId: string });
+  approveDevice(@TenantConnection() tenantDb: DataSource, @Param('id') id: string, @Query('status') status: any, @Req() req: Request) {
+    return this.userService.approveDevice(tenantDb, id, status, req.user as { userId: string });
   }
 
 }

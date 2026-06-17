@@ -579,13 +579,16 @@ export class UserService {
     };
   }
 
-  async approveDevice(tenantDb: DataSource, userId: string, Authuser: any) {
+  async approveDevice(tenantDb: DataSource, userId: string, status: DeviceApprovedStatus, Authuser: any) {
     const userRepo = tenantDb.getRepository(User);
     const user = await userRepo.findOne({ where: { id: userId } });
     if (!user) {
       throw new NotFoundException('User not found');
     }
-    user.deviceApprovedStatus = DeviceApprovedStatus.APPROVED;
+    user.deviceApprovedStatus = status;
+    if (status === DeviceApprovedStatus.REJECTED) {
+      user.deviceId = null;
+    }
     await userRepo.save(user);
 
     await this.activityLogService.recordActivityLog(tenantDb, {

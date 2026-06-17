@@ -110,19 +110,10 @@ export class TenantAuthService {
       throw new UnauthorizedException('User is deleted');
     }
 
-    // update device id and fcm token
-    if (user.deviceId !== dto.deviceId) {
-      user.deviceId = dto.deviceId ?? null;
-      user.deviceApprovedStatus = DeviceApprovedStatus.WAITING;
-    }
-    
+    this.applyDeviceBinding(user, dto);
     user.fcmToken = dto.fcmToken ?? null;
     await userRepo.save(user);
-
-    // if device approved status is not approved, throw an error
-    if (user.deviceApprovedStatus === DeviceApprovedStatus.WAITING) {
-      throw new UnauthorizedException('Device is waiting for approval, please wait for approval');
-    }
+    this.assertDeviceApproved(user);
 
     const payload = {
       type: 'tenant' as const,
@@ -149,6 +140,52 @@ export class TenantAuthService {
       user: user,
 
     };
+  }
+
+  /**
+   * One registered device per user. A new deviceId requires admin approval
+   * unless the account is already approved with no device bound yet.
+   */
+  private applyDeviceBinding(user: User, dto: TenantLoginDto): void {
+    const incomingDeviceId = dto.deviceId?.trim() || null;
+
+    if (!incomingDeviceId) {
+      if (user.deviceId) {
+        throw new UnauthorizedException('deviceId is required for this account');
+      }
+      return;
+    }
+
+    if (!user.deviceId) {
+      user.deviceId = incomingDeviceId;
+      if (user.deviceApprovedStatus !== DeviceApprovedStatus.APPROVED) {
+        user.deviceApprovedStatus = DeviceApprovedStatus.WAITING;
+      }
+      return;
+    }
+
+    if (user.deviceId !== incomingDeviceId) {
+      user.deviceId = incomingDeviceId;
+      user.deviceApprovedStatus = DeviceApprovedStatus.WAITING;
+    }
+  }
+
+  private assertDeviceApproved(user: User): void {
+    if (user.deviceApprovedStatus === DeviceApprovedStatus.WAITING) {
+      throw new UnauthorizedException(
+        'Device is waiting for approval, please wait for approval',
+      );
+    }
+    if (user.deviceApprovedStatus === DeviceApprovedStatus.REJECTED) {
+      throw new UnauthorizedException(
+        'Device was rejected. Contact your administrator to register a new device',
+      );
+    }
+    if (user.deviceApprovedStatus !== DeviceApprovedStatus.APPROVED) {
+      throw new UnauthorizedException(
+        'Device is not approved. Contact your administrator',
+      );
+    }
   }
 
   async setupInvitedUserPassword(
