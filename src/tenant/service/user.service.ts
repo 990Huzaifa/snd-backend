@@ -9,7 +9,7 @@ import { JwtService } from '@nestjs/jwt';
 import { DataSource, In, Like, Not, Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { MailService } from 'src/common/mail/mail.service';
-import { SalesmanDistributor, User, UserType } from 'src/tenant-db/entities/user.entity';
+import { DeviceApprovedStatus, SalesmanDistributor, User, UserType } from 'src/tenant-db/entities/user.entity';
 import { Role } from 'src/tenant-db/entities/role.entity';
 import { Designation } from 'src/tenant-db/entities/user.entity';
 import { Asset, AssetStatus } from 'src/tenant-db/entities/asset.entity';
@@ -576,6 +576,27 @@ export class UserService {
       message: 'Distributors assigned to user successfully',
       user,
       distributors,
+    };
+  }
+
+  async approveDevice(tenantDb: DataSource, userId: string, Authuser: any) {
+    const userRepo = tenantDb.getRepository(User);
+    const user = await userRepo.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+    user.deviceApprovedStatus = DeviceApprovedStatus.APPROVED;
+    await userRepo.save(user);
+
+    await this.activityLogService.recordActivityLog(tenantDb, {
+      actorId: Authuser.userId,
+      action: 'DEVICE_APPROVED',
+      description: `Device approved for user ${userId}`,
+      metadata: { userId: userId },
+    });
+    return {
+      message: 'Device approved successfully',
+      user,
     };
   }
 }

@@ -7,8 +7,11 @@ import {
   Put,
   Query,
   Req,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import type { Request } from 'express';
 import { DataSource } from 'typeorm';
 import { TenantJwtAuthGuard } from 'src/auth/tenant-jwt-auth.guard';
@@ -16,7 +19,11 @@ import { TenantPermissionGuard } from 'src/auth/tenant-permission.guard';
 import { RequirePermissions } from 'src/auth/require-permission.decorator';
 import { TenantConnectionGuard } from 'src/common/guards/tenant-connection.guard';
 import { TenantJwtGuard } from 'src/common/guards/tenant-jwt.guard';
-import { TenantConnection } from 'src/common/tenant/tenant-connection.decorator';
+import {
+  TenantCode,
+  TenantConnection,
+} from 'src/common/tenant/tenant-connection.decorator';
+import { saleVoucherPaymentProofMulterOptions } from '../config/sale-voucher-payment-proof.multer';
 import { SaleVoucherService } from '../service/sale-voucher.service';
 import { CreateSaleVoucherDto } from '../dto/sale-voucher/create-sale-voucher.dto';
 import { UpdateSaleVoucherDto } from '../dto/sale-voucher/update-sale-voucher.dto';
@@ -56,31 +63,45 @@ export class SaleVoucherController {
 
   @Post('create')
   @RequirePermissions('CREATE_SALE_VOUCHER')
+  @UseInterceptors(
+    FileInterceptor('paymentProof', saleVoucherPaymentProofMulterOptions),
+  )
   create(
     @TenantConnection() tenantDb: DataSource,
+    @TenantCode() tenantCode: string,
     @Body() dto: CreateSaleVoucherDto,
+    @UploadedFile() paymentProof: Express.Multer.File | undefined,
     @Req() req: Request,
   ) {
     return this.saleVoucherService.create(
       tenantDb,
+      tenantCode,
       dto,
       req.user as { userId: string },
+      paymentProof,
     );
   }
 
   @Put('update/:id')
   @RequirePermissions('UPDATE_SALE_VOUCHER')
+  @UseInterceptors(
+    FileInterceptor('paymentProof', saleVoucherPaymentProofMulterOptions),
+  )
   edit(
     @TenantConnection() tenantDb: DataSource,
+    @TenantCode() tenantCode: string,
     @Param('id') id: string,
     @Body() dto: UpdateSaleVoucherDto,
+    @UploadedFile() paymentProof: Express.Multer.File | undefined,
     @Req() req: Request,
   ) {
     return this.saleVoucherService.edit(
       tenantDb,
+      tenantCode,
       id,
       dto,
       req.user as { userId: string },
+      paymentProof,
     );
   }
 

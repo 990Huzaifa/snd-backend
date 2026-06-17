@@ -9,7 +9,7 @@ import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { Tenant, TenantStatus } from 'src/master-db/entities/tenant.entity';
 import { TenantConnectionManager } from 'src/tenant-db/services/tenant-connection-manager.service';
-import { User } from 'src/tenant-db/entities/user.entity';
+import { DeviceApprovedStatus, User } from 'src/tenant-db/entities/user.entity';
 import { TenantLoginDto } from '../dto/tenant-login.dto';
 import { SetupTenantUserPasswordDto } from '../dto/user/setup-tenant-user-password.dto';
 import { ActivityLogService } from './activity-log.service';
@@ -82,7 +82,7 @@ export class TenantAuthService {
 
     const user = await userRepo.findOne({
       where: { email },
-      relations: ['role'],
+      relations: ['role', 'assignedDistributors'],
     });
 
     if (
@@ -111,9 +111,18 @@ export class TenantAuthService {
     }
 
     // update device id and fcm token
-    user.deviceId = dto.deviceId ?? null;
+    if (user.deviceId !== dto.deviceId) {
+      user.deviceId = dto.deviceId ?? null;
+      user.deviceApprovedStatus = DeviceApprovedStatus.WAITING;
+    }
+    
     user.fcmToken = dto.fcmToken ?? null;
     await userRepo.save(user);
+
+    // if device approved status is not approved, throw an error
+    if (user.deviceApprovedStatus === DeviceApprovedStatus.WAITING) {
+      throw new UnauthorizedException('Device is waiting for approval, please wait for approval');
+    }
 
     const payload = {
       type: 'tenant' as const,
@@ -138,6 +147,7 @@ export class TenantAuthService {
     return {
       access_token: this.jwtService.sign(payload),
       user: user,
+
     };
   }
 

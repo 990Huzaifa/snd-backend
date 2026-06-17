@@ -54,6 +54,9 @@ export class SaleVoucher {
     @Column({ nullable: true })
     remarks: string;
 
+    @Column({ nullable: true })
+    paymentProof: string;
+
     @Column({ nullable: true, default: null })
     executedBy: string;
 

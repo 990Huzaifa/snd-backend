@@ -53,6 +53,13 @@ export class Designation {
 
 }
 
+export enum DeviceApprovedStatus {
+    PENDING = 'PENDING',
+    WAITING = 'WAITING',
+    APPROVED = 'APPROVED',
+    REJECTED = 'REJECTED',
+}
+
 
 @Entity('users')
 export class User {
@@ -135,6 +142,9 @@ export class User {
 
     @Column({ nullable: true })
     deviceId: string;
+
+    @Column({ type: 'enum', enum: DeviceApprovedStatus, default: DeviceApprovedStatus.PENDING })
+    deviceApprovedStatus: DeviceApprovedStatus;
 
     @Column({nullable: true})
     fcmToken: string;

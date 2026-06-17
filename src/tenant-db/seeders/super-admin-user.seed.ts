@@ -1,7 +1,7 @@
 import * as bcrypt from 'bcrypt';
 import { DataSource } from 'typeorm';
 import { Role } from '../entities/role.entity';
-import { Designation, User, UserType } from '../entities/user.entity';
+import { Designation, DeviceApprovedStatus, User, UserType } from '../entities/user.entity';
 
 export const TENANT_SUPER_ADMIN_USER = {
   code: 'SND-TENANT-ADMIN',
@@ -75,6 +75,11 @@ export async function seedTenantSuperAdminUser(dataSource: DataSource) {
     }
     if (existing.type !== UserType.ADMIN) {
       existing.type = UserType.ADMIN;
+      shouldUpdate = true;
+    }
+
+    if (existing.deviceApprovedStatus !== DeviceApprovedStatus.APPROVED) {
+      existing.deviceApprovedStatus = DeviceApprovedStatus.APPROVED;
       shouldUpdate = true;
     }
 

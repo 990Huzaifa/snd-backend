@@ -126,4 +126,10 @@ export class TenantUserController {
     return this.userService.updateUser(tenantDb, id, dto, req.user as { userId: string });
   }
 
+  @Put(':id/approve-device')
+  @RequirePermissions('UPDATE_USER')
+  approveDevice(@TenantConnection() tenantDb: DataSource, @Param('id') id: string, @Req() req: Request) {
+    return this.userService.approveDevice(tenantDb, id, req.user as { userId: string });
+  }
+
 }

@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { DataSource, EntityManager } from 'typeorm';
+import { S3Service } from 'src/common/s3/s3.service';
 import { RefType, Retailer } from 'src/tenant-db/entities/retailer.entity';
 import {
   PaymentMethod,
@@ -17,12 +18,17 @@ import { RetailerLedgerService } from './retailer/retailer-ledger.service';
 import { CreateSaleVoucherDto } from '../dto/sale-voucher/create-sale-voucher.dto';
 import { UpdateSaleVoucherDto } from '../dto/sale-voucher/update-sale-voucher.dto';
 import { UpdateSaleVoucherStatusDto } from '../dto/sale-voucher/update-sale-voucher-status.dto';
+import {
+  PAYMENT_PROOF_ALLOWED_MIME_TYPES,
+  PAYMENT_PROOF_MAX_BYTES,
+} from '../config/sale-voucher-payment-proof.multer';
 
 @Injectable()
 export class SaleVoucherService {
   constructor(
     private readonly activityLogService: ActivityLogService,
     private readonly retailerLedgerService: RetailerLedgerService,
+    private readonly s3Service: S3Service,
   ) {}
 
   private normalizePage(value: number): number {
@@ -129,6 +135,85 @@ export class SaleVoucherService {
     );
   }
 
+  private assertPaymentProofFile(file: Express.Multer.File) {
+    if (
+      !PAYMENT_PROOF_ALLOWED_MIME_TYPES.includes(
+        file.mimetype as (typeof PAYMENT_PROOF_ALLOWED_MIME_TYPES)[number],
+      )
+    ) {
+      throw new BadRequestException(
+        'paymentProof must be a PNG or JPEG image (png, jpg, jpeg)',
+      );
+    }
+    if (!file.buffer?.length) {
+      throw new BadRequestException('paymentProof file is empty');
+    }
+    if (file.size > PAYMENT_PROOF_MAX_BYTES) {
+      throw new BadRequestException(
+        `paymentProof must not exceed ${PAYMENT_PROOF_MAX_BYTES} bytes`,
+      );
+    }
+  }
+
+  private paymentProofExtension(mimetype: string): string {
+    if (mimetype === 'image/png') {
+      return 'png';
+    }
+    if (mimetype === 'image/jpeg') {
+      return 'jpg';
+    }
+    throw new BadRequestException(
+      'paymentProof must be a PNG or JPEG image (png, jpg, jpeg)',
+    );
+  }
+
+  private paymentProofUrlToS3Key(url: string | null | undefined): string | null {
+    const trimmed = url?.trim();
+    if (!trimmed) {
+      return null;
+    }
+    const bucket = process.env.AWS_S3_BUCKET;
+    if (!bucket) {
+      return null;
+    }
+    const region = process.env.AWS_REGION || 'ap-south-1';
+    const prefix = `https://${bucket}.s3.${region}.amazonaws.com/`;
+    if (!trimmed.startsWith(prefix)) {
+      return null;
+    }
+    return trimmed.slice(prefix.length);
+  }
+
+  private async uploadPaymentProof(
+    tenantCode: string,
+    voucherId: string,
+    file: Express.Multer.File,
+  ): Promise<string> {
+    this.assertPaymentProofFile(file);
+    const extension = this.paymentProofExtension(file.mimetype);
+    const key = `tenants/${tenantCode}/sale-vouchers/payment-proofs/${voucherId}.${extension}`;
+    const { url } = await this.s3Service.uploadObject(
+      key,
+      file.buffer,
+      file.mimetype,
+    );
+    return url;
+  }
+
+  private async replacePaymentProof(
+    tenantCode: string,
+    voucherId: string,
+    file: Express.Multer.File,
+    existingUrl?: string | null,
+  ): Promise<string> {
+    const url = await this.uploadPaymentProof(tenantCode, voucherId, file);
+    const oldKey = this.paymentProofUrlToS3Key(existingUrl);
+    if (oldKey) {
+      await this.s3Service.deleteObject(oldKey).catch(() => undefined);
+    }
+    return url;
+  }
+
   /**
    * Posts a PAYMENT credit to the retailer ledger and stamps execution on the voucher.
    * Idempotent when `executedBy` is already set. Caller sets `voucher.status` to PAID before calling when applicable.
@@ -159,8 +244,10 @@ export class SaleVoucherService {
 
   async create(
     tenantDb: DataSource,
+    tenantCode: string,
     dto: CreateSaleVoucherDto,
     user: { userId: string },
+    paymentProof?: Express.Multer.File,
   ) {
     this.assertChequeFields(dto);
 
@@ -206,6 +293,15 @@ export class SaleVoucherService {
       });
 
       const saved = await repo.save(entity);
+
+      if (paymentProof) {
+        saved.paymentProof = await this.uploadPaymentProof(
+          tenantCode,
+          saved.id,
+          paymentProof,
+        );
+        await repo.save(saved);
+      }
 
       if (initialStatus === SaleVoucherStatus.PAID) {
         await this.recordVoucherPaymentInLedger(manager, saved, user.userId);
@@ -264,9 +360,11 @@ export class SaleVoucherService {
 
   async edit(
     tenantDb: DataSource,
+    tenantCode: string,
     id: string,
     dto: UpdateSaleVoucherDto,
     user: { userId: string },
+    paymentProof?: Express.Multer.File,
   ) {
     const repo = tenantDb.getRepository(SaleVoucher);
     const voucher = await repo.findOne({ where: { id } });
@@ -336,6 +434,14 @@ export class SaleVoucherService {
     }
     if (dto.remarks !== undefined) {
       voucher.remarks = dto.remarks?.trim() ?? null;
+    }
+    if (paymentProof) {
+      voucher.paymentProof = await this.replacePaymentProof(
+        tenantCode,
+        voucher.id,
+        paymentProof,
+        voucher.paymentProof,
+      );
     }
 
     await repo.save(voucher);
