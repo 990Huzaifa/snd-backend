@@ -13,4 +13,12 @@ export class TenantLoginDto {
   @IsString()
   @MinLength(1)
   tenantCode?: string;
+
+  @IsOptional()
+  @IsString()
+  deviceId?: string;
+
+  @IsOptional()
+  @IsString()
+  fcmToken?: string;
 }

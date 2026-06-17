@@ -313,7 +313,7 @@ export class UserService {
       latitude: dto.latitude ?? dto.lat ?? null,
       longitude: dto.longitude ?? dto.lng ?? null,
       maxRadius: dto.maxRadius ?? dto.radius ?? null,
-      isActive: dto.isActive ?? true,
+      isActive: dto.isActive ?? false,
       isDeleted: false,
     });
 

@@ -100,6 +100,21 @@ export class TenantAuthService {
       throw new UnauthorizedException('Invalid tenant or credentials');
     }
 
+    // if user is not active, throw an error
+    if (!user.isActive) {
+      throw new UnauthorizedException('User is not active');
+    }
+
+    // if user is deleted, throw an error
+    if (user.isDeleted) {
+      throw new UnauthorizedException('User is deleted');
+    }
+
+    // update device id and fcm token
+    user.deviceId = dto.deviceId ?? null;
+    user.fcmToken = dto.fcmToken ?? null;
+    await userRepo.save(user);
+
     const payload = {
       type: 'tenant' as const,
       sub: user.id,
