@@ -383,6 +383,12 @@ export class RiderLoadsheetService {
           : RIDER_VISIBLE_STATUSES,
       });
 
+    if (filters.distributorId) {
+      qb.andWhere('ls."distributorId" = :distributorId', {
+        distributorId: filters.distributorId,
+      });
+    }
+
     const total = await qb.clone().getCount();
     const sheets = await qb
       .orderBy('ls.loadSheetDate', 'DESC')
@@ -430,7 +436,7 @@ export class RiderLoadsheetService {
       actorId: user.userId,
       action: 'RIDER_LOADSHEET_LISTED',
       description: 'Rider load sheets listed',
-      metadata: { total, page, limit },
+      metadata: { total, page, limit, distributorId: filters.distributorId },
     });
 
     return { result, meta: { total, page, limit } };
