@@ -162,6 +162,12 @@ export class LoadSheetOrder {
     @Column({default: 1})
     deliverySequence: number;
 
+    @Column({nullable: true})
+    customerSignature: string;
+
+    @Column({nullable: true})
+    deliveryProof: string;
+
     @CreateDateColumn()
     createdAt: Date;
 

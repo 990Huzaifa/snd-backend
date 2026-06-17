@@ -97,22 +97,24 @@ export class TenantAuthService {
     if (!passwordOk) {
       throw new UnauthorizedException('Invalid tenant or credentials');
     }
+    if (user.role.code !== 'SUPER_ADMIN') {
+        
+      // if user is not active, throw an error
+      if (!user.isActive) {
+        throw new UnauthorizedException('User is not active contact your administrator');
+      }
 
-    // if user is not active, throw an error
-    if (!user.isActive) {
-      throw new UnauthorizedException('User is not active');
+      // if user is deleted, throw an error
+      if (user.isDeleted) {
+        throw new UnauthorizedException('User is deleted contact your administrator');
+      }
+
+      this.applyDeviceBinding(user, dto);
+      user.fcmToken = dto.fcmToken ?? null;
+      await userRepo.save(user);
+      this.assertDeviceApproved(user);
+      
     }
-
-    // if user is deleted, throw an error
-    if (user.isDeleted) {
-      throw new UnauthorizedException('User is deleted');
-    }
-
-    this.applyDeviceBinding(user, dto);
-    user.fcmToken = dto.fcmToken ?? null;
-    await userRepo.save(user);
-    this.assertDeviceApproved(user);
-
     const payload = {
       type: 'tenant' as const,
       sub: user.id,
