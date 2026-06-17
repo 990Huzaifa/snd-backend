@@ -88,8 +88,6 @@ export class TenantAuthService {
     if (
       !user ||
       !user.password ||
-      !user.isActive ||
-      user.isDeleted ||
       !user.role
     ) {
       throw new UnauthorizedException('Invalid tenant or credentials');

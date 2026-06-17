@@ -208,7 +208,8 @@ export class SaleVoucherService {
   ): Promise<string> {
     const url = await this.uploadPaymentProof(tenantCode, voucherId, file);
     const oldKey = this.paymentProofUrlToS3Key(existingUrl);
-    if (oldKey) {
+    const newKey = this.paymentProofUrlToS3Key(url);
+    if (oldKey && oldKey !== newKey) {
       await this.s3Service.deleteObject(oldKey).catch(() => undefined);
     }
     return url;
