@@ -44,6 +44,7 @@ import { SaleOrderController } from './controller/saleorder.controller';
 import { SaleVoucherController } from './controller/sale-voucher.controller';
 import { SaleReturnController } from './controller/sale-return.controller';
 import { LoadsheetController } from './controller/loadsheet.controller';
+import { RiderLoadsheetController } from './controller/rider-app/loadsheet.controller';
 import { TenantAuthService } from './service/tenant-auth.service';
 import { ActivityLogService } from './service/activity-log.service';
 import { TenantDesignationService } from './service/tenant-designation.service';
@@ -85,6 +86,7 @@ import { SaleOrderService } from './service/saleorder.service';
 import { SaleVoucherService } from './service/sale-voucher.service';
 import { SaleReturnService } from './service/sale-return.service';
 import { LoadsheetService } from './service/loadsheet.service';
+import { RiderLoadsheetService } from './service/rider-app/loadsheet.service';
 import { RetailerLedgerService } from './service/retailer/retailer-ledger.service';
 import { UomService } from './service/product/uom.service';
 import { FlavourService } from './service/product/flavour.service';
@@ -147,6 +149,7 @@ import { PgDumpService } from './service/pg-dump.service';
     SaleVoucherController,
     SaleReturnController,
     LoadsheetController,
+    RiderLoadsheetController,
     DatabaseBackupController,
   ],
   providers: [
@@ -189,6 +192,7 @@ import { PgDumpService } from './service/pg-dump.service';
     SaleVoucherService,
     SaleReturnService,
     LoadsheetService,
+    RiderLoadsheetService,
     RetailerLedgerService,
     TenantDatabaseBackupService,
     PgDumpService,

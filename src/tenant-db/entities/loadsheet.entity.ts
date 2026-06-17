@@ -168,6 +168,9 @@ export class LoadSheetOrder {
     @Column({nullable: true})
     deliveryProof: string;
 
+    @Column({nullable: true})
+    remarks: string;
+
     @CreateDateColumn()
     createdAt: Date;
 
