@@ -19,6 +19,7 @@ import { TenantConnection } from 'src/common/tenant/tenant-connection.decorator'
 import { AttendanceService } from '../service/attendance.service';
 import { CheckInAttendanceDto } from '../dto/attendance/check-in-attendance.dto';
 import { CheckOutAttendanceDto } from '../dto/attendance/check-out-attendance.dto';
+import { AttendanceOverviewDto } from '../dto/attendance/attendance-overview.dto';
 import { ListAttendanceDto } from '../dto/attendance/list-attendance.dto';
 import { CreateTrackingLogDto } from '../dto/attendance/create-tracking-log.dto';
 
@@ -60,6 +61,20 @@ export class AttendanceController {
       tenantDb,
       distributorId,
       dto,
+      req.user as { userId: string },
+    );
+  }
+
+  @Get('overview')
+  @RequirePermissions('LIST_ATTENDANCE')
+  overview(
+    @TenantConnection() tenantDb: DataSource,
+    @Query() query: AttendanceOverviewDto,
+    @Req() req: Request,
+  ) {
+    return this.attendanceService.getOverview(
+      tenantDb,
+      query,
       req.user as { userId: string },
     );
   }

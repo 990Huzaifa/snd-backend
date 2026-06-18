@@ -16,12 +16,15 @@ import {
   AttendenceStatus,
   TrackingLog,
 } from 'src/tenant-db/entities/attendence.entity';
-import { User } from 'src/tenant-db/entities/user.entity';
+import { User, UserType } from 'src/tenant-db/entities/user.entity';
 import { ActivityLogService } from './activity-log.service';
+import { AttendanceOverviewDto } from '../dto/attendance/attendance-overview.dto';
 import { CheckInAttendanceDto } from '../dto/attendance/check-in-attendance.dto';
 import { CheckOutAttendanceDto } from '../dto/attendance/check-out-attendance.dto';
 import { ListAttendanceDto } from '../dto/attendance/list-attendance.dto';
 import { CreateTrackingLogDto } from '../dto/attendance/create-tracking-log.dto';
+
+type AttendanceDayCode = 'P' | 'A' | 'HD' | 'L' | 'W';
 
 type AttendanceGeofence = {
   centerLat: number;
@@ -68,6 +71,95 @@ export class AttendanceService {
     const d = new Date(date);
     d.setHours(23, 59, 59, 999);
     return d;
+  }
+
+  private getMonthDateRange(year: number, month: number) {
+    const start = this.startOfDay(new Date(year, month - 1, 1));
+    const end = this.endOfDay(new Date(year, month, 0));
+    return { start, end, daysInMonth: end.getDate() };
+  }
+
+  private countWorkableDaysInMonth(year: number, month: number): number {
+    const daysInMonth = new Date(year, month, 0).getDate();
+    let count = 0;
+    for (let day = 1; day <= daysInMonth; day += 1) {
+      const dayOfWeek = new Date(year, month - 1, day).getDay();
+      if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+        count += 1;
+      }
+    }
+    return count;
+  }
+
+  private toDateKey(date: Date): string {
+    const d = new Date(date);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  private isWeekend(year: number, month: number, day: number): boolean {
+    const dayOfWeek = new Date(year, month - 1, day).getDay();
+    return dayOfWeek === 0 || dayOfWeek === 6;
+  }
+
+  private weekdayLabel(year: number, month: number, day: number): string {
+    return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][
+      new Date(year, month - 1, day).getDay()
+    ];
+  }
+
+  private isPresentLikeStatus(status: AttendenceStatus): boolean {
+    return (
+      status === AttendenceStatus.PRESENT ||
+      status === AttendenceStatus.WORK_FROM_HOME ||
+      status === AttendenceStatus.REMOTE
+    );
+  }
+
+  private isHalfDayRecord(record: Attendence): boolean {
+    return (
+      record.status === AttendenceStatus.PRESENT &&
+      Boolean(record.checkInTime) &&
+      !record.checkOutTime
+    );
+  }
+
+  private resolveDayCode(
+    records: Attendence[],
+    weekend: boolean,
+  ): AttendanceDayCode {
+    if (!records.length) {
+      return weekend ? 'W' : 'A';
+    }
+
+    if (records.some((record) => record.status === AttendenceStatus.LEAVE)) {
+      return 'L';
+    }
+
+    if (records.every((record) => record.status === AttendenceStatus.ABSENT)) {
+      return 'A';
+    }
+
+    const presentLike = records.filter((record) =>
+      this.isPresentLikeStatus(record.status),
+    );
+    if (presentLike.length) {
+      const hasFullPresent = presentLike.some(
+        (record) => !this.isHalfDayRecord(record),
+      );
+      if (hasFullPresent) {
+        return 'P';
+      }
+      return 'HD';
+    }
+
+    return weekend ? 'W' : 'A';
+  }
+
+  private roundAttendanceRate(value: number): number {
+    return Math.round(value * 10) / 10;
   }
 
   private async assertDistributor(
@@ -477,5 +569,178 @@ export class AttendanceService {
     );
 
     return logs;
+  }
+
+  async getOverview(
+    tenantDb: DataSource,
+    filters: AttendanceOverviewDto,
+    user: { userId: string },
+  ) {
+    const { year, month } = filters;
+    const { start, end, daysInMonth } = this.getMonthDateRange(year, month);
+    const workableDays = this.countWorkableDaysInMonth(year, month);
+
+    const userQb = tenantDb
+      .getRepository(User)
+      .createQueryBuilder('u')
+      .leftJoinAndSelect('u.designation', 'designation')
+      .where('u."isDeleted" = false')
+      .andWhere('u."isActive" = true');
+
+    if (filters.designationId) {
+      userQb.andWhere('u."designationId" = :designationId', {
+        designationId: filters.designationId,
+      });
+    }
+
+    if (filters.userType) {
+      userQb.andWhere('u.type = :userType', {
+        userType: filters.userType as UserType,
+      });
+    }
+
+    const search = filters.search?.trim();
+    if (search) {
+      userQb.andWhere('u.name ILIKE :search', { search: `%${search}%` });
+    }
+
+    const users = await userQb
+      .select([
+        'u.id',
+        'u.name',
+        'u.locationTitle',
+        'u.type',
+        'designation.id',
+        'designation.name',
+        'designation.slug',
+      ])
+      .orderBy('u.name', 'ASC')
+      .getMany();
+
+    const userIds = users.map((row) => row.id);
+    const attendanceByUserAndDate = new Map<string, Map<string, Attendence[]>>();
+
+    if (userIds.length) {
+      const attendanceRows = await tenantDb
+        .getRepository(Attendence)
+        .createQueryBuilder('a')
+        .where('a."userId" IN (:...userIds)', { userIds })
+        .andWhere('a."attendenceDate" >= :start', { start })
+        .andWhere('a."attendenceDate" <= :end', { end })
+        .getMany();
+
+      for (const row of attendanceRows) {
+        const dateKey = this.toDateKey(row.attendenceDate);
+        if (!attendanceByUserAndDate.has(row.userId)) {
+          attendanceByUserAndDate.set(row.userId, new Map());
+        }
+        const byDate = attendanceByUserAndDate.get(row.userId)!;
+        if (!byDate.has(dateKey)) {
+          byDate.set(dateKey, []);
+        }
+        byDate.get(dateKey)!.push(row);
+      }
+    }
+
+    let presentDays = 0;
+    let absentDays = 0;
+    let halfDays = 0;
+
+    const employees = users.map((employee) => {
+      const byDate = attendanceByUserAndDate.get(employee.id) ?? new Map();
+      let employeePresent = 0;
+      let employeeAbsent = 0;
+      let employeeHalfDays = 0;
+      let employeeLeave = 0;
+
+      const days = Array.from({ length: daysInMonth }, (_, index) => {
+        const day = index + 1;
+        const dateKey = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const weekend = this.isWeekend(year, month, day);
+        const code = this.resolveDayCode(byDate.get(dateKey) ?? [], weekend);
+
+        if (code === 'P') {
+          presentDays += 1;
+          employeePresent += 1;
+        } else if (code === 'A') {
+          absentDays += 1;
+          employeeAbsent += 1;
+        } else if (code === 'HD') {
+          halfDays += 1;
+          employeeHalfDays += 1;
+        } else if (code === 'L') {
+          employeeLeave += 1;
+        }
+
+        return {
+          day,
+          weekday: this.weekdayLabel(year, month, day),
+          code,
+        };
+      });
+
+      return {
+        id: employee.id,
+        name: employee.name,
+        zone: employee.locationTitle,
+        userType: employee.type,
+        designation: employee.designation
+          ? {
+              id: employee.designation.id,
+              name: employee.designation.name,
+              slug: employee.designation.slug,
+            }
+          : null,
+        days,
+        summary: {
+          present: employeePresent,
+          absent: employeeAbsent,
+          halfDays: employeeHalfDays,
+          leave: employeeLeave,
+        },
+      };
+    });
+
+    const totalUsers = users.length;
+    const expectedWorkSlots = totalUsers * workableDays;
+    const attendanceRate =
+      expectedWorkSlots > 0
+        ? this.roundAttendanceRate((presentDays / expectedWorkSlots) * 100)
+        : 0;
+
+    await this.activityLogService.recordActivityLog(tenantDb, {
+      actorId: user.userId,
+      action: 'ATTENDANCE_OVERVIEW_VIEWED',
+      description: 'Attendance overview viewed',
+      metadata: {
+        year,
+        month,
+        designationId: filters.designationId ?? null,
+        userType: filters.userType ?? null,
+        totalUsers,
+      },
+    });
+
+    return {
+      filters: {
+        year,
+        month,
+        designationId: filters.designationId ?? null,
+        userType: filters.userType ?? null,
+        search: search ?? null,
+      },
+      summary: {
+        totalUsers,
+        presentDays,
+        absentDays,
+        halfDays,
+        attendanceRate,
+      },
+      meta: {
+        daysInMonth,
+        workableDays,
+      },
+      employees,
+    };
   }
 }
