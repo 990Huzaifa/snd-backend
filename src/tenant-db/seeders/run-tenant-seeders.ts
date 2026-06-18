@@ -15,10 +15,10 @@ export async function runTenantSeeders(dataSource: DataSource) {
   // 4) uoms
   // 5) users (assign role/designation to user)
   await seedTenantPermissions(dataSource);
-  await seedTenantRoles(dataSource);
-  await seedTenantDesignations(dataSource);
-  await seedTenantUoms(dataSource);
-  await seedTenantSuperAdminUser(dataSource);
+  // await seedTenantRoles(dataSource);
+  // await seedTenantDesignations(dataSource);
+  // await seedTenantUoms(dataSource);
+  // await seedTenantSuperAdminUser(dataSource);
 
   console.log('🎉 Tenant seeders completed successfully.\n');
 }
