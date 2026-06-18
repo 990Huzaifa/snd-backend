@@ -22,10 +22,10 @@ export class Attendence {
     @JoinColumn({ name: 'userId' })
     user: User;
 
-    @Column()
-    distributorId: string;
+    @Column({ nullable: true })
+    distributorId: string | null;
 
-    @ManyToOne(() => Distributor, { onDelete: 'RESTRICT' })
+    @ManyToOne(() => Distributor, { onDelete: 'RESTRICT', nullable: true })
     @JoinColumn({ name: 'distributorId' })
     distributor: Distributor;
 

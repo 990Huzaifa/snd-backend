@@ -162,6 +162,65 @@ export class AttendanceService {
     return Math.round(value * 10) / 10;
   }
 
+  private resolveUserGeofence(
+    user: Pick<User, 'latitude' | 'longitude' | 'maxRadius'>,
+  ): AttendanceGeofence {
+    try {
+      return {
+        centerLat: parseGeoCoordinate(user.latitude, 'latitude'),
+        centerLng: parseGeoCoordinate(user.longitude, 'longitude'),
+        radiusKm: parseMaxRadiusKm(user.maxRadius),
+        source: 'user',
+      };
+    } catch {
+      throw new BadRequestException('Invalid user location configuration');
+    }
+  }
+
+  private async findTodayAttendance(
+    tenantDb: DataSource,
+    userId: string,
+    distributorId: string | null,
+  ): Promise<Attendence | null> {
+    const today = this.startOfDay(new Date());
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const qb = tenantDb
+      .getRepository(Attendence)
+      .createQueryBuilder('a')
+      .where('a."userId" = :userId', { userId })
+      .andWhere('a."attendenceDate" >= :today', { today })
+      .andWhere('a."attendenceDate" < :tomorrow', { tomorrow });
+
+    if (distributorId) {
+      qb.andWhere('a."distributorId" = :distributorId', { distributorId });
+    } else {
+      qb.andWhere('a."distributorId" IS NULL');
+    }
+
+    return qb.getOne();
+  }
+
+  private async findActiveTodayAttendance(
+    tenantDb: DataSource,
+    userId: string,
+  ): Promise<Attendence | null> {
+    const today = this.startOfDay(new Date());
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    return tenantDb
+      .getRepository(Attendence)
+      .createQueryBuilder('a')
+      .where('a."userId" = :userId', { userId })
+      .andWhere('a."attendenceDate" >= :today', { today })
+      .andWhere('a."attendenceDate" < :tomorrow', { tomorrow })
+      .andWhere('a."checkOutTime" IS NULL')
+      .orderBy('a."checkInTime"', 'DESC')
+      .getOne();
+  }
+
   private async assertDistributor(
     tenantDb: DataSource,
     distributorId: string,
@@ -248,16 +307,6 @@ export class AttendanceService {
     dto: CheckInAttendanceDto,
     user: { userId: string },
   ) {
-    const normalizedDistributorId = dto.distributorId?.trim();
-    if (!normalizedDistributorId) {
-      throw new BadRequestException('distributorId is required');
-    }
-
-    const distributor = await this.assertDistributor(
-      tenantDb,
-      normalizedDistributorId,
-    );
-
     const attendanceUser = await tenantDb.getRepository(User).findOne({
       where: { id: user.userId, isDeleted: false },
       select: ['id', 'latitude', 'longitude', 'maxRadius'],
@@ -266,40 +315,53 @@ export class AttendanceService {
       throw new NotFoundException('User not found');
     }
 
-    const today = this.startOfDay(new Date());
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    const normalizedDistributorId = dto.distributorId?.trim() || null;
+    const hasUserGeofence = this.hasCompleteUserGeofence(attendanceUser);
 
-    const repo = tenantDb.getRepository(Attendence);
-    const existingToday = await repo
-      .createQueryBuilder('a')
-      .where('a."userId" = :userId', { userId: user.userId })
-      .andWhere('a."distributorId" = :distributorId', {
-        distributorId: normalizedDistributorId,
-      })
-      .andWhere('a."attendenceDate" >= :today', { today })
-      .andWhere('a."attendenceDate" < :tomorrow', { tomorrow })
-      .getOne();
+    if (!hasUserGeofence && !normalizedDistributorId) {
+      throw new BadRequestException(
+        'Distributor is required when user location is not configured',
+      );
+    }
+
+    const distributor = normalizedDistributorId
+      ? await this.assertDistributor(tenantDb, normalizedDistributorId)
+      : null;
+
+    const existingToday = await this.findTodayAttendance(
+      tenantDb,
+      user.userId,
+      normalizedDistributorId,
+    );
 
     if (existingToday) {
       if (!existingToday.checkOutTime) {
         throw new BadRequestException(
-          'Already checked in for this distributor today. Check out first.',
+          normalizedDistributorId
+            ? 'Already checked in for this distributor today. Check out first.'
+            : 'Already checked in today. Check out first.',
         );
       }
       throw new BadRequestException(
-        'Attendance for this distributor is already completed today',
+        normalizedDistributorId
+          ? 'Attendance for this distributor is already completed today'
+          : 'Attendance is already completed today',
       );
     }
 
-    const geofence = this.resolveAttendanceGeofence(attendanceUser, distributor);
+    const geofence =
+      hasUserGeofence && !distributor
+        ? this.resolveUserGeofence(attendanceUser)
+        : this.resolveAttendanceGeofence(attendanceUser, distributor!);
     this.assertWithinAttendanceArea(
       dto.checkInLatitude,
       dto.checkInLongitude,
       geofence,
     );
 
+    const today = this.startOfDay(new Date());
     const now = new Date();
+    const repo = tenantDb.getRepository(Attendence);
     const attendance = await repo.save(
       repo.create({
         userId: user.userId,
@@ -342,29 +404,22 @@ export class AttendanceService {
     dto: CheckOutAttendanceDto,
     user: { userId: string },
   ) {
-    const normalizedDistributorId = dto.distributorId?.trim();
-    if (!normalizedDistributorId) {
-      throw new BadRequestException('distributorId is required');
-    }
-
-    const today = this.startOfDay(new Date());
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    const normalizedDistributorId = dto.distributorId?.trim() || null;
 
     const repo = tenantDb.getRepository(Attendence);
-    const attendance = await repo
-      .createQueryBuilder('a')
-      .where('a."userId" = :userId', { userId: user.userId })
-      .andWhere('a."distributorId" = :distributorId', {
-        distributorId: normalizedDistributorId,
-      })
-      .andWhere('a."attendenceDate" >= :today', { today })
-      .andWhere('a."attendenceDate" < :tomorrow', { tomorrow })
-      .getOne();
+    const attendance = normalizedDistributorId
+      ? await this.findTodayAttendance(
+          tenantDb,
+          user.userId,
+          normalizedDistributorId,
+        )
+      : await this.findActiveTodayAttendance(tenantDb, user.userId);
 
     if (!attendance) {
       throw new NotFoundException(
-        'No check-in found for this distributor today',
+        normalizedDistributorId
+          ? 'No check-in found for this distributor today'
+          : 'No active check-in found for today',
       );
     }
 

@@ -8,8 +8,9 @@ import {
 } from 'class-validator';
 
 export class CheckOutAttendanceDto {
+  @IsOptional()
   @IsUUID()
-  distributorId: string;
+  distributorId?: string;
 
   @Type(() => Number)
   @IsNumber({ maxDecimalPlaces: 8 })

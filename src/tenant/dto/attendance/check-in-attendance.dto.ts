@@ -10,8 +10,9 @@ import {
 import { AttendenceStatus } from 'src/tenant-db/entities/attendence.entity';
 
 export class CheckInAttendanceDto {
+  @IsOptional()
   @IsUUID()
-  distributorId: string;
+  distributorId?: string;
 
   @Type(() => Number)
   @IsNumber({ maxDecimalPlaces: 8 })
