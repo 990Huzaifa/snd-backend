@@ -37,13 +37,11 @@ export class AttendanceController {
   // @RequirePermissions('CHECK_IN_ATTENDANCE')
   checkIn(
     @TenantConnection() tenantDb: DataSource,
-    @Query('distributorId') distributorId: string,
-    @Body() dto: CheckInAttendanceDto,
+    @Query() dto: CheckInAttendanceDto,
     @Req() req: Request,
   ) {
     return this.attendanceService.checkIn(
       tenantDb,
-      distributorId,
       dto,
       req.user as { userId: string },
     );
@@ -53,13 +51,11 @@ export class AttendanceController {
   @RequirePermissions('CHECK_OUT_ATTENDANCE')
   checkOut(
     @TenantConnection() tenantDb: DataSource,
-    @Query('distributorId') distributorId: string,
-    @Body() dto: CheckOutAttendanceDto,
+    @Query() dto: CheckOutAttendanceDto,
     @Req() req: Request,
   ) {
     return this.attendanceService.checkOut(
       tenantDb,
-      distributorId,
       dto,
       req.user as { userId: string },
     );

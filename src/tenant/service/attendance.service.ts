@@ -245,13 +245,12 @@ export class AttendanceService {
 
   async checkIn(
     tenantDb: DataSource,
-    distributorId: string,
     dto: CheckInAttendanceDto,
     user: { userId: string },
   ) {
-    const normalizedDistributorId = distributorId?.trim();
+    const normalizedDistributorId = dto.distributorId?.trim();
     if (!normalizedDistributorId) {
-      throw new BadRequestException('distributorId query parameter is required');
+      throw new BadRequestException('distributorId is required');
     }
 
     const distributor = await this.assertDistributor(
@@ -340,13 +339,12 @@ export class AttendanceService {
 
   async checkOut(
     tenantDb: DataSource,
-    distributorId: string,
     dto: CheckOutAttendanceDto,
     user: { userId: string },
   ) {
-    const normalizedDistributorId = distributorId?.trim();
+    const normalizedDistributorId = dto.distributorId?.trim();
     if (!normalizedDistributorId) {
-      throw new BadRequestException('distributorId query parameter is required');
+      throw new BadRequestException('distributorId is required');
     }
 
     const today = this.startOfDay(new Date());

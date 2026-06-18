@@ -4,17 +4,21 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  IsUUID,
   MaxLength,
 } from 'class-validator';
 import { AttendenceStatus } from 'src/tenant-db/entities/attendence.entity';
 
 export class CheckInAttendanceDto {
+  @IsUUID()
+  distributorId: string;
+
   @Type(() => Number)
-  @IsNumber()
+  @IsNumber({ maxDecimalPlaces: 8 })
   checkInLatitude: number;
 
   @Type(() => Number)
-  @IsNumber()
+  @IsNumber({ maxDecimalPlaces: 8 })
   checkInLongitude: number;
 
   @IsOptional()
