@@ -34,7 +34,7 @@ export class AttendanceController {
   constructor(private readonly attendanceService: AttendanceService) {}
 
   @Post('check-in')
-  @RequirePermissions('CHECK_IN_ATTENDANCE')
+  // @RequirePermissions('CHECK_IN_ATTENDANCE')
   checkIn(
     @TenantConnection() tenantDb: DataSource,
     @Query('distributorId') distributorId: string,
