@@ -309,9 +309,6 @@ export class AttendanceService {
     if (!attendance) {
       throw new NotFoundException('Attendance record not found');
     }
-    if (attendance.userId !== userId) {
-      throw new ForbiddenException('Not allowed to access this attendance record');
-    }
     return attendance;
   }
 
