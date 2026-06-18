@@ -48,7 +48,7 @@ export class AttendanceController {
   }
 
   @Post('check-out')
-  @RequirePermissions('CHECK_OUT_ATTENDANCE')
+  // @RequirePermissions('CHECK_OUT_ATTENDANCE')
   checkOut(
     @TenantConnection() tenantDb: DataSource,
     @Query() dto: CheckOutAttendanceDto,
