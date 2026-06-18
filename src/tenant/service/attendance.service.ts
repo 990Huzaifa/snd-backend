@@ -5,17 +5,30 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { DataSource } from 'typeorm';
+import {
+  isWithinRadiusKm,
+  parseGeoCoordinate,
+  parseMaxRadiusKm,
+} from 'src/common/geo/geo.util';
 import { Distributor } from 'src/tenant-db/entities/distributor.entity';
 import {
   Attendence,
   AttendenceStatus,
   TrackingLog,
 } from 'src/tenant-db/entities/attendence.entity';
+import { User } from 'src/tenant-db/entities/user.entity';
 import { ActivityLogService } from './activity-log.service';
 import { CheckInAttendanceDto } from '../dto/attendance/check-in-attendance.dto';
 import { CheckOutAttendanceDto } from '../dto/attendance/check-out-attendance.dto';
 import { ListAttendanceDto } from '../dto/attendance/list-attendance.dto';
 import { CreateTrackingLogDto } from '../dto/attendance/create-tracking-log.dto';
+
+type AttendanceGeofence = {
+  centerLat: number;
+  centerLng: number;
+  radiusKm: number;
+  source: 'user' | 'distributor';
+};
 
 @Injectable()
 export class AttendanceService {
@@ -60,13 +73,64 @@ export class AttendanceService {
   private async assertDistributor(
     tenantDb: DataSource,
     distributorId: string,
-  ): Promise<void> {
+  ): Promise<Pick<Distributor, 'id' | 'latitude' | 'longitude' | 'maxRadius'>> {
     const distributor = await tenantDb.getRepository(Distributor).findOne({
       where: { id: distributorId, isDeleted: false },
-      select: ['id'],
+      select: ['id', 'latitude', 'longitude', 'maxRadius'],
     });
     if (!distributor) {
       throw new NotFoundException('Distributor not found');
+    }
+    return distributor;
+  }
+
+  private hasCompleteUserGeofence(
+    user: Pick<User, 'latitude' | 'longitude' | 'maxRadius'>,
+  ): boolean {
+    const lat = user.latitude?.trim();
+    const lng = user.longitude?.trim();
+    const radius = user.maxRadius?.trim();
+    return Boolean(lat && lng && radius);
+  }
+
+  private resolveAttendanceGeofence(
+    user: Pick<User, 'latitude' | 'longitude' | 'maxRadius'>,
+    distributor: Pick<Distributor, 'latitude' | 'longitude' | 'maxRadius'>,
+  ): AttendanceGeofence {
+    const useUserGeofence = this.hasCompleteUserGeofence(user);
+    const source = useUserGeofence ? user : distributor;
+
+    try {
+      return {
+        centerLat: parseGeoCoordinate(source.latitude, 'latitude'),
+        centerLng: parseGeoCoordinate(source.longitude, 'longitude'),
+        radiusKm: parseMaxRadiusKm(source.maxRadius),
+        source: useUserGeofence ? 'user' : 'distributor',
+      };
+    } catch {
+      throw new BadRequestException(
+        useUserGeofence
+          ? 'Invalid user location configuration'
+          : 'Invalid distributor location configuration',
+      );
+    }
+  }
+
+  private assertWithinAttendanceArea(
+    checkLat: number,
+    checkLng: number,
+    geofence: AttendanceGeofence,
+  ): void {
+    if (
+      !isWithinRadiusKm(
+        checkLat,
+        checkLng,
+        geofence.centerLat,
+        geofence.centerLng,
+        geofence.radiusKm,
+      )
+    ) {
+      throw new BadRequestException('You are outside the allowed check-in area');
     }
   }
 
@@ -98,7 +162,18 @@ export class AttendanceService {
       throw new BadRequestException('distributorId query parameter is required');
     }
 
-    await this.assertDistributor(tenantDb, normalizedDistributorId);
+    const distributor = await this.assertDistributor(
+      tenantDb,
+      normalizedDistributorId,
+    );
+
+    const attendanceUser = await tenantDb.getRepository(User).findOne({
+      where: { id: user.userId, isDeleted: false },
+      select: ['id', 'latitude', 'longitude', 'maxRadius'],
+    });
+    if (!attendanceUser) {
+      throw new NotFoundException('User not found');
+    }
 
     const today = this.startOfDay(new Date());
     const tomorrow = new Date(today);
@@ -125,6 +200,13 @@ export class AttendanceService {
         'Attendance for this distributor is already completed today',
       );
     }
+
+    const geofence = this.resolveAttendanceGeofence(attendanceUser, distributor);
+    this.assertWithinAttendanceArea(
+      dto.checkInLatitude,
+      dto.checkInLongitude,
+      geofence,
+    );
 
     const now = new Date();
     const attendance = await repo.save(
