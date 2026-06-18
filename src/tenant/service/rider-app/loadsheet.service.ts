@@ -19,6 +19,7 @@ import {
 } from 'src/tenant-db/entities/saleorder.entity';
 import { ActivityLogService } from '../activity-log.service';
 import { LoadsheetService } from '../loadsheet.service';
+import { RiderSaleOrderDeliveryService } from './sale-order-delivery.service';
 import { ListRiderLoadsheetDto } from '../../dto/rider-app/loadsheet/list-rider-loadsheet.dto';
 import { UpdateOrderDeliveryDto } from '../../dto/rider-app/loadsheet/update-order-delivery.dto';
 import { BulkUpdateLoadsheetDeliveryDto } from '../../dto/rider-app/loadsheet/bulk-update-loadsheet-delivery.dto';
@@ -56,6 +57,7 @@ export class RiderLoadsheetService {
     private readonly activityLogService: ActivityLogService,
     private readonly loadsheetService: LoadsheetService,
     private readonly s3Service: S3Service,
+    private readonly riderSaleOrderDeliveryService: RiderSaleOrderDeliveryService,
   ) {}
 
   private normalizePage(value?: number): number {
@@ -325,13 +327,44 @@ export class RiderLoadsheetService {
       loadSheetOrder.deliveryProof = imageUrls.deliveryProof;
     }
 
-    if (loadSheetOrder.saleOrder) {
+    if (loadSheetOrder.saleOrder && dto.deliveryStatus !== DeliveryStatus.DELIVERED) {
       loadSheetOrder.saleOrder.orderStatus = this.mapSaleOrderStatus(
         dto.deliveryStatus,
       );
-      loadSheetOrder.saleOrder.deliveredDate = this.parseDeliveredDate(
-        dto.deliveredDate,
+      if (dto.deliveredDate) {
+        loadSheetOrder.saleOrder.deliveredDate = this.parseDeliveredDate(
+          dto.deliveredDate,
+        );
+      }
+    }
+  }
+
+  private async finalizeSaleOrderOnDelivery(
+    manager: EntityManager,
+    loadSheetOrder: LoadSheetOrder,
+    dto: UpdateOrderDeliveryDto,
+    actorUserId: string,
+  ): Promise<void> {
+    if (
+      dto.deliveryStatus !== DeliveryStatus.DELIVERED ||
+      !loadSheetOrder.saleOrderId
+    ) {
+      return;
+    }
+
+    const { order } =
+      await this.riderSaleOrderDeliveryService.markDeliveredAndCreateInvoice(
+        manager,
+        {
+          saleOrderId: loadSheetOrder.saleOrderId,
+          deliveredDate: this.parseDeliveredDate(dto.deliveredDate),
+          actorUserId,
+        },
       );
+
+    if (loadSheetOrder.saleOrder) {
+      loadSheetOrder.saleOrder.orderStatus = order.orderStatus;
+      loadSheetOrder.saleOrder.deliveredDate = order.deliveredDate;
     }
   }
 
@@ -554,7 +587,18 @@ export class RiderLoadsheetService {
         loadSheetOrder.loadSheetOrderItems ?? [],
       );
       await manager.getRepository(LoadSheetOrder).save(loadSheetOrder);
-      if (loadSheetOrder.saleOrder) {
+
+      await this.finalizeSaleOrderOnDelivery(
+        manager,
+        loadSheetOrder,
+        dto,
+        user.userId,
+      );
+
+      if (
+        loadSheetOrder.saleOrder &&
+        dto.deliveryStatus !== DeliveryStatus.DELIVERED
+      ) {
         await manager.getRepository(SaleOrder).save(loadSheetOrder.saleOrder);
       }
 
@@ -622,7 +666,18 @@ export class RiderLoadsheetService {
           loadSheetOrder.loadSheetOrderItems ?? [],
         );
         await manager.getRepository(LoadSheetOrder).save(loadSheetOrder);
-        if (loadSheetOrder.saleOrder) {
+
+        await this.finalizeSaleOrderOnDelivery(
+          manager,
+          loadSheetOrder,
+          deliveryDto,
+          user.userId,
+        );
+
+        if (
+          loadSheetOrder.saleOrder &&
+          deliveryDto.deliveryStatus !== DeliveryStatus.DELIVERED
+        ) {
           await manager.getRepository(SaleOrder).save(loadSheetOrder.saleOrder);
         }
       }

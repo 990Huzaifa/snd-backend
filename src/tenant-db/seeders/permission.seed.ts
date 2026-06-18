@@ -14,6 +14,7 @@ export const TENANT_PERMISSIONS = [
   { code: 'CREATE_RETAILER_CATEGORY', name: 'Create Retailer Category' },
   { code: 'CREATE_RETAILER_CHANNEL', name: 'Create Retailer Channel' },
   { code: 'CREATE_RETAILER', name: 'Create Retailer' },
+  { code: 'CREATE_RETAILER_VISIT', name: 'Create Retailer Visit' },
   { code: 'CREATE_REGION', name: 'Create Region' },
   { code: 'CREATE_AREA', name: 'Create Area' },
   { code: 'CREATE_SALE_ORDER', name: 'Create Sale Order' },
@@ -28,6 +29,8 @@ export const TENANT_PERMISSIONS = [
   { code: 'CREATE_OPENING_STOCK', name: 'Create Opening Stock' },
   { code: 'CREATE_PURCHASE_STOCK', name: 'Create Purchase Stock' },
   { code: 'CREATE_TRANSFER_STOCK', name: 'Create Transfer Stock' },
+  { code: 'CHECK_IN_ATTENDANCE', name: 'Check In Attendance' },
+  { code: 'CHECK_OUT_ATTENDANCE', name: 'Check Out Attendance' },
 
   { code: 'LIST_USER', name: 'List Users' },
   { code: 'LIST_ROLE', name: 'List Role' },
@@ -41,6 +44,7 @@ export const TENANT_PERMISSIONS = [
   { code: 'LIST_RETAILER_CATEGORY', name: 'List Retailer Category' },
   { code: 'LIST_RETAILER_CHANNEL', name: 'List Retailer Channel' },
   { code: 'LIST_RETAILER', name: 'List Retailer' },
+  { code: 'LIST_RETAILER_VISIT', name: 'List Retailer Visit' },
   { code: 'LIST_RETAILER_LEDGER', name: 'List Retailer' },
   { code: 'LIST_REGION', name: 'List Region' },
   { code: 'LIST_AREA', name: 'List Area' },
@@ -56,6 +60,7 @@ export const TENANT_PERMISSIONS = [
   { code: 'LIST_OPENING_STOCK', name: 'List Opening Stock' },
   { code: 'LIST_PURCHASE_STOCK', name: 'List Purchase Stock' },
   { code: 'LIST_TRANSFER_STOCK', name: 'List Transfer Stock' },
+  { code: 'LIST_ATTENDANCE', name: 'List Attendance' },
 
   { code: 'UPDATE_USER', name: 'Update Users' },
   { code: 'UPDATE_ROLE', name: 'Update Role' },
@@ -98,6 +103,7 @@ export const TENANT_PERMISSIONS = [
   { code: 'VIEW_RETAILER_CATEGORY', name: 'View Retailer Category' },
   { code: 'VIEW_RETAILER_CHANNEL', name: 'View Retailer Channel' },
   { code: 'VIEW_RETAILER', name: 'View Retailer' },
+  { code: 'VIEW_RETAILER_VISIT', name: 'View Retailer Visit' },
   { code: 'VIEW_REGION', name: 'View Region' },
   { code: 'VIEW_AREA', name: 'View Area' },
   { code: 'VIEW_SALE_ORDER', name: 'View Sale Order' },
@@ -113,6 +119,7 @@ export const TENANT_PERMISSIONS = [
   { code: 'VIEW_OPENING_STOCK', name: 'View Opening Stock' },
   { code: 'VIEW_PURCHASE_STOCK', name: 'View Purchase Stock' },
   { code: 'VIEW_TRANSFER_STOCK', name: 'View Transfer Stock' },
+  { code: 'VIEW_ATTENDANCE', name: 'View Attendance' },
 
   { code: 'DELETE_USER', name: 'Delete Users' },
   { code: 'DELETE_ROLE', name: 'Delete Role' },

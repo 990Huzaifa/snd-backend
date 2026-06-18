@@ -200,3 +200,63 @@ export class RetailerLedger {
     @UpdateDateColumn()
     updatedAt: Date;    
 }
+
+export enum RetailerVisitStatus {
+    ORDER_BOOKED = 'ORDER_BOOKED',
+    NO_SALE = 'NO_SALE',
+    SHOP_CLOSED = 'SHOP_CLOSED',
+    OWNER_ABSENT = 'OWNER_ABSENT',
+    STOCK_FULL = 'STOCK_FULL',
+    RETURN_BOOKED = 'RETURN_BOOKED',
+    MERCHANDISED = 'MERCHANDISED',
+}
+
+@Entity('retailer_visits')
+export class RetailerVisit {
+    @PrimaryGeneratedColumn('uuid')
+    id: string;
+
+    @Column({comment: 'Salesman ID, MERCHANDISER ID, etc.'})
+    userId: string;
+
+    @ManyToOne(() => User, { onDelete: 'RESTRICT' })
+    @JoinColumn({ name: 'userId' })
+    user: User;
+
+    @Column()
+    retailerId: string;
+
+    @ManyToOne(() => Retailer, { onDelete: 'RESTRICT' })
+    @JoinColumn({ name: 'retailerId' })
+    retailer: Retailer;
+
+    @Column()
+    routeId: string;
+
+    @ManyToOne(() => Route, { onDelete: 'RESTRICT' })
+    @JoinColumn({ name: 'routeId' })
+    route: Route;
+
+    @Column()
+    checkInLatitude: number;
+
+    @Column()
+    checkInLongitude: number;
+
+    @Column({ type: 'enum', enum: RetailerVisitStatus })
+    visitStatus: RetailerVisitStatus;   
+
+    @Column({ nullable: true })
+    notes: string;
+
+    @Column('text', { array: true, nullable: true })
+    shopImages: string[] | null;
+
+    @Column('text', { array: true, nullable: true })
+    shelfImages: string[] | null;
+
+    @CreateDateColumn()
+    createdAt: Date;
+    @UpdateDateColumn()
+    updatedAt: Date;
+}
