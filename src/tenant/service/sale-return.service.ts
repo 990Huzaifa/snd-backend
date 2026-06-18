@@ -688,7 +688,6 @@ export class SaleReturnService {
         const returnRepo = manager.getRepository(SaleReturn);
         const saleReturn = await returnRepo.findOne({
           where: { id },
-          relations: ['items'],
           lock: { mode: 'pessimistic_write' },
         });
 
@@ -726,7 +725,11 @@ export class SaleReturnService {
             );
           }
 
-          const resolvedItems = saleReturn.items.map((item) => ({
+          const items = await manager.getRepository(SaleReturnItem).find({
+            where: { saleReturnId: id },
+          });
+
+          const resolvedItems = items.map((item) => ({
             productId: item.productId,
             productFlavourId: item.productFlavourId,
             productPricingId: item.productPricingId,
