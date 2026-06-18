@@ -796,7 +796,9 @@ export class SaleReturnService {
       .getRepository(SaleReturn)
       .createQueryBuilder('sr')
       .innerJoinAndSelect('sr.retailer', 'r')
-      .leftJoinAndSelect('sr.order', 'o');
+      .leftJoinAndSelect('sr.order', 'o')
+      .leftJoinAndSelect('o.distributor', 'd')
+      .leftJoinAndSelect('o.salesman', 's');
 
     if (statusFilter) {
       qb.andWhere('sr."returnStatus" = :returnStatus', {
@@ -848,6 +850,26 @@ export class SaleReturnService {
 
     const rows = await qb
       .clone()
+      .select([
+        'sr.id',
+        'sr.returnNumber',
+        'sr.returnDate',
+        'sr.returnStatus',
+        'sr.returnType',
+        'sr.returnAmount',
+        'sr.note',
+        'r.shopName',
+        'd.name',
+        's.name',
+        'o.orderNumber',
+        'o.orderDate',
+        'o.totalAmount',
+        'o.createdAt',
+        'o.executedDate',
+        'o.deliveredDate',
+        'o.distributorId',
+        'o.salesmanId',
+      ])
       .orderBy('sr.returnDate', 'DESC')
       .skip((page - 1) * limit)
       .take(limit)
