@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Param,
+  ParseEnumPipe,
   Post,
   Put,
   Query,
@@ -20,7 +21,7 @@ import { TenantConnection } from 'src/common/tenant/tenant-connection.decorator'
 import { SaleReturnService } from '../service/sale-return.service';
 import { CreateSaleReturnDto } from '../dto/sale-return/create-sale-return.dto';
 import { UpdateSaleReturnDto } from '../dto/sale-return/update-sale-return.dto';
-import { UpdateSaleReturnStatusDto } from '../dto/sale-return/update-sale-return-status.dto';
+import { ReturnStatus } from 'src/tenant-db/entities/sale-return.entity';
 
 @Controller('tenant/sale-returns')
 @UseGuards(
@@ -99,13 +100,14 @@ export class SaleReturnController {
   updateStatus(
     @TenantConnection() tenantDb: DataSource,
     @Param('id') id: string,
-    @Body() dto: UpdateSaleReturnStatusDto,
+    @Query('returnStatus', new ParseEnumPipe(ReturnStatus))
+    returnStatus: ReturnStatus,
     @Req() req: Request,
   ) {
     return this.saleReturnService.updateStatus(
       tenantDb,
       id,
-      dto,
+      { returnStatus },
       req.user as { userId: string },
     );
   }
