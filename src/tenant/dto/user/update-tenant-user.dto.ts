@@ -56,4 +56,24 @@ export class UpdateTenantUserDto {
   @ValidateIf((_, value) => value !== null)
   @IsString()
   cityId?: string | null;
+
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsString()
+  locationTitle?: string | null;
+
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsString()
+  latitude?: string | null;
+
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsString()
+  longitude?: string | null;
+
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsString()
+  maxRadius?: string | null;
 }

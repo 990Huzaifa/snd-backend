@@ -424,6 +424,10 @@ export class UserService {
     if (dto.countryId !== undefined) user.countryId = dto.countryId?.trim() || null;
     if (dto.stateId !== undefined) user.stateId = dto.stateId?.trim() || null;
     if (dto.cityId !== undefined) user.cityId = dto.cityId?.trim() || null;
+    if (dto.locationTitle !== undefined) user.locationTitle = dto.locationTitle?.trim() ?? null;
+    if (dto.latitude !== undefined) user.latitude = dto.latitude?.trim() ?? null;
+    if (dto.longitude !== undefined) user.longitude = dto.longitude?.trim() ?? null;
+    if (dto.maxRadius !== undefined) user.maxRadius = dto.maxRadius?.trim() ?? null;
 
     const updatedUser = await userRepo.save(user);
 
