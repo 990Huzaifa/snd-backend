@@ -38,10 +38,10 @@ export class Attendence {
     @Column({nullable: true})
     checkInTime: Date;
 
-    @Column({nullable: true})
+    @Column({nullable: true, type: 'decimal', precision: 10, scale: 8 })
     checkInLatitude: number;
 
-    @Column({nullable: true})
+    @Column({nullable: true, type: 'decimal', precision: 10, scale: 8 })
     checkInLongitude: number;
 
 
@@ -52,10 +52,10 @@ export class Attendence {
     @Column({nullable: true})
     checkOutTime: Date;
 
-    @Column({nullable: true})
+    @Column({nullable: true, type: 'decimal', precision: 10, scale: 8 })
     checkOutLatitude: number;
 
-    @Column({nullable: true})
+    @Column({nullable: true, type: 'decimal', precision: 10, scale: 8 })
     checkOutLongitude: number;
 
     @Column({ type: 'enum', enum: AttendenceStatus })
@@ -87,10 +87,10 @@ export class TrackingLog {
     @JoinColumn({ name: 'attendenceId' })
     attendence: Attendence;
 
-    @Column()
+    @Column({type: 'decimal', precision: 10, scale: 8})
     latitude: number;
 
-    @Column()
+    @Column({type: 'decimal', precision: 10, scale: 8})
     longitude: number;
 
     @CreateDateColumn()

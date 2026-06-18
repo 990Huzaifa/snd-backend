@@ -158,6 +158,19 @@ export class AttendanceService {
     return weekend ? 'W' : 'A';
   }
 
+  private pickPrimaryAttendanceRecord(
+    records: Attendence[],
+  ): Attendence | null {
+    if (!records.length) {
+      return null;
+    }
+
+    return [...records].sort(
+      (left, right) =>
+        (right.checkInTime?.getTime() ?? 0) - (left.checkInTime?.getTime() ?? 0),
+    )[0];
+  }
+
   private roundAttendanceRate(value: number): number {
     return Math.round(value * 10) / 10;
   }
@@ -710,7 +723,9 @@ export class AttendanceService {
         const day = index + 1;
         const dateKey = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
         const weekend = this.isWeekend(year, month, day);
-        const code = this.resolveDayCode(byDate.get(dateKey) ?? [], weekend);
+        const dayRecords = byDate.get(dateKey) ?? [];
+        const primaryRecord = this.pickPrimaryAttendanceRecord(dayRecords);
+        const code = this.resolveDayCode(dayRecords, weekend);
 
         if (code === 'P') {
           presentDays += 1;
@@ -726,6 +741,7 @@ export class AttendanceService {
         }
 
         return {
+          id: primaryRecord?.id ?? null,
           day,
           weekday: this.weekdayLabel(year, month, day),
           code,
