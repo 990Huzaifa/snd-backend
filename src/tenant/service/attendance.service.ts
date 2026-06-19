@@ -24,7 +24,7 @@ import { CheckOutAttendanceDto } from '../dto/attendance/check-out-attendance.dt
 import { ListAttendanceDto } from '../dto/attendance/list-attendance.dto';
 import { CreateTrackingLogDto } from '../dto/attendance/create-tracking-log.dto';
 
-type AttendanceDayCode = 'P' | 'A' | 'HD' | 'L' | 'W';
+type AttendanceDayCode = 'P' | 'A' | 'HD' | 'L' | 'W' | 'NA';
 
 type AttendanceGeofence = {
   centerLat: number;
@@ -91,6 +91,34 @@ export class AttendanceService {
     return count;
   }
 
+  private countElapsedWorkableDaysInMonth(year: number, month: number): number {
+    const today = this.startOfDay(new Date());
+    const monthStart = this.startOfDay(new Date(year, month - 1, 1));
+    const monthEnd = this.endOfDay(new Date(year, month, 0));
+
+    if (today < monthStart) {
+      return 0;
+    }
+
+    const lastDay =
+      today > monthEnd ? new Date(year, month, 0).getDate() : today.getDate();
+
+    let count = 0;
+    for (let day = 1; day <= lastDay; day += 1) {
+      const dayOfWeek = new Date(year, month - 1, day).getDay();
+      if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+        count += 1;
+      }
+    }
+    return count;
+  }
+
+  private isFutureDay(year: number, month: number, day: number): boolean {
+    const today = this.startOfDay(new Date());
+    const target = this.startOfDay(new Date(year, month - 1, day));
+    return target > today;
+  }
+
   private toDateKey(date: Date): string {
     const d = new Date(date);
     const year = d.getFullYear();
@@ -129,8 +157,12 @@ export class AttendanceService {
   private resolveDayCode(
     records: Attendence[],
     weekend: boolean,
+    isFuture = false,
   ): AttendanceDayCode {
     if (!records.length) {
+      if (isFuture) {
+        return weekend ? 'W' : 'NA';
+      }
       return weekend ? 'W' : 'A';
     }
 
@@ -642,6 +674,7 @@ export class AttendanceService {
     const { year, month } = filters;
     const { start, end, daysInMonth } = this.getMonthDateRange(year, month);
     const workableDays = this.countWorkableDaysInMonth(year, month);
+    const elapsedWorkableDays = this.countElapsedWorkableDaysInMonth(year, month);
 
     const userQb = tenantDb
       .getRepository(User)
@@ -720,9 +753,10 @@ export class AttendanceService {
         const day = index + 1;
         const dateKey = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
         const weekend = this.isWeekend(year, month, day);
+        const isFuture = this.isFutureDay(year, month, day);
         const dayRecords = byDate.get(dateKey) ?? [];
         const primaryRecord = this.pickPrimaryAttendanceRecord(dayRecords);
-        const code = this.resolveDayCode(dayRecords, weekend);
+        const code = this.resolveDayCode(dayRecords, weekend, isFuture);
 
         if (code === 'P') {
           presentDays += 1;
@@ -768,7 +802,7 @@ export class AttendanceService {
     });
 
     const totalUsers = users.length;
-    const expectedWorkSlots = totalUsers * workableDays;
+    const expectedWorkSlots = totalUsers * elapsedWorkableDays;
     const attendanceRate =
       expectedWorkSlots > 0
         ? this.roundAttendanceRate((presentDays / expectedWorkSlots) * 100)
