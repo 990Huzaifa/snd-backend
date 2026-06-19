@@ -3,6 +3,11 @@ import type { Request } from 'express';
 import { TenantJwtAuthGuard } from 'src/auth/tenant-jwt-auth.guard';
 import { TenantAuthService } from '../service/tenant-auth.service';
 import { TenantLoginDto } from '../dto/tenant-login.dto';
+import {
+  ForgotPasswordDto,
+  ResetPasswordDto,
+  VerifyResetOtpDto,
+} from '../dto/auth/forgot-password.dto';
 import { SetupTenantUserPasswordDto } from '../dto/user/setup-tenant-user-password.dto';
 import { PusherService } from 'src/common/pusher/pusher.service';
 
@@ -67,6 +72,33 @@ export class TenantAuthController {
       dto,
       resolveTenantHost(origin, referer, host),
     );
+  }
+
+  @Post('forgot-password')
+  forgotPassword(@Body() dto: ForgotPasswordDto, @Req() req: Request) {
+    const origin = getRequestHeader(req, ['origin', 'x-forwarded-origin']);
+    const referer = getRequestHeader(req, ['referer']);
+    const host = getRequestHeader(req, ['x-original-host', 'x-forwarded-host', 'host']);
+    return this.tenantAuthService.forgotPassword(
+      dto,
+      resolveTenantHost(origin, referer, host),
+    );
+  }
+
+  @Post('verify-reset-otp')
+  verifyResetOtp(@Body() dto: VerifyResetOtpDto, @Req() req: Request) {
+    const origin = getRequestHeader(req, ['origin', 'x-forwarded-origin']);
+    const referer = getRequestHeader(req, ['referer']);
+    const host = getRequestHeader(req, ['x-original-host', 'x-forwarded-host', 'host']);
+    return this.tenantAuthService.verifyResetOtp(
+      dto,
+      resolveTenantHost(origin, referer, host),
+    );
+  }
+
+  @Post('reset-password')
+  resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.tenantAuthService.resetPassword(dto);
   }
 
   @UseGuards(TenantJwtAuthGuard)

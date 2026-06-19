@@ -55,6 +55,19 @@ export class MailService {
         return this.renderTemplate('reset-password-email', data);
     }
 
+    renderTenantOtpTemplate(data: {
+        logoUrl: string;
+        tenantName: string;
+        recipientName: string;
+        otp: string;
+        heading: string;
+        message: string;
+        expiryMinutes: number;
+        year: number;
+    }) {
+        return this.renderTemplate('tenant-otp-email', data);
+    }
+
     renderTenantUserInviteTemplate(data: {
         logoUrl: string;
         invitedByName: string;

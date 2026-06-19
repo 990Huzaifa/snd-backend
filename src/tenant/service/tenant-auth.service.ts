@@ -8,12 +8,25 @@ import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
+import { MailService } from 'src/common/mail/mail.service';
 import { Tenant, TenantStatus } from 'src/master-db/entities/tenant.entity';
 import { TenantConnectionManager } from 'src/tenant-db/services/tenant-connection-manager.service';
 import { DeviceApprovedStatus, User } from 'src/tenant-db/entities/user.entity';
+import {
+  ForgotPasswordDto,
+  ResetPasswordDto,
+  VerifyResetOtpDto,
+} from '../dto/auth/forgot-password.dto';
 import { TenantLoginDto } from '../dto/tenant-login.dto';
 import { SetupTenantUserPasswordDto } from '../dto/user/setup-tenant-user-password.dto';
 import { ActivityLogService } from './activity-log.service';
+
+const PASSWORD_RESET_OTP_EXPIRY_MS = 10 * 60 * 1000;
+const PASSWORD_RESET_TOKEN_EXPIRY = '15m';
+const MAX_PASSWORD_RESET_OTP_ATTEMPTS = 5;
+const PASSWORD_RESET_RESEND_COOLDOWN_MS = 60 * 1000;
+const FORGOT_PASSWORD_GENERIC_MESSAGE =
+  'If an account exists for this email, a reset code has been sent.';
 
 /**
  * First label of host is treated as tenantCode unless it is `api` or `www`.
@@ -43,7 +56,256 @@ export class TenantAuthService {
     private readonly tenantConnectionManager: TenantConnectionManager,
     private readonly jwtService: JwtService,
     private readonly activityLogService: ActivityLogService,
+    private readonly mailService: MailService,
   ) {}
+
+  private async resolveProvisionedTenant(
+    tenantCode: string | undefined,
+    hostHeader: string | undefined,
+  ): Promise<Tenant> {
+    const fromHost = extractTenantCodeFromHost(hostHeader);
+    const tenantName = (fromHost ?? tenantCode)?.trim();
+
+    if (!tenantName) {
+      throw new BadRequestException(
+        'Tenant could not be resolved: use a tenant subdomain or pass tenantCode in the body',
+      );
+    }
+
+    const tenant = await this.tenantRepo.findOne({
+      where: [{ name: tenantName }, { code: tenantName }],
+      select: ['id', 'code', 'name', 'isActive', 'status'],
+      relations: ['profile'],
+    });
+
+    if (!tenant || !tenant.isActive || tenant.status !== TenantStatus.PROVISIONED) {
+      throw new UnauthorizedException('Invalid tenant context');
+    }
+
+    return tenant;
+  }
+
+  private generateOtp(): string {
+    return Math.floor(100000 + Math.random() * 900000).toString();
+  }
+
+  private clearPasswordResetOtp(user: User): void {
+    user.passwordResetOtpHash = null;
+    user.passwordResetOtpExpiresAt = null;
+    user.passwordResetOtpAttempts = 0;
+  }
+
+  private isPasswordResetEligible(user: User): boolean {
+    return (
+      !!user.password &&
+      user.isActive &&
+      !user.isDeleted
+    );
+  }
+
+  private getTenantBranding(tenant: Tenant) {
+    const logoUrl =
+      tenant.profile?.logoUrl ||
+      process.env.APP_LOGO_URL ||
+      'https://snd.com/logo.png';
+    const tenantName = tenant.profile?.displayName || tenant.name;
+
+    return { logoUrl, tenantName };
+  }
+
+  async forgotPassword(dto: ForgotPasswordDto, hostHeader: string | undefined) {
+    const tenant = await this.resolveProvisionedTenant(dto.tenantCode, hostHeader);
+    const tenantDb = await this.tenantConnectionManager.getConnection(tenant.id);
+    const userRepo = tenantDb.getRepository(User);
+    const email = dto.email.trim().toLowerCase();
+
+    const user = await userRepo.findOne({
+      where: { email },
+      select: [
+        'id',
+        'email',
+        'name',
+        'password',
+        'isActive',
+        'isDeleted',
+        'passwordResetOtpExpiresAt',
+        'updatedAt',
+      ],
+    });
+
+    if (!user || !this.isPasswordResetEligible(user)) {
+      return { message: FORGOT_PASSWORD_GENERIC_MESSAGE };
+    }
+
+    const now = Date.now();
+    if (
+      user.passwordResetOtpExpiresAt &&
+      user.passwordResetOtpExpiresAt.getTime() > now &&
+      user.updatedAt &&
+      now - user.updatedAt.getTime() < PASSWORD_RESET_RESEND_COOLDOWN_MS
+    ) {
+      return { message: FORGOT_PASSWORD_GENERIC_MESSAGE };
+    }
+
+    const otp = this.generateOtp();
+    user.passwordResetOtpHash = await bcrypt.hash(otp, 10);
+    user.passwordResetOtpExpiresAt = new Date(now + PASSWORD_RESET_OTP_EXPIRY_MS);
+    user.passwordResetOtpAttempts = 0;
+    await userRepo.save(user);
+
+    const { logoUrl, tenantName } = this.getTenantBranding(tenant);
+    const emailHtml = this.mailService.renderTenantOtpTemplate({
+      logoUrl,
+      tenantName,
+      recipientName: user.name,
+      otp,
+      heading: 'Reset Your Password',
+      message: 'We received a request to reset your password. Use the verification code below to continue.',
+      expiryMinutes: PASSWORD_RESET_OTP_EXPIRY_MS / 60_000,
+      year: new Date().getFullYear(),
+    });
+
+    await this.mailService.sendEmail(
+      user.email,
+      `Password reset code - ${tenantName}`,
+      emailHtml,
+      'noreply@salesvince.com',
+    );
+
+    await this.activityLogService.recordActivityLog(tenantDb, {
+      actorId: user.id,
+      action: 'USER_PASSWORD_RESET_REQUESTED',
+      description: `Password reset OTP sent to ${user.email}`,
+      metadata: { userId: user.id },
+    });
+
+    return { message: FORGOT_PASSWORD_GENERIC_MESSAGE };
+  }
+
+  async verifyResetOtp(dto: VerifyResetOtpDto, hostHeader: string | undefined) {
+    const tenant = await this.resolveProvisionedTenant(dto.tenantCode, hostHeader);
+    const tenantDb = await this.tenantConnectionManager.getConnection(tenant.id);
+    const userRepo = tenantDb.getRepository(User);
+    const email = dto.email.trim().toLowerCase();
+
+    const user = await userRepo.findOne({
+      where: { email },
+      select: [
+        'id',
+        'email',
+        'passwordResetOtpHash',
+        'passwordResetOtpExpiresAt',
+        'passwordResetOtpAttempts',
+        'isActive',
+        'isDeleted',
+        'password',
+      ],
+    });
+
+    if (!user || !this.isPasswordResetEligible(user)) {
+      throw new BadRequestException('Invalid or expired verification code');
+    }
+
+    if (
+      !user.passwordResetOtpHash ||
+      !user.passwordResetOtpExpiresAt ||
+      user.passwordResetOtpExpiresAt < new Date()
+    ) {
+      throw new BadRequestException('Invalid or expired verification code');
+    }
+
+    if (user.passwordResetOtpAttempts >= MAX_PASSWORD_RESET_OTP_ATTEMPTS) {
+      this.clearPasswordResetOtp(user);
+      await userRepo.save(user);
+      throw new BadRequestException(
+        'Too many failed attempts. Please request a new code.',
+      );
+    }
+
+    const otpValid = await bcrypt.compare(dto.otp, user.passwordResetOtpHash);
+    if (!otpValid) {
+      user.passwordResetOtpAttempts += 1;
+      await userRepo.save(user);
+      throw new BadRequestException('Invalid or expired verification code');
+    }
+
+    const resetToken = this.jwtService.sign(
+      {
+        type: 'tenant_password_reset',
+        userId: user.id,
+        tenantId: tenant.id,
+        email: user.email,
+      },
+      { expiresIn: PASSWORD_RESET_TOKEN_EXPIRY },
+    );
+
+    return { resetToken };
+  }
+
+  async resetPassword(dto: ResetPasswordDto) {
+    let resetPayload: {
+      type: string;
+      userId: string;
+      tenantId: string;
+      email: string;
+    };
+
+    try {
+      resetPayload = this.jwtService.verify(dto.resetToken);
+    } catch {
+      throw new UnauthorizedException('Invalid or expired reset token');
+    }
+
+    if (resetPayload.type !== 'tenant_password_reset') {
+      throw new UnauthorizedException('Invalid reset token type');
+    }
+
+    const tenant = await this.tenantRepo.findOne({
+      where: { id: resetPayload.tenantId },
+      select: ['id', 'isActive', 'status'],
+    });
+
+    if (!tenant || !tenant.isActive || tenant.status !== TenantStatus.PROVISIONED) {
+      throw new UnauthorizedException('Invalid tenant context');
+    }
+
+    const tenantDb = await this.tenantConnectionManager.getConnection(tenant.id);
+    const userRepo = tenantDb.getRepository(User);
+    const user = await userRepo.findOne({
+      where: { id: resetPayload.userId },
+      select: [
+        'id',
+        'email',
+        'password',
+        'isActive',
+        'isDeleted',
+        'passwordResetOtpHash',
+        'passwordResetOtpExpiresAt',
+        'passwordResetOtpAttempts',
+      ],
+    });
+
+    if (
+      !user ||
+      !this.isPasswordResetEligible(user) ||
+      user.email !== resetPayload.email
+    ) {
+      throw new UnauthorizedException('Invalid reset request');
+    }
+
+    user.password = await bcrypt.hash(dto.password, 10);
+    this.clearPasswordResetOtp(user);
+    await userRepo.save(user);
+
+    await this.activityLogService.recordActivityLog(tenantDb, {
+      actorId: user.id,
+      action: 'USER_PASSWORD_RESET_COMPLETED',
+      description: `Password reset completed for ${user.email}`,
+      metadata: { userId: user.id },
+    });
+
+    return { message: 'Password reset successfully' };
+  }
 
   async login(
     dto: TenantLoginDto,

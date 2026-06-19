@@ -161,6 +161,15 @@ export class User {
     @Column({ nullable: true })
     maxRadius: string;
 
+    @Column({ nullable: true })
+    passwordResetOtpHash: string | null;
+
+    @Column({ nullable: true })
+    passwordResetOtpExpiresAt: Date | null;
+
+    @Column({ default: 0 })
+    passwordResetOtpAttempts: number;
+
     @CreateDateColumn()
     createdAt: Date;
 
