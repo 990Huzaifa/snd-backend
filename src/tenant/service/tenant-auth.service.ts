@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
@@ -254,4 +255,5 @@ export class TenantAuthService {
 
     return { message: 'Password setup completed successfully' };
   }
+
 }

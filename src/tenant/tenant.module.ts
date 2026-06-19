@@ -48,6 +48,7 @@ import { LoadsheetController } from './controller/loadsheet.controller';
 import { RiderLoadsheetController } from './controller/rider-app/loadsheet.controller';
 import { SalesmanRetailerVisitController } from './controller/salesman-app/retailer-visit.controller';
 import { AttendanceController } from './controller/attendance.controller';
+import { ProfileController } from './controller/profile.controller';
 import { TenantAuthService } from './service/tenant-auth.service';
 import { ActivityLogService } from './service/activity-log.service';
 import { TenantDesignationService } from './service/tenant-designation.service';
@@ -100,6 +101,7 @@ import { FlavourService } from './service/product/flavour.service';
 import { DatabaseBackupController } from './controller/database-backup.controller';
 import { TenantDatabaseBackupService } from './service/tenant-database-backup.service';
 import { PgDumpService } from './service/pg-dump.service';
+import { ProfileService } from './service/profile.service';
 
 
 @Module({
@@ -160,6 +162,7 @@ import { PgDumpService } from './service/pg-dump.service';
     RiderLoadsheetController,
     SalesmanRetailerVisitController,
     AttendanceController,
+    ProfileController,
     DatabaseBackupController,
   ],
   providers: [
@@ -210,6 +213,7 @@ import { PgDumpService } from './service/pg-dump.service';
     RetailerLedgerService,
     TenantDatabaseBackupService,
     PgDumpService,
+    ProfileService,
   ],
 })
 export class TenantModule { }
