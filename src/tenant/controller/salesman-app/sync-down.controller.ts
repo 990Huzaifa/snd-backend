@@ -7,10 +7,10 @@ import { RequirePermissions } from 'src/auth/require-permission.decorator';
 import { TenantConnectionGuard } from 'src/common/guards/tenant-connection.guard';
 import { TenantJwtGuard } from 'src/common/guards/tenant-jwt.guard';
 import { TenantConnection } from 'src/common/tenant/tenant-connection.decorator';
-import { SalesmanSyncDownDto } from '../../dto/salesman-app/sync-down/sync-down.dto';
+import { SalesmanDistributorQueryDto } from '../../dto/salesman-app/sync-down/sync-down.dto';
 import { SalesmanSyncDownService } from '../../service/salesman-app/sync-down.service';
 
-@Controller('tenant/salesman/sync-down')
+@Controller('tenant/salesman')
 @UseGuards(
   TenantJwtAuthGuard,
   TenantJwtGuard,
@@ -20,25 +20,11 @@ import { SalesmanSyncDownService } from '../../service/salesman-app/sync-down.se
 export class SalesmanSyncDownController {
   constructor(private readonly syncDownService: SalesmanSyncDownService) {}
 
-  @Get()
-  @RequirePermissions('SALESMAN_SYNC_DOWN')
-  syncDown(
-    @TenantConnection() tenantDb: DataSource,
-    @Query() query: SalesmanSyncDownDto,
-    @Req() req: Request,
-  ) {
-    return this.syncDownService.syncDown(
-      tenantDb,
-      query.distributorId,
-      req.user as { userId: string },
-    );
-  }
-
   @Get('stock-products')
   @RequirePermissions('SALESMAN_SYNC_DOWN')
   listStockProducts(
     @TenantConnection() tenantDb: DataSource,
-    @Query() query: SalesmanSyncDownDto,
+    @Query() query: SalesmanDistributorQueryDto,
   ) {
     return this.syncDownService.listStockProducts(tenantDb, query.distributorId);
   }
@@ -53,7 +39,7 @@ export class SalesmanSyncDownController {
   @RequirePermissions('SALESMAN_SYNC_DOWN')
   listRoutes(
     @TenantConnection() tenantDb: DataSource,
-    @Query() query: SalesmanSyncDownDto,
+    @Query() query: SalesmanDistributorQueryDto,
   ) {
     return this.syncDownService.listRoutes(tenantDb, query.distributorId);
   }

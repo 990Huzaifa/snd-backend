@@ -11,7 +11,6 @@ import {
   SaleVoucherStatus,
 } from 'src/tenant-db/entities/sale-voucher.entity';
 import { StockBalance } from 'src/tenant-db/entities/stock.entity';
-import { ActivityLogService } from '../activity-log.service';
 
 const SCHEME_RELATIONS = [
   'slabs',
@@ -73,7 +72,6 @@ const SALE_INVOICE_RELATIONS = [
 
 @Injectable()
 export class SalesmanSyncDownService {
-  constructor(private readonly activityLogService: ActivityLogService) {}
 
   private normalizeDistributorId(distributorId?: string): string {
     const normalized = (distributorId ?? '').trim();
@@ -222,55 +220,5 @@ export class SalesmanSyncDownService {
     });
 
     return { result: invoices };
-  }
-
-  async syncDown(
-    tenantDb: DataSource,
-    distributorId: string,
-    user: { userId: string },
-  ) {
-    const [
-      stockProducts,
-      schemes,
-      routes,
-      retailers,
-      pjps,
-      approvedSaleVouchers,
-      approvedSaleInvoices,
-    ] = await Promise.all([
-      this.listStockProducts(tenantDb, distributorId),
-      this.listSchemes(tenantDb),
-      this.listRoutes(tenantDb, distributorId),
-      this.listRetailers(tenantDb),
-      this.listPjps(tenantDb, user),
-      this.listApprovedSaleVouchers(tenantDb, user),
-      this.listApprovedSaleInvoices(tenantDb, user),
-    ]);
-
-    await this.activityLogService.recordActivityLog(tenantDb, {
-      actorId: user.userId,
-      action: 'SALESMAN_SYNC_DOWN',
-      description: 'Salesman app sync down completed',
-      metadata: {
-        distributorId,
-        stockProducts: stockProducts.result.length,
-        schemes: schemes.result.length,
-        routes: routes.result.length,
-        retailers: retailers.result.length,
-        pjps: pjps.result.length,
-        approvedSaleVouchers: approvedSaleVouchers.result.length,
-        approvedSaleInvoices: approvedSaleInvoices.result.length,
-      },
-    });
-
-    return {
-      stockProducts: stockProducts.result,
-      schemes: schemes.result,
-      routes: routes.result,
-      retailers: retailers.result,
-      pjps: pjps.result,
-      approvedSaleVouchers: approvedSaleVouchers.result,
-      approvedSaleInvoices: approvedSaleInvoices.result,
-    };
   }
 }
