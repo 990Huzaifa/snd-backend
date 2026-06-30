@@ -1,5 +1,6 @@
 import {
   IsEmail,
+  IsEnum,
   IsInt,
   IsOptional,
   IsString,
@@ -7,6 +8,7 @@ import {
   MinLength,
   ValidateIf,
 } from 'class-validator';
+import { UserType } from 'src/tenant-db/entities/user.entity';
 
 export class UpdateTenantUserDto {
   @IsOptional()
@@ -76,4 +78,11 @@ export class UpdateTenantUserDto {
   @ValidateIf((_, value) => value !== null)
   @IsString()
   maxRadius?: string | null;
+
+  @IsOptional()
+  @IsEnum(UserType)
+  type?: UserType;
+
+  @IsOptional()
+  joiningDate?: string | null;
 }
