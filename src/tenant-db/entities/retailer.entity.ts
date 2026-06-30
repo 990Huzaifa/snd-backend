@@ -208,7 +208,6 @@ export enum RetailerVisitStatus {
     OWNER_ABSENT = 'OWNER_ABSENT',
     STOCK_FULL = 'STOCK_FULL',
     RETURN_BOOKED = 'RETURN_BOOKED',
-    MERCHANDISED = 'MERCHANDISED',
 }
 
 @Entity('retailer_visits')
@@ -237,12 +236,6 @@ export class RetailerVisit {
     @JoinColumn({ name: 'routeId' })
     route: Route;
 
-    @Column()
-    checkInLatitude: number;
-
-    @Column()
-    checkInLongitude: number;
-
     @Column({ type: 'enum', enum: RetailerVisitStatus })
     visitStatus: RetailerVisitStatus;   
 
@@ -260,3 +253,63 @@ export class RetailerVisit {
     @UpdateDateColumn()
     updatedAt: Date;
 }
+
+@Entity('retailer_merchandising')
+export class RetailerMerchandising {
+    @PrimaryGeneratedColumn('uuid')
+    id: string;
+
+    @Column()
+    retailerId: string;
+
+    @ManyToOne(() => Retailer, { onDelete: 'RESTRICT' })
+    @JoinColumn({ name: 'retailerId' })
+    retailer: Retailer;
+
+    @Column()
+    userId: string;
+
+    @ManyToOne(() => User, { onDelete: 'RESTRICT' })
+    @JoinColumn({ name: 'userId' })
+    user: User;
+
+    @Column('text', { array: true, nullable: true })
+    shelfImages: string[] | null;
+
+    @Column({nullable: true})
+    notes: string;
+    
+    @CreateDateColumn()
+    createdAt: Date;
+
+    @UpdateDateColumn()
+    updatedAt: Date;
+}  
+
+@Entity('retailer_attendences')
+export class RetailerAttendence {
+    @PrimaryGeneratedColumn('uuid')
+    id: string;
+
+    @Column()
+    retailerId: string;
+
+    @ManyToOne(() => Retailer, { onDelete: 'RESTRICT' })
+    @JoinColumn({ name: 'retailerId' })
+    retailer: Retailer;
+
+    @Column()
+    attendenceDate: Date;
+
+    @Column({nullable: true, type: 'decimal', precision: 10, scale: 8 })
+    checkinLatitude: number;
+
+    @Column({nullable: true, type: 'decimal', precision: 10, scale: 8 })
+    checkinLongitude: number;
+
+    @CreateDateColumn()
+    createdAt: Date;
+    
+    @UpdateDateColumn()
+    updatedAt: Date;
+}  
