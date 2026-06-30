@@ -191,13 +191,12 @@ export class SalesmanSyncDownService {
     return { result };
   }
 
-  async listApprovedSaleVouchers(
+  async listPaidSaleVouchers(
     tenantDb: DataSource,
     user: { userId: string },
   ) {
     const vouchers = await tenantDb.getRepository(SaleVoucher).find({
       where: {
-        createdBy: user.userId,
         status: In([SaleVoucherStatus.PAID, SaleVoucherStatus.PARTIALLY_PAID]),
       },
       relations: [...SALE_VOUCHER_RELATIONS],

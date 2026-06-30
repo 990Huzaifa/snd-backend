@@ -62,13 +62,13 @@ export class SalesmanSyncDownController {
     );
   }
 
-  @Get('approved-sale-vouchers')
+  @Get('paid-sale-vouchers')
   @RequirePermissions('SALESMAN_SYNC_DOWN')
   listApprovedSaleVouchers(
     @TenantConnection() tenantDb: DataSource,
     @Req() req: Request,
   ) {
-    return this.syncDownService.listApprovedSaleVouchers(
+    return this.syncDownService.listPaidSaleVouchers(
       tenantDb,
       req.user as { userId: string },
     );
