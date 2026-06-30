@@ -1,6 +1,10 @@
-import { Body, Controller, Post, Req, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Req, Res, UnauthorizedException, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
+import { DataSource } from 'typeorm';
 import { TenantJwtAuthGuard } from 'src/auth/tenant-jwt-auth.guard';
+import { TenantConnectionGuard } from 'src/common/guards/tenant-connection.guard';
+import { TenantJwtGuard } from 'src/common/guards/tenant-jwt.guard';
+import { TenantConnection } from 'src/common/tenant/tenant-connection.decorator';
 import { TenantAuthService } from '../service/tenant-auth.service';
 import { TenantLoginDto } from '../dto/tenant-login.dto';
 import {
@@ -99,6 +103,20 @@ export class TenantAuthController {
   @Post('reset-password')
   resetPassword(@Body() dto: ResetPasswordDto) {
     return this.tenantAuthService.resetPassword(dto);
+  }
+
+  @Get('check-account')
+  @UseGuards(TenantJwtAuthGuard, TenantJwtGuard, TenantConnectionGuard)
+  checkAccount(
+    @TenantConnection() tenantDb: DataSource,
+    @Req() req: Request,
+  ) {
+    const user = req.user as { userId?: string; sub?: string };
+    const userId = user.userId ?? user.sub;
+    if (!userId) {
+      throw new UnauthorizedException('User not found in token');
+    }
+    return this.tenantAuthService.checkAccount(tenantDb, userId);
   }
 
   @UseGuards(TenantJwtAuthGuard)

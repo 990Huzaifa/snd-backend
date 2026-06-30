@@ -13,14 +13,6 @@ export class CreateRetailerVisitDto {
   @IsUUID()
   retailerId: string;
 
-  @Type(() => Number)
-  @IsNumber()
-  checkInLatitude: number;
-
-  @Type(() => Number)
-  @IsNumber()
-  checkInLongitude: number;
-
   @IsEnum(RetailerVisitStatus)
   visitStatus: RetailerVisitStatus;
 

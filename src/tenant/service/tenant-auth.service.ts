@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { MailService } from 'src/common/mail/mail.service';
 import { Tenant, TenantStatus } from 'src/master-db/entities/tenant.entity';
@@ -375,7 +375,7 @@ export class TenantAuthService {
       this.applyDeviceBinding(user, dto);
       user.fcmToken = dto.fcmToken ?? null;
       await userRepo.save(user);
-      this.assertDeviceApproved(user);
+      this.assertDeviceApprovedForLogin(user);
       
     }
     const payload = {
@@ -433,11 +433,9 @@ export class TenantAuthService {
     }
   }
 
-  private assertDeviceApproved(user: User): void {
+  private assertDeviceApprovedForLogin(user: User): void {
     if (user.deviceApprovedStatus === DeviceApprovedStatus.WAITING) {
-      throw new UnauthorizedException(
-        'Device is waiting for approval, please wait for approval',
-      );
+      return;
     }
     if (user.deviceApprovedStatus === DeviceApprovedStatus.REJECTED) {
       throw new UnauthorizedException(
@@ -448,6 +446,31 @@ export class TenantAuthService {
       throw new UnauthorizedException(
         'Device is not approved. Contact your administrator',
       );
+    }
+  }
+
+  async checkAccount(tenantDb: DataSource, userId: string) {
+    const user = await tenantDb.getRepository(User).findOne({
+      where: { id: userId },
+      select: ['id', 'isActive', 'isDeleted', 'deviceApprovedStatus'],
+    });
+
+    if (!user || user.isDeleted) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    if (!user.isActive) {
+      throw new UnauthorizedException('User is not active');
+    }
+
+    if (user.deviceApprovedStatus === DeviceApprovedStatus.REJECTED) {
+      throw new UnauthorizedException('Device was rejected. Contact your administrator to register a new device');
+    }
+    if (user.deviceApprovedStatus === DeviceApprovedStatus.WAITING) {
+      return { deviceApprovedStatus: DeviceApprovedStatus.WAITING };
+    }
+    if (user.deviceApprovedStatus === DeviceApprovedStatus.APPROVED) {
+      return { deviceApprovedStatus: DeviceApprovedStatus.APPROVED };
     }
   }
 

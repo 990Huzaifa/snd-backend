@@ -159,12 +159,9 @@ export class RetailerVisitService {
     const visitRepo = tenantDb.getRepository(RetailerVisit);
     const visit = await visitRepo.save(
       visitRepo.create({
-        id: visitId,
         userId: user.userId,
         retailerId: dto.retailerId,
         routeId: retailer.routeId,
-        checkInLatitude: dto.checkInLatitude,
-        checkInLongitude: dto.checkInLongitude,
         visitStatus: dto.visitStatus,
         notes: dto.notes?.trim() || null,
         shopImages: shopImageUrls.length ? shopImageUrls : null,
