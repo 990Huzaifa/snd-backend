@@ -5,25 +5,59 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
-import { DataSource } from 'typeorm';
+import { DataSource, In } from 'typeorm';
+import {
+  isWithinRadiusKm,
+  parseGeoCoordinate,
+  parseMaxRadiusKm,
+} from 'src/common/geo/geo.util';
 import { S3Service } from 'src/common/s3/s3.service';
 import {
   Retailer,
+  RetailerAttendence,
   RetailerVisit,
   RetailerVisitStatus,
 } from 'src/tenant-db/entities/retailer.entity';
 import { ActivityLogService } from '../activity-log.service';
-import { CreateRetailerVisitDto } from '../../dto/salesman-app/retailer-visit/create-retailer-visit.dto';
+import { NotificationService } from '../notification.service';
+import { TenantJob, TenantJobService } from '../tenant-job.service';
+import {
+  BulkCheckInRetailerDto,
+  CheckInRetailerItemDto,
+} from '../../dto/salesman-app/retailer-visit/check-in-retailer.dto';
+import {
+  BulkCreateRetailerVisitDto,
+  CreateRetailerVisitItemDto,
+} from '../../dto/salesman-app/retailer-visit/create-retailer-visit.dto';
 import { ListRetailerVisitDto } from '../../dto/salesman-app/retailer-visit/list-retailer-visit.dto';
 import {
+  SALESMAN_BULK_VISIT_MAX,
   SALESMAN_VISIT_IMAGE_ALLOWED_MIME_TYPES,
   SALESMAN_VISIT_IMAGE_MAX_BYTES,
   SALESMAN_VISIT_IMAGE_MAX_FILES_PER_FIELD,
 } from '../../config/salesman-visit-image.multer';
 
-type VisitImageFiles = {
-  shopImages?: Express.Multer.File[];
-  shelfImages?: Express.Multer.File[];
+const SALESMAN_BULK_CHECK_IN_MAX = 50;
+
+type VisitImagePayload = {
+  buffer: Buffer;
+  mimetype: string;
+};
+
+type VisitRowImages = {
+  shopImages: VisitImagePayload[];
+  shelfImages: VisitImagePayload[];
+};
+
+type VisitSyncRow = {
+  row: number;
+  visit: CreateRetailerVisitItemDto;
+  images: VisitRowImages;
+};
+
+type CheckInSyncRow = {
+  row: number;
+  checkIn: CheckInRetailerItemDto;
 };
 
 @Injectable()
@@ -31,6 +65,8 @@ export class RetailerVisitService {
   constructor(
     private readonly activityLogService: ActivityLogService,
     private readonly s3Service: S3Service,
+    private readonly notificationService: NotificationService,
+    private readonly tenantJobService: TenantJobService,
   ) {}
 
   private normalizePage(value?: number): number {
@@ -44,6 +80,12 @@ export class RetailerVisitService {
       return 10;
     }
     return Math.min(Math.floor(n), 100);
+  }
+
+  private startOfDay(date: Date): Date {
+    const d = new Date(date);
+    d.setHours(0, 0, 0, 0);
+    return d;
   }
 
   private parseOptionalDayBoundary(iso?: string): Date | undefined {
@@ -93,94 +135,397 @@ export class RetailerVisitService {
     throw new BadRequestException('Image must be PNG, JPEG, or WebP');
   }
 
-  private assertImageFileList(
-    files: Express.Multer.File[] | undefined,
-    fieldName: string,
-  ): Express.Multer.File[] {
-    if (!files?.length) {
-      return [];
-    }
-    if (files.length > SALESMAN_VISIT_IMAGE_MAX_FILES_PER_FIELD) {
-      throw new BadRequestException(
-        `${fieldName} allows at most ${SALESMAN_VISIT_IMAGE_MAX_FILES_PER_FIELD} files`,
-      );
-    }
-    for (const file of files) {
-      this.assertVisitImageFile(file, fieldName);
-    }
-    return files;
-  }
-
   private async uploadVisitImages(
     tenantCode: string,
     visitId: string,
     folder: 'shop' | 'shelf',
-    files: Express.Multer.File[],
+    images: VisitImagePayload[],
   ): Promise<string[]> {
     const urls: string[] = [];
-    for (let index = 0; index < files.length; index++) {
-      const file = files[index];
-      const extension = this.imageExtension(file.mimetype);
+    for (let index = 0; index < images.length; index++) {
+      const image = images[index];
+      const extension = this.imageExtension(image.mimetype);
       const key = `tenants/${tenantCode}/retailer-visits/${visitId}/${folder}/${index}.${extension}`;
       const { url } = await this.s3Service.uploadObject(
         key,
-        file.buffer,
-        file.mimetype,
+        image.buffer,
+        image.mimetype,
       );
       urls.push(url);
     }
     return urls;
   }
 
-  async createVisit(
-    tenantDb: DataSource,
-    tenantCode: string,
-    dto: CreateRetailerVisitDto,
-    files: VisitImageFiles | undefined,
-    user: { userId: string },
-  ) {
-    const retailer = await tenantDb.getRepository(Retailer).findOne({
-      where: { id: dto.retailerId },
-      select: ['id', 'routeId'],
-    });
-    if (!retailer) {
-      throw new NotFoundException('Retailer not found');
+  private emptyVisitRowImages(): VisitRowImages {
+    return { shopImages: [], shelfImages: [] };
+  }
+
+  private parseVisitImageField(
+    fieldname: string,
+    visitCount: number,
+  ): { visitIndex: number; type: 'shop' | 'shelf' } | null {
+    const patterns: Array<{
+      regex: RegExp;
+      type: 'shop' | 'shelf';
+    }> = [
+      { regex: /^shopImages\[(\d+)\]$/, type: 'shop' },
+      { regex: /^shelfImages\[(\d+)\]$/, type: 'shelf' },
+      { regex: /^shopImages_(\d+)$/, type: 'shop' },
+      { regex: /^shelfImages_(\d+)$/, type: 'shelf' },
+    ];
+
+    for (const pattern of patterns) {
+      const match = fieldname.match(pattern.regex);
+      if (match) {
+        return { visitIndex: Number(match[1]), type: pattern.type };
+      }
     }
 
-    const shopFiles = this.assertImageFileList(files?.shopImages, 'shopImages');
-    const shelfFiles = this.assertImageFileList(files?.shelfImages, 'shelfImages');
+    if (visitCount === 1) {
+      if (fieldname === 'shopImages') {
+        return { visitIndex: 0, type: 'shop' };
+      }
+      if (fieldname === 'shelfImages') {
+        return { visitIndex: 0, type: 'shelf' };
+      }
+    }
 
+    return null;
+  }
+
+  private extractVisitImages(
+    files: Express.Multer.File[] | undefined,
+    visitCount: number,
+  ): Map<number, VisitRowImages> {
+    const imagesByIndex = new Map<number, VisitRowImages>();
+    if (!files?.length) {
+      return imagesByIndex;
+    }
+
+    for (const file of files) {
+      const parsed = this.parseVisitImageField(file.fieldname, visitCount);
+      if (!parsed) {
+        continue;
+      }
+
+      if (parsed.visitIndex < 0 || parsed.visitIndex >= visitCount) {
+        throw new BadRequestException(
+          `Image field ${file.fieldname} does not match any visit index`,
+        );
+      }
+
+      this.assertVisitImageFile(file, file.fieldname);
+
+      const bucket =
+        imagesByIndex.get(parsed.visitIndex) ?? this.emptyVisitRowImages();
+      const target =
+        parsed.type === 'shop' ? bucket.shopImages : bucket.shelfImages;
+
+      if (target.length >= SALESMAN_VISIT_IMAGE_MAX_FILES_PER_FIELD) {
+        throw new BadRequestException(
+          `${file.fieldname} allows at most ${SALESMAN_VISIT_IMAGE_MAX_FILES_PER_FIELD} files per visit`,
+        );
+      }
+
+      target.push({
+        buffer: file.buffer,
+        mimetype: file.mimetype,
+      });
+      imagesByIndex.set(parsed.visitIndex, bucket);
+    }
+
+    return imagesByIndex;
+  }
+
+  private buildVisitRows(
+    dto: BulkCreateRetailerVisitDto,
+    imagesByIndex: Map<number, VisitRowImages>,
+  ): VisitSyncRow[] {
+    return dto.visits.map((visit, index) => ({
+      row: index + 1,
+      visit,
+      images: imagesByIndex.get(index) ?? this.emptyVisitRowImages(),
+    }));
+  }
+
+  private async notifyVisitSyncCompletion(
+    tenantDb: DataSource,
+    job: TenantJob,
+    user: { userId: string },
+    tenantCode: string,
+    status: 'completed' | 'failed',
+  ) {
+    const title =
+      status === 'completed'
+        ? 'Retailer visit sync completed'
+        : 'Retailer visit sync failed';
+    const message =
+      status === 'completed'
+        ? `Visit sync finished. Inserted: ${job.inserted}, Failed: ${job.failed}, Total: ${job.totalRows}`
+        : 'Retailer visit sync failed. Please review sync logs.';
+
+    await this.notificationService.createNotification(
+      tenantDb,
+      {
+        userId: user.userId,
+        title,
+        message,
+        type: 'salesman_retailer_visit_sync',
+      },
+      tenantCode,
+      {
+        job: {
+          id: job.id,
+          jobType: job.jobType,
+          status,
+          fileName: job.fileName,
+          totalRows: job.totalRows,
+          inserted: job.inserted,
+          failed: job.failed,
+          completedAt: job.completedAt,
+          logs: job.logs,
+        },
+      },
+    );
+  }
+
+  private async buildVisitEntity(
+    row: VisitSyncRow,
+    userId: string,
+    tenantCode: string,
+    routeId: string,
+  ): Promise<Partial<RetailerVisit>> {
     const visitId = randomUUID();
     const [shopImageUrls, shelfImageUrls] = await Promise.all([
-      this.uploadVisitImages(tenantCode, visitId, 'shop', shopFiles),
-      this.uploadVisitImages(tenantCode, visitId, 'shelf', shelfFiles),
+      this.uploadVisitImages(tenantCode, visitId, 'shop', row.images.shopImages),
+      this.uploadVisitImages(tenantCode, visitId, 'shelf', row.images.shelfImages),
     ]);
 
+    return {
+      id: visitId,
+      userId,
+      retailerId: row.visit.retailerId,
+      routeId,
+      visitStatus: row.visit.visitStatus,
+      notes: row.visit.notes?.trim() || null,
+      shopImages: shopImageUrls.length ? shopImageUrls : null,
+      shelfImages: shelfImageUrls.length ? shelfImageUrls : null,
+    };
+  }
+
+  private async processBulkVisitJob(
+    tenantDb: DataSource,
+    jobId: string,
+    rows: VisitSyncRow[],
+    user: { userId: string },
+    tenantCode: string,
+  ) {
+    this.tenantJobService.startJob(jobId);
+
+    const retailerIds = [...new Set(rows.map((row) => row.visit.retailerId))];
+    const retailers = await tenantDb.getRepository(Retailer).find({
+      where: { id: In(retailerIds) },
+      select: ['id', 'shopName', 'routeId'],
+    });
+    const retailerById = new Map(retailers.map((retailer) => [retailer.id, retailer]));
+
     const visitRepo = tenantDb.getRepository(RetailerVisit);
-    const visit = await visitRepo.save(
-      visitRepo.create({
-        userId: user.userId,
-        retailerId: dto.retailerId,
-        routeId: retailer.routeId,
-        visitStatus: dto.visitStatus,
-        notes: dto.notes?.trim() || null,
-        shopImages: shopImageUrls.length ? shopImageUrls : null,
-        shelfImages: shelfImageUrls.length ? shelfImageUrls : null,
-      }),
-    );
+    const validRows: Array<{
+      row: VisitSyncRow;
+      entity: Partial<RetailerVisit>;
+      label: string;
+    }> = [];
+
+    for (const row of rows) {
+      const retailer = retailerById.get(row.visit.retailerId);
+      const label = retailer?.shopName?.trim() || row.visit.retailerId;
+
+      if (!retailer) {
+        this.tenantJobService.appendLog(jobId, {
+          row: row.row,
+          name: label,
+          status: 'error',
+          error: 'Retailer not found',
+        });
+        continue;
+      }
+
+      try {
+        validRows.push({
+          row,
+          label,
+          entity: await this.buildVisitEntity(
+            row,
+            user.userId,
+            tenantCode,
+            retailer.routeId,
+          ),
+        });
+      } catch (error) {
+        this.tenantJobService.appendLog(jobId, {
+          row: row.row,
+          name: label,
+          status: 'error',
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+    }
+
+    if (validRows.length) {
+      try {
+        const saved = await visitRepo.save(
+          validRows.map((item) => visitRepo.create(item.entity)),
+        );
+
+        saved.forEach((visit, index) => {
+          const source = validRows[index];
+          this.tenantJobService.appendLog(jobId, {
+            row: source.row.row,
+            name: source.label,
+            status: 'success',
+            metadata: {
+              retailerVisitId: visit.id,
+              retailerId: visit.retailerId,
+              visitStatus: visit.visitStatus,
+            },
+          });
+        });
+      } catch {
+        for (const item of validRows) {
+          try {
+            const visit = await visitRepo.save(visitRepo.create(item.entity));
+            this.tenantJobService.appendLog(jobId, {
+              row: item.row.row,
+              name: item.label,
+              status: 'success',
+              metadata: {
+                retailerVisitId: visit.id,
+                retailerId: visit.retailerId,
+                visitStatus: visit.visitStatus,
+              },
+            });
+          } catch (error) {
+            this.tenantJobService.appendLog(jobId, {
+              row: item.row.row,
+              name: item.label,
+              status: 'error',
+              error: error instanceof Error ? error.message : 'Unknown error',
+            });
+          }
+        }
+      }
+    }
+
+    const completedJob = this.tenantJobService.completeJob(jobId);
 
     await this.activityLogService.recordActivityLog(tenantDb, {
       actorId: user.userId,
-      action: 'RETAILER_VISIT_CREATED',
-      description: 'Retailer visit created',
+      action: 'TENANT_JOB_COMPLETED',
+      description: `Salesman retailer visit sync completed for ${completedJob.fileName}`,
       metadata: {
-        retailerVisitId: visit.id,
-        retailerId: visit.retailerId,
-        visitStatus: visit.visitStatus,
+        jobId: completedJob.id,
+        jobType: completedJob.jobType,
+        fileName: completedJob.fileName,
+        totalRows: completedJob.totalRows,
+        inserted: completedJob.inserted,
+        failed: completedJob.failed,
       },
     });
 
-    return this.viewVisit(tenantDb, visit.id, user, { recordActivityLog: false });
+    await this.notifyVisitSyncCompletion(
+      tenantDb,
+      completedJob,
+      user,
+      tenantCode,
+      'completed',
+    );
+  }
+
+  async bulkCreateVisits(
+    tenantDb: DataSource,
+    tenantCode: string,
+    dto: BulkCreateRetailerVisitDto,
+    files: Express.Multer.File[] | undefined,
+    user: { userId: string },
+  ) {
+    if (!dto.visits?.length) {
+      throw new BadRequestException('At least one visit is required');
+    }
+
+    if (dto.visits.length > SALESMAN_BULK_VISIT_MAX) {
+      throw new BadRequestException(
+        `At most ${SALESMAN_BULK_VISIT_MAX} visits are allowed per sync`,
+      );
+    }
+
+    const imagesByIndex = this.extractVisitImages(files, dto.visits.length);
+    const rows = this.buildVisitRows(dto, imagesByIndex);
+    const fileName = `salesman-retailer-visit-sync-${new Date().toISOString()}`;
+
+    const job = this.tenantJobService.createJob({
+      tenantCode,
+      jobType: 'SALESMAN_RETAILER_VISIT_SYNC',
+      fileName,
+      createdBy: user.userId,
+      totalRows: rows.length,
+    });
+
+    await this.activityLogService.recordActivityLog(tenantDb, {
+      actorId: user.userId,
+      action: 'TENANT_JOB_STARTED',
+      description: `Salesman retailer visit sync started (${rows.length} records)`,
+      metadata: {
+        jobId: job.id,
+        jobType: job.jobType,
+        fileName,
+        totalRows: rows.length,
+      },
+    });
+
+    void this.processBulkVisitJob(tenantDb, job.id, rows, user, tenantCode).catch(
+      async (error) => {
+        this.tenantJobService.failJob(job.id);
+        this.tenantJobService.appendLog(job.id, {
+          row: 0,
+          name: '',
+          status: 'error',
+          error: error instanceof Error ? error.message : 'Unknown processing failure',
+        });
+
+        const failedJob = this.tenantJobService.getJobById(
+          job.id,
+          tenantCode,
+          user.userId,
+        );
+
+        await this.activityLogService.recordActivityLog(tenantDb, {
+          actorId: user.userId,
+          action: 'TENANT_JOB_FAILED',
+          description: 'Salesman retailer visit sync failed',
+          metadata: {
+            jobId: job.id,
+            jobType: job.jobType,
+            fileName,
+            error: error instanceof Error ? error.message : String(error),
+          },
+        });
+
+        await this.notifyVisitSyncCompletion(
+          tenantDb,
+          failedJob,
+          user,
+          tenantCode,
+          'failed',
+        );
+      },
+    );
+
+    return {
+      message: 'Retailer visit sync started',
+      jobId: job.id,
+      status: job.status,
+      totalRows: job.totalRows,
+    };
   }
 
   async listHistory(
@@ -238,8 +583,6 @@ export class RetailerVisitService {
       .select([
         'rv.id',
         'rv.visitStatus',
-        'rv.checkInLatitude',
-        'rv.checkInLongitude',
         'rv.notes',
         'rv.shopImages',
         'rv.shelfImages',
@@ -294,5 +637,339 @@ export class RetailerVisitService {
     }
 
     return visit;
+  }
+
+  private async findTodayAttendancesForRetailers(
+    tenantDb: DataSource,
+    retailerIds: string[],
+  ): Promise<Set<string>> {
+    if (!retailerIds.length) {
+      return new Set();
+    }
+
+    const today = this.startOfDay(new Date());
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const records = await tenantDb
+      .getRepository(RetailerAttendence)
+      .createQueryBuilder('ra')
+      .select(['ra.retailerId'])
+      .where('ra."retailerId" IN (:...retailerIds)', { retailerIds })
+      .andWhere('ra."attendenceDate" >= :today', { today })
+      .andWhere('ra."attendenceDate" < :tomorrow', { tomorrow })
+      .getMany();
+
+    return new Set(records.map((record) => record.retailerId));
+  }
+
+  private isWithinRetailerArea(
+    checkLat: number,
+    checkLng: number,
+    retailer: Pick<Retailer, 'latitude' | 'longitude' | 'maxRadius'>,
+  ): { ok: true } | { ok: false; error: string } {
+    try {
+      const centerLat = parseGeoCoordinate(retailer.latitude, 'latitude');
+      const centerLng = parseGeoCoordinate(retailer.longitude, 'longitude');
+      const radiusKm = parseMaxRadiusKm(retailer.maxRadius);
+      if (
+        !isWithinRadiusKm(checkLat, checkLng, centerLat, centerLng, radiusKm)
+      ) {
+        return {
+          ok: false,
+          error: 'You are outside the allowed check-in area for this retailer',
+        };
+      }
+      return { ok: true };
+    } catch {
+      return { ok: false, error: 'Invalid retailer location configuration' };
+    }
+  }
+
+  private buildCheckInRows(dto: BulkCheckInRetailerDto): CheckInSyncRow[] {
+    return dto.checkIns.map((checkIn, index) => ({
+      row: index + 1,
+      checkIn,
+    }));
+  }
+
+  private async notifyCheckInCompletion(
+    tenantDb: DataSource,
+    job: TenantJob,
+    user: { userId: string },
+    tenantCode: string,
+    status: 'completed' | 'failed',
+  ) {
+    const title =
+      status === 'completed'
+        ? 'Retailer check-in sync completed'
+        : 'Retailer check-in sync failed';
+    const message =
+      status === 'completed'
+        ? `Check-in sync finished. Inserted: ${job.inserted}, Failed: ${job.failed}, Total: ${job.totalRows}`
+        : 'Retailer check-in sync failed. Please review sync logs.';
+
+    await this.notificationService.createNotification(
+      tenantDb,
+      {
+        userId: user.userId,
+        title,
+        message,
+        type: 'salesman_retailer_check_in_sync',
+      },
+      tenantCode,
+      {
+        job: {
+          id: job.id,
+          jobType: job.jobType,
+          status,
+          fileName: job.fileName,
+          totalRows: job.totalRows,
+          inserted: job.inserted,
+          failed: job.failed,
+          completedAt: job.completedAt,
+          logs: job.logs,
+        },
+      },
+    );
+  }
+
+  private async processBulkCheckInJob(
+    tenantDb: DataSource,
+    jobId: string,
+    rows: CheckInSyncRow[],
+    user: { userId: string },
+    tenantCode: string,
+  ) {
+    this.tenantJobService.startJob(jobId);
+
+    const retailerIds = [...new Set(rows.map((row) => row.checkIn.retailerId))];
+    const retailers = await tenantDb.getRepository(Retailer).find({
+      where: { id: In(retailerIds) },
+      select: ['id', 'shopName', 'latitude', 'longitude', 'maxRadius'],
+    });
+    const retailerById = new Map(retailers.map((retailer) => [retailer.id, retailer]));
+
+    const todayAttendedRetailerIds = await this.findTodayAttendancesForRetailers(
+      tenantDb,
+      retailerIds,
+    );
+    const batchRetailerIds = new Set<string>();
+    const today = this.startOfDay(new Date());
+    const attendanceRepo = tenantDb.getRepository(RetailerAttendence);
+    const validRows: Array<{
+      row: CheckInSyncRow;
+      entity: Partial<RetailerAttendence>;
+      label: string;
+    }> = [];
+
+    for (const row of rows) {
+      const retailer = retailerById.get(row.checkIn.retailerId);
+      const label = retailer?.shopName?.trim() || row.checkIn.retailerId;
+
+      if (!retailer) {
+        this.tenantJobService.appendLog(jobId, {
+          row: row.row,
+          name: label,
+          status: 'error',
+          error: 'Retailer not found',
+        });
+        continue;
+      }
+
+      if (
+        todayAttendedRetailerIds.has(row.checkIn.retailerId) ||
+        batchRetailerIds.has(row.checkIn.retailerId)
+      ) {
+        this.tenantJobService.appendLog(jobId, {
+          row: row.row,
+          name: label,
+          status: 'error',
+          error: 'Retailer attendance is already marked for today',
+        });
+        continue;
+      }
+
+      const areaResult = this.isWithinRetailerArea(
+        row.checkIn.checkInLatitude,
+        row.checkIn.checkInLongitude,
+        retailer,
+      );
+      if (areaResult.ok === false) {
+        this.tenantJobService.appendLog(jobId, {
+          row: row.row,
+          name: label,
+          status: 'error',
+          error: areaResult.error,
+        });
+        continue;
+      }
+
+      batchRetailerIds.add(row.checkIn.retailerId);
+      validRows.push({
+        row,
+        label,
+        entity: {
+          retailerId: row.checkIn.retailerId,
+          attendenceDate: today,
+          checkinLatitude: row.checkIn.checkInLatitude,
+          checkinLongitude: row.checkIn.checkInLongitude,
+        },
+      });
+    }
+
+    if (validRows.length) {
+      try {
+        const saved = await attendanceRepo.save(
+          validRows.map((item) => attendanceRepo.create(item.entity)),
+        );
+
+        saved.forEach((attendance, index) => {
+          const source = validRows[index];
+          this.tenantJobService.appendLog(jobId, {
+            row: source.row.row,
+            name: source.label,
+            status: 'success',
+            metadata: {
+              retailerAttendenceId: attendance.id,
+              retailerId: attendance.retailerId,
+            },
+          });
+        });
+      } catch {
+        for (const item of validRows) {
+          try {
+            const attendance = await attendanceRepo.save(
+              attendanceRepo.create(item.entity),
+            );
+            this.tenantJobService.appendLog(jobId, {
+              row: item.row.row,
+              name: item.label,
+              status: 'success',
+              metadata: {
+                retailerAttendenceId: attendance.id,
+                retailerId: attendance.retailerId,
+              },
+            });
+          } catch (error) {
+            this.tenantJobService.appendLog(jobId, {
+              row: item.row.row,
+              name: item.label,
+              status: 'error',
+              error: error instanceof Error ? error.message : 'Unknown error',
+            });
+          }
+        }
+      }
+    }
+
+    const completedJob = this.tenantJobService.completeJob(jobId);
+
+    await this.activityLogService.recordActivityLog(tenantDb, {
+      actorId: user.userId,
+      action: 'TENANT_JOB_COMPLETED',
+      description: `Salesman retailer check-in sync completed for ${completedJob.fileName}`,
+      metadata: {
+        jobId: completedJob.id,
+        jobType: completedJob.jobType,
+        fileName: completedJob.fileName,
+        totalRows: completedJob.totalRows,
+        inserted: completedJob.inserted,
+        failed: completedJob.failed,
+      },
+    });
+
+    await this.notifyCheckInCompletion(
+      tenantDb,
+      completedJob,
+      user,
+      tenantCode,
+      'completed',
+    );
+  }
+
+  async bulkCheckInRetailers(
+    tenantDb: DataSource,
+    dto: BulkCheckInRetailerDto,
+    user: { userId: string },
+    tenantCode: string,
+  ) {
+    if (!dto.checkIns?.length) {
+      throw new BadRequestException('At least one check-in is required');
+    }
+
+    if (dto.checkIns.length > SALESMAN_BULK_CHECK_IN_MAX) {
+      throw new BadRequestException(
+        `At most ${SALESMAN_BULK_CHECK_IN_MAX} check-ins are allowed per sync`,
+      );
+    }
+
+    const rows = this.buildCheckInRows(dto);
+    const fileName = `salesman-retailer-check-in-sync-${new Date().toISOString()}`;
+
+    const job = this.tenantJobService.createJob({
+      tenantCode,
+      jobType: 'SALESMAN_RETAILER_CHECK_IN_SYNC',
+      fileName,
+      createdBy: user.userId,
+      totalRows: rows.length,
+    });
+
+    await this.activityLogService.recordActivityLog(tenantDb, {
+      actorId: user.userId,
+      action: 'TENANT_JOB_STARTED',
+      description: `Salesman retailer check-in sync started (${rows.length} records)`,
+      metadata: {
+        jobId: job.id,
+        jobType: job.jobType,
+        fileName,
+        totalRows: rows.length,
+      },
+    });
+
+    void this.processBulkCheckInJob(tenantDb, job.id, rows, user, tenantCode).catch(
+      async (error) => {
+        this.tenantJobService.failJob(job.id);
+        this.tenantJobService.appendLog(job.id, {
+          row: 0,
+          name: '',
+          status: 'error',
+          error: error instanceof Error ? error.message : 'Unknown processing failure',
+        });
+
+        const failedJob = this.tenantJobService.getJobById(
+          job.id,
+          tenantCode,
+          user.userId,
+        );
+
+        await this.activityLogService.recordActivityLog(tenantDb, {
+          actorId: user.userId,
+          action: 'TENANT_JOB_FAILED',
+          description: 'Salesman retailer check-in sync failed',
+          metadata: {
+            jobId: job.id,
+            jobType: job.jobType,
+            fileName,
+            error: error instanceof Error ? error.message : String(error),
+          },
+        });
+
+        await this.notifyCheckInCompletion(
+          tenantDb,
+          failedJob,
+          user,
+          tenantCode,
+          'failed',
+        );
+      },
+    );
+
+    return {
+      message: 'Retailer check-in sync started',
+      jobId: job.id,
+      status: job.status,
+      totalRows: job.totalRows,
+    };
   }
 }

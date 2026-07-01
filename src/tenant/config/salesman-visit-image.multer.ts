@@ -8,6 +8,7 @@ export const SALESMAN_VISIT_IMAGE_ALLOWED_MIME_TYPES = [
 
 export const SALESMAN_VISIT_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 export const SALESMAN_VISIT_IMAGE_MAX_FILES_PER_FIELD = 10;
+export const SALESMAN_BULK_VISIT_MAX = 50;
 
 export const salesmanVisitImageMulterOptions = {
   storage: memoryStorage(),
@@ -31,5 +32,16 @@ export const salesmanVisitImageMulterOptions = {
       return;
     }
     callback(null, true);
+  },
+};
+
+export const salesmanBulkVisitImageMulterOptions = {
+  ...salesmanVisitImageMulterOptions,
+  limits: {
+    fileSize: SALESMAN_VISIT_IMAGE_MAX_BYTES,
+    files:
+      SALESMAN_BULK_VISIT_MAX *
+      SALESMAN_VISIT_IMAGE_MAX_FILES_PER_FIELD *
+      2,
   },
 };

@@ -48,6 +48,7 @@ import { LoadsheetController } from './controller/loadsheet.controller';
 import { RiderLoadsheetController } from './controller/rider-app/loadsheet.controller';
 import { SalesmanRetailerVisitController } from './controller/salesman-app/retailer-visit.controller';
 import { SalesmanSyncDownController } from './controller/salesman-app/sync-down.controller';
+import { SalesmanSyncUpController } from './controller/salesman-app/sync-up.controller';
 import { AttendanceController } from './controller/attendance.controller';
 import { ProfileController } from './controller/profile.controller';
 import { TenantAuthService } from './service/tenant-auth.service';
@@ -96,6 +97,7 @@ import { RiderLoadsheetService } from './service/rider-app/loadsheet.service';
 import { RiderSaleOrderDeliveryService } from './service/rider-app/sale-order-delivery.service';
 import { RetailerVisitService } from './service/salesman-app/retailer-visit.service';
 import { SalesmanSyncDownService } from './service/salesman-app/sync-down.service';
+import { SalesmanSyncUpService } from './service/salesman-app/sync-up.service';
 import { AttendanceService } from './service/attendance.service';
 import { RetailerLedgerService } from './service/retailer/retailer-ledger.service';
 import { UomService } from './service/product/uom.service';
@@ -164,6 +166,7 @@ import { ProfileService } from './service/profile.service';
     RiderLoadsheetController,
     SalesmanRetailerVisitController,
     SalesmanSyncDownController,
+    SalesmanSyncUpController,
     AttendanceController,
     ProfileController,
     DatabaseBackupController,
@@ -213,6 +216,7 @@ import { ProfileService } from './service/profile.service';
     RiderSaleOrderDeliveryService,
     RetailerVisitService,
     SalesmanSyncDownService,
+    SalesmanSyncUpService,
     AttendanceService,
     RetailerLedgerService,
     TenantDatabaseBackupService,

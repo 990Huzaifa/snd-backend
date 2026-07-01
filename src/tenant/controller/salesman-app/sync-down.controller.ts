@@ -85,4 +85,16 @@ export class SalesmanSyncDownController {
       req.user as { userId: string },
     );
   }
+
+  @Get('retailer-categories')
+  @RequirePermissions('SALESMAN_SYNC_DOWN')
+  listRetailerCategories(@TenantConnection() tenantDb: DataSource) {
+    return this.syncDownService.listRetailerCategories(tenantDb);
+  }
+
+  @Get('retailer-channels')
+  @RequirePermissions('SALESMAN_SYNC_DOWN')
+  listRetailerChannels(@TenantConnection() tenantDb: DataSource) {
+    return this.syncDownService.listRetailerChannels(tenantDb);
+  }
 }

@@ -2,7 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { DataSource, In } from 'typeorm';
 import { ProductPricing } from 'src/tenant-db/entities/product.entity';
 import { PJP, PJPRoute, PJPStatus } from 'src/tenant-db/entities/pjp.entity';
-import { Retailer } from 'src/tenant-db/entities/retailer.entity';
+import { Retailer, RetailerCategory, RetailerChannel } from 'src/tenant-db/entities/retailer.entity';
 import { Route } from 'src/tenant-db/entities/route.entity';
 import { Scheme } from 'src/tenant-db/entities/scheme.entity';
 import { SaleInvoice } from 'src/tenant-db/entities/sale-invoice.entity';
@@ -219,5 +219,24 @@ export class SalesmanSyncDownService {
     });
 
     return { result: invoices };
+  }
+
+
+  // retailer categories
+  async listRetailerCategories(tenantDb: DataSource) {
+    const categories = await tenantDb.getRepository(RetailerCategory).find({
+      relations: ['retailers'],
+      order: { name: 'ASC' },
+    });
+    return { result: categories };
+  }
+
+  // retailer channels
+  async listRetailerChannels(tenantDb: DataSource) {
+    const channels = await tenantDb.getRepository(RetailerChannel).find({
+      relations: ['retailers'],
+      order: { name: 'ASC' },
+    });
+    return { result: channels };
   }
 }
