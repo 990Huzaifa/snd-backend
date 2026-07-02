@@ -63,6 +63,7 @@ export const TENANT_PERMISSIONS = [
   { code: 'LIST_PURCHASE_STOCK', name: 'List Purchase Stock' },
   { code: 'LIST_TRANSFER_STOCK', name: 'List Transfer Stock' },
   { code: 'LIST_ATTENDANCE', name: 'List Attendance' },
+  { code: 'VIEW_INVENTORY_REPORT', name: 'View Inventory Report' },
 
   { code: 'UPDATE_USER', name: 'Update Users' },
   { code: 'UPDATE_ROLE', name: 'Update Role' },

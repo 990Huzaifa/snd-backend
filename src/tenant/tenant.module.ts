@@ -51,6 +51,7 @@ import { SalesmanSyncDownController } from './controller/salesman-app/sync-down.
 import { SalesmanSyncUpController } from './controller/salesman-app/sync-up.controller';
 import { AttendanceController } from './controller/attendance.controller';
 import { ProfileController } from './controller/profile.controller';
+import { InventoryReportController } from './controller/report/inventory-report.controller';
 import { TenantAuthService } from './service/tenant-auth.service';
 import { ActivityLogService } from './service/activity-log.service';
 import { TenantDesignationService } from './service/tenant-designation.service';
@@ -106,6 +107,7 @@ import { DatabaseBackupController } from './controller/database-backup.controlle
 import { TenantDatabaseBackupService } from './service/tenant-database-backup.service';
 import { PgDumpService } from './service/pg-dump.service';
 import { ProfileService } from './service/profile.service';
+import { InventoryReportService } from './service/report/inventory-report.service';
 
 
 @Module({
@@ -170,6 +172,7 @@ import { ProfileService } from './service/profile.service';
     AttendanceController,
     ProfileController,
     DatabaseBackupController,
+    InventoryReportController,
   ],
   providers: [
     TenantAuthService,
@@ -222,6 +225,7 @@ import { ProfileService } from './service/profile.service';
     TenantDatabaseBackupService,
     PgDumpService,
     ProfileService,
+    InventoryReportService,
   ],
 })
 export class TenantModule { }
