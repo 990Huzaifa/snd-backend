@@ -237,6 +237,7 @@ export class InventoryReportService {
           id: product.id,
           name: product.name,
           skuCode: product.skuCode,
+          image: product.image,
           category: product.category
             ? {
                 id: product.category.id,
