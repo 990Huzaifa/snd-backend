@@ -353,12 +353,12 @@ export class TenantAuthService {
       !user.password ||
       !user.role
     ) {
-      throw new UnauthorizedException('Invalid tenant or credentials');
+      throw new UnauthorizedException('Invalid credentials');
     }
 
     const passwordOk = await bcrypt.compare(dto.password, user.password);
     if (!passwordOk) {
-      throw new UnauthorizedException('Invalid tenant or credentials');
+      throw new UnauthorizedException('Invalid credentials');
     }
     if (user.role.code !== 'SUPER_ADMIN') {
         
