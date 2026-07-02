@@ -53,6 +53,7 @@ import { AttendanceController } from './controller/attendance.controller';
 import { ProfileController } from './controller/profile.controller';
 import { InventoryReportController } from './controller/report/inventory-report.controller';
 import { RetailerVisitReportController } from './controller/report/retailer-visit-report.controller';
+import { RetailerCheckInReportController } from './controller/report/retailer-checkin-report.controller';
 import { TenantAuthService } from './service/tenant-auth.service';
 import { ActivityLogService } from './service/activity-log.service';
 import { TenantDesignationService } from './service/tenant-designation.service';
@@ -110,6 +111,7 @@ import { PgDumpService } from './service/pg-dump.service';
 import { ProfileService } from './service/profile.service';
 import { InventoryReportService } from './service/report/inventory-report.service';
 import { RetailerVisitReportService } from './service/report/retailer-visit-report.service';
+import { RetailerCheckInReportService } from './service/report/retailer-checkin-report.service';
 
 
 @Module({
@@ -176,6 +178,7 @@ import { RetailerVisitReportService } from './service/report/retailer-visit-repo
     DatabaseBackupController,
     InventoryReportController,
     RetailerVisitReportController,
+    RetailerCheckInReportController,
   ],
   providers: [
     TenantAuthService,
@@ -230,6 +233,7 @@ import { RetailerVisitReportService } from './service/report/retailer-visit-repo
     ProfileService,
     InventoryReportService,
     RetailerVisitReportService,
+    RetailerCheckInReportService,
   ],
 })
 export class TenantModule { }
