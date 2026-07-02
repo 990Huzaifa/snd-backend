@@ -142,12 +142,12 @@ export class SaleOrderService {
         if (!scheme) throw new NotFoundException(`Scheme ${item.schemeId} not found`);
       }
 
-      if (item.slabId) {
-        const slab = await tenantDb.getRepository(SchemeSlab).findOne({
-          where: { id: item.slabId },
+      if (item.schemeSlabId) {
+        const schemeSlab = await tenantDb.getRepository(SchemeSlab).findOne({
+          where: { id: item.schemeSlabId },
           select: ['id'],
         });
-        if (!slab) throw new NotFoundException(`Scheme slab ${item.slabId} not found`);
+        if (!schemeSlab) throw new NotFoundException(`Scheme slab ${item.schemeSlabId} not found`);
       }
     }
   }
@@ -433,7 +433,7 @@ export class SaleOrderService {
             productFlavourId: item.productFlavourId.toString(),
             productPricingId: item.productPricingId.toString(),
             schemeId: item.schemeId ?? null,
-            slabId: item.slabId ?? null,
+            slabId: item.schemeSlabId ?? null,
             quantity: item.quantity,
             discountPercentage: item.discountPercentage ?? 0,
             discountAmount: item.discountAmount ?? 0,
@@ -576,7 +576,7 @@ export class SaleOrderService {
               productFlavourId: item.productFlavourId.toString(),
               productPricingId: item.productPricingId.toString(),
               schemeId: item.schemeId ?? null,
-              slabId: item.slabId ?? null,
+              slabId: item.schemeSlabId ?? null,
               quantity: item.quantity,
               discountPercentage: item.discountPercentage ?? 0,
               discountAmount: item.discountAmount ?? 0,

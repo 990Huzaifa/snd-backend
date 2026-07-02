@@ -17,7 +17,7 @@ export class CreateSaleOrderItemDto {
 
   @IsOptional()
   @IsUUID()
-  slabId?: string;
+  schemeSlabId?: string;
 
   @Type(() => Number)
   @IsInt()
