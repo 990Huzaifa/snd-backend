@@ -20,6 +20,24 @@ import {
     BulkCreateRetailerDto,
     CreateRetailerShopDto,
 } from '../../dto/salesman-app/retailer/create-retailer.dto';
+import {
+    BulkCreateSaleOrderDto,
+    SALESMAN_SALE_ORDER_SYNC_MAX,
+} from '../../dto/salesman-app/saleorder/bulk-create-saleorder.dto';
+import { CreateSaleOrderDto } from '../../dto/saleorder/create-saleorder.dto';
+import { SaleOrderService } from '../saleorder.service';
+import {
+    BulkCreateSaleVoucherDto,
+} from '../../dto/salesman-app/sale-voucher/bulk-create-sale-voucher.dto';
+import { CreateSaleVoucherDto } from '../../dto/sale-voucher/create-sale-voucher.dto';
+import {
+    PAYMENT_PROOF_ALLOWED_MIME_TYPES,
+    PAYMENT_PROOF_MAX_BYTES,
+} from '../../config/sale-voucher-payment-proof.multer';
+import {
+    SALESMAN_SALE_VOUCHER_SYNC_MAX,
+} from '../../config/salesman-sale-voucher-sync.multer';
+import { SaleVoucherService } from '../sale-voucher.service';
 
 const DEFAULT_MAX_RADIUS = '1';
 const DEFAULT_CREDIT_LIMIT = '0.00';
@@ -36,6 +54,22 @@ type RetailerSyncRow = {
     image?: ShopImagePayload;
 };
 
+type SaleOrderSyncRow = {
+    row: number;
+    order: CreateSaleOrderDto;
+};
+
+type PaymentProofPayload = {
+    buffer: Buffer;
+    mimetype: string;
+};
+
+type SaleVoucherSyncRow = {
+    row: number;
+    voucher: CreateSaleVoucherDto;
+    paymentProof?: PaymentProofPayload;
+};
+
 @Injectable()
 export class SalesmanSyncUpService {
     constructor(
@@ -43,6 +77,8 @@ export class SalesmanSyncUpService {
         private readonly notificationService: NotificationService,
         private readonly tenantJobService: TenantJobService,
         private readonly s3Service: S3Service,
+        private readonly saleOrderService: SaleOrderService,
+        private readonly saleVoucherService: SaleVoucherService,
     ) {}
 
     private normalize(value: string): string {
@@ -487,6 +523,493 @@ export class SalesmanSyncUpService {
 
         return {
             message: 'Retailer sync started',
+            jobId: job.id,
+            status: job.status,
+            totalRows: job.totalRows,
+        };
+    }
+
+    private buildSaleOrderSyncRows(dto: BulkCreateSaleOrderDto): SaleOrderSyncRow[] {
+        return dto.orders.map((order, index) => ({
+            row: index + 1,
+            order,
+        }));
+    }
+
+    private saleOrderRowLabel(order: CreateSaleOrderDto, row: number): string {
+        return order.retailerId ? `Retailer ${order.retailerId}` : `Row ${row}`;
+    }
+
+    private async notifySaleOrderSyncCompletion(
+        tenantDb: DataSource,
+        job: TenantJob,
+        user: { userId: string },
+        tenantCode: string,
+        status: 'completed' | 'failed',
+    ) {
+        const title =
+            status === 'completed'
+                ? 'Sale order sync completed'
+                : 'Sale order sync failed';
+        const message =
+            status === 'completed'
+                ? `Sync finished. Inserted: ${job.inserted}, Failed: ${job.failed}, Total: ${job.totalRows}`
+                : 'Sale order sync failed. Please review sync logs.';
+
+        await this.notificationService.createNotification(
+            tenantDb,
+            {
+                userId: user.userId,
+                title,
+                message,
+                type: 'salesman_sale_order_sync',
+            },
+            tenantCode,
+            {
+                job: {
+                    id: job.id,
+                    jobType: job.jobType,
+                    status,
+                    fileName: job.fileName,
+                    totalRows: job.totalRows,
+                    inserted: job.inserted,
+                    failed: job.failed,
+                    completedAt: job.completedAt,
+                    logs: job.logs,
+                },
+            },
+        );
+    }
+
+    private async processCreateSaleOrdersJob(
+        tenantDb: DataSource,
+        jobId: string,
+        rows: SaleOrderSyncRow[],
+        user: { userId: string },
+        tenantCode: string,
+    ) {
+        this.tenantJobService.startJob(jobId);
+
+        for (const row of rows) {
+            const orderLabel = this.saleOrderRowLabel(row.order, row.row);
+
+            try {
+                const created = await this.saleOrderService.create(
+                    tenantDb,
+                    row.order,
+                    user,
+                );
+
+                this.tenantJobService.appendLog(jobId, {
+                    row: row.row,
+                    name: created.orderNumber ?? orderLabel,
+                    status: 'success',
+                    metadata: {
+                        saleOrderId: created.id,
+                        orderNumber: created.orderNumber,
+                    },
+                });
+            } catch (error) {
+                this.tenantJobService.appendLog(jobId, {
+                    row: row.row,
+                    name: orderLabel,
+                    status: 'error',
+                    error: error instanceof Error ? error.message : 'Unknown error',
+                });
+            }
+        }
+
+        const completedJob = this.tenantJobService.completeJob(jobId);
+
+        await this.activityLogService.recordActivityLog(tenantDb, {
+            actorId: user.userId,
+            action: 'TENANT_JOB_COMPLETED',
+            description: `Salesman sale order sync completed for ${completedJob.fileName}`,
+            metadata: {
+                jobId: completedJob.id,
+                jobType: completedJob.jobType,
+                fileName: completedJob.fileName,
+                totalRows: completedJob.totalRows,
+                inserted: completedJob.inserted,
+                failed: completedJob.failed,
+            },
+        });
+
+        await this.notifySaleOrderSyncCompletion(
+            tenantDb,
+            completedJob,
+            user,
+            tenantCode,
+            'completed',
+        );
+    }
+
+    async createSaleOrders(
+        tenantDb: DataSource,
+        dto: BulkCreateSaleOrderDto,
+        user: { userId: string },
+        tenantCode: string,
+    ) {
+        if (!dto.orders?.length) {
+            throw new BadRequestException('At least one sale order is required');
+        }
+
+        if (dto.orders.length > SALESMAN_SALE_ORDER_SYNC_MAX) {
+            throw new BadRequestException(
+                `At most ${SALESMAN_SALE_ORDER_SYNC_MAX} sale orders are allowed per sync`,
+            );
+        }
+
+        const rows = this.buildSaleOrderSyncRows(dto);
+        const fileName = `salesman-sale-order-sync-${new Date().toISOString()}`;
+
+        const job = this.tenantJobService.createJob({
+            tenantCode,
+            jobType: 'SALESMAN_SALE_ORDER_SYNC',
+            fileName,
+            createdBy: user.userId,
+            totalRows: rows.length,
+        });
+
+        await this.activityLogService.recordActivityLog(tenantDb, {
+            actorId: user.userId,
+            action: 'TENANT_JOB_STARTED',
+            description: `Salesman sale order sync started (${rows.length} orders)`,
+            metadata: {
+                jobId: job.id,
+                jobType: job.jobType,
+                fileName,
+                totalRows: rows.length,
+            },
+        });
+
+        void this.processCreateSaleOrdersJob(tenantDb, job.id, rows, user, tenantCode).catch(
+            async (error) => {
+                this.tenantJobService.failJob(job.id);
+                this.tenantJobService.appendLog(job.id, {
+                    row: 0,
+                    name: '',
+                    status: 'error',
+                    error: error instanceof Error ? error.message : 'Unknown processing failure',
+                });
+
+                const failedJob = this.tenantJobService.getJobById(job.id, tenantCode, user.userId);
+
+                await this.activityLogService.recordActivityLog(tenantDb, {
+                    actorId: user.userId,
+                    action: 'TENANT_JOB_FAILED',
+                    description: 'Salesman sale order sync failed',
+                    metadata: {
+                        jobId: job.id,
+                        jobType: job.jobType,
+                        fileName,
+                        error: error instanceof Error ? error.message : String(error),
+                    },
+                });
+
+                await this.notifySaleOrderSyncCompletion(
+                    tenantDb,
+                    failedJob,
+                    user,
+                    tenantCode,
+                    'failed',
+                );
+            },
+        );
+
+        return {
+            message: 'Sale order sync started',
+            jobId: job.id,
+            status: job.status,
+            totalRows: job.totalRows,
+        };
+    }
+
+    private buildSaleVoucherSyncRows(
+        dto: BulkCreateSaleVoucherDto,
+        paymentProofsByIndex: Map<number, PaymentProofPayload>,
+    ): SaleVoucherSyncRow[] {
+        return dto.vouchers.map((voucher, index) => ({
+            row: index + 1,
+            voucher,
+            paymentProof: paymentProofsByIndex.get(index),
+        }));
+    }
+
+    private parsePaymentProofFieldIndex(fieldname: string): number | null {
+        const bracketMatch = fieldname.match(/^paymentProofs?\[(\d+)\]$/);
+        if (bracketMatch) {
+            return Number(bracketMatch[1]);
+        }
+
+        const underscoreMatch = fieldname.match(/^paymentProofs?_(\d+)$/);
+        if (underscoreMatch) {
+            return Number(underscoreMatch[1]);
+        }
+
+        if (fieldname === 'paymentProof' || fieldname === 'paymentProofs') {
+            return 0;
+        }
+
+        return null;
+    }
+
+    private assertPaymentProofFile(file: Express.Multer.File, fieldname: string): void {
+        if (
+            !PAYMENT_PROOF_ALLOWED_MIME_TYPES.includes(
+                file.mimetype as (typeof PAYMENT_PROOF_ALLOWED_MIME_TYPES)[number],
+            )
+        ) {
+            throw new BadRequestException(
+                `${fieldname} must be a PNG or JPEG image`,
+            );
+        }
+        if (!file.buffer?.length) {
+            throw new BadRequestException(`${fieldname} file is empty`);
+        }
+        if (file.size > PAYMENT_PROOF_MAX_BYTES) {
+            throw new BadRequestException(
+                `${fieldname} must not exceed ${PAYMENT_PROOF_MAX_BYTES} bytes`,
+            );
+        }
+    }
+
+    private extractPaymentProofs(
+        files: Express.Multer.File[] | undefined,
+        voucherCount: number,
+    ): Map<number, PaymentProofPayload> {
+        const proofsByIndex = new Map<number, PaymentProofPayload>();
+        if (!files?.length) {
+            return proofsByIndex;
+        }
+
+        for (const file of files) {
+            const index = this.parsePaymentProofFieldIndex(file.fieldname);
+            if (index === null) {
+                continue;
+            }
+
+            if (index < 0 || index >= voucherCount) {
+                throw new BadRequestException(
+                    `Payment proof field ${file.fieldname} does not match any voucher index`,
+                );
+            }
+
+            if (proofsByIndex.has(index)) {
+                throw new BadRequestException(
+                    `Multiple payment proofs provided for voucher index ${index}`,
+                );
+            }
+
+            this.assertPaymentProofFile(file, file.fieldname);
+            proofsByIndex.set(index, {
+                buffer: file.buffer,
+                mimetype: file.mimetype,
+            });
+        }
+
+        return proofsByIndex;
+    }
+
+    private toPaymentProofFile(payload: PaymentProofPayload): Express.Multer.File {
+        return {
+            buffer: payload.buffer,
+            mimetype: payload.mimetype,
+            size: payload.buffer.length,
+            fieldname: 'paymentProof',
+            originalname: 'payment-proof',
+        } as Express.Multer.File;
+    }
+
+    private saleVoucherRowLabel(voucher: CreateSaleVoucherDto, row: number): string {
+        return voucher.retailerId ? `Retailer ${voucher.retailerId}` : `Row ${row}`;
+    }
+
+    private async notifySaleVoucherSyncCompletion(
+        tenantDb: DataSource,
+        job: TenantJob,
+        user: { userId: string },
+        tenantCode: string,
+        status: 'completed' | 'failed',
+    ) {
+        const title =
+            status === 'completed'
+                ? 'Sale voucher sync completed'
+                : 'Sale voucher sync failed';
+        const message =
+            status === 'completed'
+                ? `Sync finished. Inserted: ${job.inserted}, Failed: ${job.failed}, Total: ${job.totalRows}`
+                : 'Sale voucher sync failed. Please review sync logs.';
+
+        await this.notificationService.createNotification(
+            tenantDb,
+            {
+                userId: user.userId,
+                title,
+                message,
+                type: 'salesman_sale_voucher_sync',
+            },
+            tenantCode,
+            {
+                job: {
+                    id: job.id,
+                    jobType: job.jobType,
+                    status,
+                    fileName: job.fileName,
+                    totalRows: job.totalRows,
+                    inserted: job.inserted,
+                    failed: job.failed,
+                    completedAt: job.completedAt,
+                    logs: job.logs,
+                },
+            },
+        );
+    }
+
+    private async processCreateSaleVouchersJob(
+        tenantDb: DataSource,
+        jobId: string,
+        rows: SaleVoucherSyncRow[],
+        user: { userId: string },
+        tenantCode: string,
+    ) {
+        this.tenantJobService.startJob(jobId);
+
+        for (const row of rows) {
+            const voucherLabel = this.saleVoucherRowLabel(row.voucher, row.row);
+
+            try {
+                const created = await this.saleVoucherService.create(
+                    tenantDb,
+                    tenantCode,
+                    row.voucher,
+                    user,
+                    row.paymentProof
+                        ? this.toPaymentProofFile(row.paymentProof)
+                        : undefined,
+                );
+
+                this.tenantJobService.appendLog(jobId, {
+                    row: row.row,
+                    name: created.voucherNumber ?? voucherLabel,
+                    status: 'success',
+                    metadata: {
+                        saleVoucherId: created.id,
+                        voucherNumber: created.voucherNumber,
+                    },
+                });
+            } catch (error) {
+                this.tenantJobService.appendLog(jobId, {
+                    row: row.row,
+                    name: voucherLabel,
+                    status: 'error',
+                    error: error instanceof Error ? error.message : 'Unknown error',
+                });
+            }
+        }
+
+        const completedJob = this.tenantJobService.completeJob(jobId);
+
+        await this.activityLogService.recordActivityLog(tenantDb, {
+            actorId: user.userId,
+            action: 'TENANT_JOB_COMPLETED',
+            description: `Salesman sale voucher sync completed for ${completedJob.fileName}`,
+            metadata: {
+                jobId: completedJob.id,
+                jobType: completedJob.jobType,
+                fileName: completedJob.fileName,
+                totalRows: completedJob.totalRows,
+                inserted: completedJob.inserted,
+                failed: completedJob.failed,
+            },
+        });
+
+        await this.notifySaleVoucherSyncCompletion(
+            tenantDb,
+            completedJob,
+            user,
+            tenantCode,
+            'completed',
+        );
+    }
+
+    async createSaleVouchers(
+        tenantDb: DataSource,
+        dto: BulkCreateSaleVoucherDto,
+        files: Express.Multer.File[] | undefined,
+        user: { userId: string },
+        tenantCode: string,
+    ) {
+        if (!dto.vouchers?.length) {
+            throw new BadRequestException('At least one sale voucher is required');
+        }
+
+        if (dto.vouchers.length > SALESMAN_SALE_VOUCHER_SYNC_MAX) {
+            throw new BadRequestException(
+                `At most ${SALESMAN_SALE_VOUCHER_SYNC_MAX} sale vouchers are allowed per sync`,
+            );
+        }
+
+        const paymentProofsByIndex = this.extractPaymentProofs(files, dto.vouchers.length);
+        const rows = this.buildSaleVoucherSyncRows(dto, paymentProofsByIndex);
+        const fileName = `salesman-sale-voucher-sync-${new Date().toISOString()}`;
+
+        const job = this.tenantJobService.createJob({
+            tenantCode,
+            jobType: 'SALESMAN_SALE_VOUCHER_SYNC',
+            fileName,
+            createdBy: user.userId,
+            totalRows: rows.length,
+        });
+
+        await this.activityLogService.recordActivityLog(tenantDb, {
+            actorId: user.userId,
+            action: 'TENANT_JOB_STARTED',
+            description: `Salesman sale voucher sync started (${rows.length} vouchers)`,
+            metadata: {
+                jobId: job.id,
+                jobType: job.jobType,
+                fileName,
+                totalRows: rows.length,
+            },
+        });
+
+        void this.processCreateSaleVouchersJob(tenantDb, job.id, rows, user, tenantCode).catch(
+            async (error) => {
+                this.tenantJobService.failJob(job.id);
+                this.tenantJobService.appendLog(job.id, {
+                    row: 0,
+                    name: '',
+                    status: 'error',
+                    error: error instanceof Error ? error.message : 'Unknown processing failure',
+                });
+
+                const failedJob = this.tenantJobService.getJobById(job.id, tenantCode, user.userId);
+
+                await this.activityLogService.recordActivityLog(tenantDb, {
+                    actorId: user.userId,
+                    action: 'TENANT_JOB_FAILED',
+                    description: 'Salesman sale voucher sync failed',
+                    metadata: {
+                        jobId: job.id,
+                        jobType: job.jobType,
+                        fileName,
+                        error: error instanceof Error ? error.message : String(error),
+                    },
+                });
+
+                await this.notifySaleVoucherSyncCompletion(
+                    tenantDb,
+                    failedJob,
+                    user,
+                    tenantCode,
+                    'failed',
+                );
+            },
+        );
+
+        return {
+            message: 'Sale voucher sync started',
             jobId: job.id,
             status: job.status,
             totalRows: job.totalRows,

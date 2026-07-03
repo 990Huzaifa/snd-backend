@@ -20,7 +20,10 @@ import {
     TenantConnection,
 } from 'src/common/tenant/tenant-connection.decorator';
 import { salesmanRetailerImageMulterOptions } from '../../config/salesman-retailer-image.multer';
+import { salesmanSaleVoucherSyncMulterOptions } from '../../config/salesman-sale-voucher-sync.multer';
 import { BulkCreateRetailerDto } from '../../dto/salesman-app/retailer/create-retailer.dto';
+import { BulkCreateSaleOrderDto } from '../../dto/salesman-app/saleorder/bulk-create-saleorder.dto';
+import { BulkCreateSaleVoucherDto } from '../../dto/salesman-app/sale-voucher/bulk-create-sale-voucher.dto';
 import { SalesmanSyncUpService } from '../../service/salesman-app/sync-up.service';
 
 @Controller('tenant/salesman')
@@ -44,6 +47,41 @@ export class SalesmanSyncUpController {
         @Req() req: Request,
     ) {
         return this.syncUpService.createRetailers(
+            tenantDb,
+            dto,
+            files,
+            req.user as { userId: string },
+            tenantCode,
+        );
+    }
+
+    @Post('sale-orders')
+    @RequirePermissions('SALESMAN_SYNC_UP')
+    createSaleOrders(
+        @TenantConnection() tenantDb: DataSource,
+        @TenantCode() tenantCode: string,
+        @Body() dto: BulkCreateSaleOrderDto,
+        @Req() req: Request,
+    ) {
+        return this.syncUpService.createSaleOrders(
+            tenantDb,
+            dto,
+            req.user as { userId: string },
+            tenantCode,
+        );
+    }
+
+    @Post('sale-vouchers')
+    @RequirePermissions('SALESMAN_SYNC_UP')
+    @UseInterceptors(AnyFilesInterceptor(salesmanSaleVoucherSyncMulterOptions))
+    createSaleVouchers(
+        @TenantConnection() tenantDb: DataSource,
+        @TenantCode() tenantCode: string,
+        @Body() dto: BulkCreateSaleVoucherDto,
+        @UploadedFiles() files: Express.Multer.File[] | undefined,
+        @Req() req: Request,
+    ) {
+        return this.syncUpService.createSaleVouchers(
             tenantDb,
             dto,
             files,
