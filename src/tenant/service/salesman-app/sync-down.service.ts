@@ -225,7 +225,6 @@ export class SalesmanSyncDownService {
   // retailer categories
   async listRetailerCategories(tenantDb: DataSource) {
     const categories = await tenantDb.getRepository(RetailerCategory).find({
-      relations: ['retailers'],
       order: { name: 'ASC' },
     });
     return { result: categories };
@@ -234,7 +233,6 @@ export class SalesmanSyncDownService {
   // retailer channels
   async listRetailerChannels(tenantDb: DataSource) {
     const channels = await tenantDb.getRepository(RetailerChannel).find({
-      relations: ['retailers'],
       order: { name: 'ASC' },
     });
     return { result: channels };
