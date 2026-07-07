@@ -49,6 +49,8 @@ import { RiderLoadsheetController } from './controller/rider-app/loadsheet.contr
 import { SalesmanRetailerVisitController } from './controller/salesman-app/retailer-visit.controller';
 import { SalesmanSyncDownController } from './controller/salesman-app/sync-down.controller';
 import { SalesmanSyncUpController } from './controller/salesman-app/sync-up.controller';
+import { MerchandiserSyncDownController } from './controller/merchandiser/sync-down.controller';
+import { MerchandiserSyncUpController } from './controller/merchandiser/sync-up.controller';
 import { AttendanceController } from './controller/attendance.controller';
 import { ProfileController } from './controller/profile.controller';
 import { InventoryReportController } from './controller/report/inventory-report.controller';
@@ -99,6 +101,8 @@ import { LoadsheetService } from './service/loadsheet.service';
 import { RiderLoadsheetService } from './service/rider-app/loadsheet.service';
 import { RiderSaleOrderDeliveryService } from './service/rider-app/sale-order-delivery.service';
 import { RetailerVisitService } from './service/salesman-app/retailer-visit.service';
+import { MerchandiserSyncDownService } from './service/merchandiser-app/sync-down.service';
+import { MerchandiserSyncUpService } from './service/merchandiser-app/sync-up.service';
 import { SalesmanSyncDownService } from './service/salesman-app/sync-down.service';
 import { SalesmanSyncUpService } from './service/salesman-app/sync-up.service';
 import { AttendanceService } from './service/attendance.service';
@@ -173,6 +177,8 @@ import { RetailerCheckInReportService } from './service/report/retailer-checkin-
     SalesmanRetailerVisitController,
     SalesmanSyncDownController,
     SalesmanSyncUpController,
+    MerchandiserSyncDownController,
+    MerchandiserSyncUpController,
     AttendanceController,
     ProfileController,
     DatabaseBackupController,
@@ -224,6 +230,8 @@ import { RetailerCheckInReportService } from './service/report/retailer-checkin-
     RiderLoadsheetService,
     RiderSaleOrderDeliveryService,
     RetailerVisitService,
+    MerchandiserSyncDownService,
+    MerchandiserSyncUpService,
     SalesmanSyncDownService,
     SalesmanSyncUpService,
     AttendanceService,
