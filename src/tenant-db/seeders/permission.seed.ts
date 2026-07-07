@@ -49,6 +49,8 @@ export const TENANT_PERMISSIONS = [
   { code: 'SALESMAN_SYNC_UP', name: 'Salesman Sync Up' },
   { code: 'MERCHANDISER_SYNC_DOWN', name: 'Merchandiser Sync Down' },
   { code: 'MERCHANDISER_SYNC_UP', name: 'Merchandiser Sync Up' },
+  { code: 'RIDER_SYNC_DOWN', name: 'Rider Sync Down' },
+  { code: 'RIDER_SYNC_UP', name: 'Rider Sync Up' },
   { code: 'LIST_RETAILER_LEDGER', name: 'List Retailer' },
   { code: 'LIST_REGION', name: 'List Region' },
   { code: 'LIST_AREA', name: 'List Area' },
