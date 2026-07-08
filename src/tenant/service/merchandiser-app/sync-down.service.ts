@@ -3,6 +3,7 @@ import { DataSource, In } from 'typeorm';
 import { PJP, PJPRoute, PJPStatus } from 'src/tenant-db/entities/pjp.entity';
 import { Retailer, RetailerCategory, RetailerChannel } from 'src/tenant-db/entities/retailer.entity';
 import { Route } from 'src/tenant-db/entities/route.entity';
+import { SalesmanDistributor } from 'src/tenant-db/entities/user.entity';
 
 const RETAILER_RELATIONS = [
   'createdByUser',
@@ -79,6 +80,27 @@ export class MerchandiserSyncDownService {
       ...pjp,
       routes: routesByPjpId.get(pjp.id) ?? [],
     }));
+
+    return { result };
+  }
+
+  async listAssignedDistributors(
+    tenantDb: DataSource,
+    user: { userId: string },
+  ) {
+    const assignments = await tenantDb.getRepository(SalesmanDistributor).find({
+      where: { userId: user.userId },
+      relations: [
+        'distributor',
+        'distributor.area',
+        'distributor.area.region',
+      ],
+      order: { createdAt: 'ASC' },
+    });
+
+    const result = assignments
+      .map((assignment) => assignment.distributor)
+      .filter((distributor) => distributor && !distributor.isDeleted && distributor.isActive);
 
     return { result };
   }

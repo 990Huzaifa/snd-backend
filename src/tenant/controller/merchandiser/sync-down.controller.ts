@@ -20,6 +20,18 @@ import { MerchandiserSyncDownService } from '../../service/merchandiser-app/sync
 export class MerchandiserSyncDownController {
   constructor(private readonly syncDownService: MerchandiserSyncDownService) {}
 
+  @Get('assigned-distributors')
+  @RequirePermissions('MERCHANDISER_SYNC_DOWN')
+  listAssignedDistributors(
+    @TenantConnection() tenantDb: DataSource,
+    @Req() req: Request,
+  ) {
+    return this.syncDownService.listAssignedDistributors(
+      tenantDb,
+      req.user as { userId: string },
+    );
+  }
+
   @Get('routes')
   @RequirePermissions('MERCHANDISER_SYNC_DOWN')
   listRoutes(

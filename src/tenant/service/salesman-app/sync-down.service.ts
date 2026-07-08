@@ -10,6 +10,7 @@ import {
   SaleVoucher,
   SaleVoucherStatus,
 } from 'src/tenant-db/entities/sale-voucher.entity';
+import { SalesmanDistributor } from 'src/tenant-db/entities/user.entity';
 import { StockBalance } from 'src/tenant-db/entities/stock.entity';
 
 const SCHEME_RELATIONS = [
@@ -221,6 +222,26 @@ export class SalesmanSyncDownService {
     return { result: invoices };
   }
 
+  async listAssignedDistributors(
+    tenantDb: DataSource,
+    user: { userId: string },
+  ) {
+    const assignments = await tenantDb.getRepository(SalesmanDistributor).find({
+      where: { userId: user.userId },
+      relations: [
+        'distributor',
+        'distributor.area',
+        'distributor.area.region',
+      ],
+      order: { createdAt: 'ASC' },
+    });
+
+    const result = assignments
+      .map((assignment) => assignment.distributor)
+      .filter((distributor) => distributor && !distributor.isDeleted && distributor.isActive);
+
+    return { result };
+  }
 
   // retailer categories
   async listRetailerCategories(tenantDb: DataSource) {

@@ -20,6 +20,18 @@ import { SalesmanSyncDownService } from '../../service/salesman-app/sync-down.se
 export class SalesmanSyncDownController {
   constructor(private readonly syncDownService: SalesmanSyncDownService) {}
 
+  @Get('assigned-distributors')
+  @RequirePermissions('SALESMAN_SYNC_DOWN')
+  listAssignedDistributors(
+    @TenantConnection() tenantDb: DataSource,
+    @Req() req: Request,
+  ) {
+    return this.syncDownService.listAssignedDistributors(
+      tenantDb,
+      req.user as { userId: string },
+    );
+  }
+
   @Get('stock-products')
   @RequirePermissions('SALESMAN_SYNC_DOWN')
   listStockProducts(
