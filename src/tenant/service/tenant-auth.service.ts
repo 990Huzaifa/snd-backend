@@ -310,7 +310,16 @@ export class TenantAuthService {
   async login(
     dto: TenantLoginDto,
     origin: string | undefined,
-  ): Promise<{ access_token: string; user: User }> {
+  ): Promise<{ access_token: string; user: Omit<User, 'assignedDistributors'> & {
+    assignedDistributors: Array<{
+      id: number;
+      userId: string;
+      distributorId: string;
+      name: string | null;
+      createdAt: Date;
+      updatedAt: Date;
+    }>;
+  } }> {
     const fromHost = extractTenantCodeFromHost(origin);
     const tenantName = (fromHost ?? dto.tenantCode)?.trim();
     // console.log('tenantName', tenantName);
@@ -345,7 +354,11 @@ export class TenantAuthService {
 
     const user = await userRepo.findOne({
       where: { email },
-      relations: ['role', 'assignedDistributors'],
+      relations: [
+        'role',
+        'assignedDistributors',
+        'assignedDistributors.distributor',
+      ],
     });
 
     if (
@@ -391,6 +404,18 @@ export class TenantAuthService {
 
     delete user.password;
 
+    const userResponse = {
+      ...user,
+      assignedDistributors: (user.assignedDistributors ?? []).map((assignment) => ({
+        id: assignment.id,
+        userId: assignment.userId,
+        distributorId: assignment.distributorId,
+        name: assignment.distributor?.name ?? null,
+        createdAt: assignment.createdAt,
+        updatedAt: assignment.updatedAt,
+      })),
+    };
+
     await this.activityLogService.recordActivityLog(tenantDb, {
       actorId: user.id,
       action: 'USER_LOGIN',
@@ -400,8 +425,7 @@ export class TenantAuthService {
 
     return {
       access_token: this.jwtService.sign(payload),
-      user: user,
-
+      user: userResponse,
     };
   }
 
