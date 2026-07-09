@@ -316,6 +316,9 @@ export class TenantAuthService {
       userId: string;
       distributorId: string;
       name: string | null;
+      latitude: string | null;
+      longitude: string | null;
+      maxRadius: string | null;
       createdAt: Date;
       updatedAt: Date;
     }>;
@@ -411,6 +414,9 @@ export class TenantAuthService {
         userId: assignment.userId,
         distributorId: assignment.distributorId,
         name: assignment.distributor?.name ?? null,
+        latitude: assignment.distributor?.latitude ?? null,
+        longitude: assignment.distributor?.longitude ?? null,
+        maxRadius: assignment.distributor?.maxRadius ?? null,
         createdAt: assignment.createdAt,
         updatedAt: assignment.updatedAt,
       })),
