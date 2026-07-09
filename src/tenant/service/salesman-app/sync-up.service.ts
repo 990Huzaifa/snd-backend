@@ -38,6 +38,12 @@ import {
     SALESMAN_SALE_VOUCHER_SYNC_MAX,
 } from '../../config/salesman-sale-voucher-sync.multer';
 import { SaleVoucherService } from '../sale-voucher.service';
+import {
+    BulkCreateSaleReturnDto,
+    SALESMAN_SALE_RETURN_SYNC_MAX,
+} from '../../dto/salesman-app/sale-return/bulk-create-sale-return.dto';
+import { CreateSaleReturnDto } from '../../dto/sale-return/create-sale-return.dto';
+import { SaleReturnService } from '../sale-return.service';
 
 const DEFAULT_MAX_RADIUS = '1';
 const DEFAULT_CREDIT_LIMIT = '0.00';
@@ -70,6 +76,11 @@ type SaleVoucherSyncRow = {
     paymentProof?: PaymentProofPayload;
 };
 
+type SaleReturnSyncRow = {
+    row: number;
+    saleReturn: CreateSaleReturnDto;
+};
+
 @Injectable()
 export class SalesmanSyncUpService {
     constructor(
@@ -79,6 +90,7 @@ export class SalesmanSyncUpService {
         private readonly s3Service: S3Service,
         private readonly saleOrderService: SaleOrderService,
         private readonly saleVoucherService: SaleVoucherService,
+        private readonly saleReturnService: SaleReturnService,
     ) {}
 
     private normalize(value: string): string {
@@ -719,6 +731,202 @@ export class SalesmanSyncUpService {
 
         return {
             message: 'Sale order sync started',
+            jobId: job.id,
+            status: job.status,
+            totalRows: job.totalRows,
+        };
+    }
+
+    private buildSaleReturnSyncRows(dto: BulkCreateSaleReturnDto): SaleReturnSyncRow[] {
+        return dto.returns.map((saleReturn, index) => ({
+            row: index + 1,
+            saleReturn,
+        }));
+    }
+
+    private saleReturnRowLabel(saleReturn: CreateSaleReturnDto, row: number): string {
+        return saleReturn.retailerId ? `Retailer ${saleReturn.retailerId}` : `Row ${row}`;
+    }
+
+    private async notifySaleReturnSyncCompletion(
+        tenantDb: DataSource,
+        job: TenantJob,
+        user: { userId: string },
+        tenantCode: string,
+        status: 'completed' | 'failed',
+    ) {
+        const title =
+            status === 'completed'
+                ? 'Sale return sync completed'
+                : 'Sale return sync failed';
+        const message =
+            status === 'completed'
+                ? `Sync finished. Inserted: ${job.inserted}, Failed: ${job.failed}, Total: ${job.totalRows}`
+                : 'Sale return sync failed. Please review sync logs.';
+
+        await this.notificationService.createNotification(
+            tenantDb,
+            {
+                userId: user.userId,
+                title,
+                message,
+                type: 'salesman_sale_return_sync',
+            },
+            tenantCode,
+            {
+                job: {
+                    id: job.id,
+                    jobType: job.jobType,
+                    status,
+                    fileName: job.fileName,
+                    totalRows: job.totalRows,
+                    inserted: job.inserted,
+                    failed: job.failed,
+                    completedAt: job.completedAt,
+                    logs: job.logs,
+                },
+            },
+        );
+    }
+
+    private async processCreateSaleReturnsJob(
+        tenantDb: DataSource,
+        jobId: string,
+        rows: SaleReturnSyncRow[],
+        user: { userId: string },
+        tenantCode: string,
+    ) {
+        this.tenantJobService.startJob(jobId);
+
+        for (const row of rows) {
+            const returnLabel = this.saleReturnRowLabel(row.saleReturn, row.row);
+
+            try {
+                const created = await this.saleReturnService.create(
+                    tenantDb,
+                    row.saleReturn,
+                    user,
+                );
+
+                this.tenantJobService.appendLog(jobId, {
+                    row: row.row,
+                    name: created.returnNumber ?? returnLabel,
+                    status: 'success',
+                    metadata: {
+                        saleReturnId: created.id,
+                        returnNumber: created.returnNumber,
+                    },
+                });
+            } catch (error) {
+                this.tenantJobService.appendLog(jobId, {
+                    row: row.row,
+                    name: returnLabel,
+                    status: 'error',
+                    error: error instanceof Error ? error.message : 'Unknown error',
+                });
+            }
+        }
+
+        const completedJob = this.tenantJobService.completeJob(jobId);
+
+        await this.activityLogService.recordActivityLog(tenantDb, {
+            actorId: user.userId,
+            action: 'TENANT_JOB_COMPLETED',
+            description: `Salesman sale return sync completed for ${completedJob.fileName}`,
+            metadata: {
+                jobId: completedJob.id,
+                jobType: completedJob.jobType,
+                fileName: completedJob.fileName,
+                totalRows: completedJob.totalRows,
+                inserted: completedJob.inserted,
+                failed: completedJob.failed,
+            },
+        });
+
+        await this.notifySaleReturnSyncCompletion(
+            tenantDb,
+            completedJob,
+            user,
+            tenantCode,
+            'completed',
+        );
+    }
+
+    async createSaleReturns(
+        tenantDb: DataSource,
+        dto: BulkCreateSaleReturnDto,
+        user: { userId: string },
+        tenantCode: string,
+    ) {
+        if (!dto.returns?.length) {
+            throw new BadRequestException('At least one sale return is required');
+        }
+
+        if (dto.returns.length > SALESMAN_SALE_RETURN_SYNC_MAX) {
+            throw new BadRequestException(
+                `At most ${SALESMAN_SALE_RETURN_SYNC_MAX} sale returns are allowed per sync`,
+            );
+        }
+
+        const rows = this.buildSaleReturnSyncRows(dto);
+        const fileName = `salesman-sale-return-sync-${new Date().toISOString()}`;
+
+        const job = this.tenantJobService.createJob({
+            tenantCode,
+            jobType: 'SALESMAN_SALE_RETURN_SYNC',
+            fileName,
+            createdBy: user.userId,
+            totalRows: rows.length,
+        });
+
+        await this.activityLogService.recordActivityLog(tenantDb, {
+            actorId: user.userId,
+            action: 'TENANT_JOB_STARTED',
+            description: `Salesman sale return sync started (${rows.length} returns)`,
+            metadata: {
+                jobId: job.id,
+                jobType: job.jobType,
+                fileName,
+                totalRows: rows.length,
+            },
+        });
+
+        void this.processCreateSaleReturnsJob(tenantDb, job.id, rows, user, tenantCode).catch(
+            async (error) => {
+                this.tenantJobService.failJob(job.id);
+                this.tenantJobService.appendLog(job.id, {
+                    row: 0,
+                    name: '',
+                    status: 'error',
+                    error: error instanceof Error ? error.message : 'Unknown processing failure',
+                });
+
+                const failedJob = this.tenantJobService.getJobById(job.id, tenantCode, user.userId);
+
+                await this.activityLogService.recordActivityLog(tenantDb, {
+                    actorId: user.userId,
+                    action: 'TENANT_JOB_FAILED',
+                    description: 'Salesman sale return sync failed',
+                    metadata: {
+                        jobId: job.id,
+                        jobType: job.jobType,
+                        fileName,
+                        error: error instanceof Error ? error.message : String(error),
+                    },
+                });
+
+                await this.notifySaleReturnSyncCompletion(
+                    tenantDb,
+                    failedJob,
+                    user,
+                    tenantCode,
+                    'failed',
+                );
+            },
+        );
+
+        return {
+            message: 'Sale return sync started',
             jobId: job.id,
             status: job.status,
             totalRows: job.totalRows,
