@@ -207,7 +207,9 @@ export class DistributorService {
     }
 
     if (dto.name !== undefined) distributor.name = this.normalize(dto.name);
-    if (dto.email !== undefined) distributor.email = this.normalize(dto.email).toLowerCase();
+    if (dto.email !== undefined) {
+      distributor.email = dto.email ? this.normalize(dto.email).toLowerCase() : null;
+    }
     if (dto.phone !== undefined) distributor.phone = this.normalize(dto.phone);
     if (dto.address !== undefined) distributor.address = this.normalize(dto.address);
     if (dto.countryId !== undefined) distributor.countryId = dto.countryId?.trim() || null;
