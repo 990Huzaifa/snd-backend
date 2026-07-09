@@ -2,7 +2,12 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { DataSource, In } from 'typeorm';
 import { ProductPricing } from 'src/tenant-db/entities/product.entity';
 import { PJP, PJPRoute, PJPStatus } from 'src/tenant-db/entities/pjp.entity';
-import { Retailer, RetailerCategory, RetailerChannel } from 'src/tenant-db/entities/retailer.entity';
+import {
+  Retailer,
+  RetailerCategory,
+  RetailerChannel,
+  RetailerLedger,
+} from 'src/tenant-db/entities/retailer.entity';
 import { Route } from 'src/tenant-db/entities/route.entity';
 import { Scheme } from 'src/tenant-db/entities/scheme.entity';
 import { SaleInvoice } from 'src/tenant-db/entities/sale-invoice.entity';
@@ -157,7 +162,34 @@ export class SalesmanSyncDownService {
       order: { shopName: 'ASC' },
     });
 
-    return { result: retailers };
+    if (!retailers.length) {
+      return { result: [] };
+    }
+
+    const retailerIds = retailers.map((retailer) => retailer.id);
+    const latestLedgers = await tenantDb
+      .getRepository(RetailerLedger)
+      .createQueryBuilder('ledger')
+      .distinctOn(['ledger.retailerId'])
+      .select(['ledger.retailerId', 'ledger.currentBalance'])
+      .where('ledger.retailerId IN (:...retailerIds)', { retailerIds })
+      .orderBy('ledger.retailerId', 'ASC')
+      .addOrderBy('ledger.createdAt', 'DESC')
+      .getMany();
+
+    const balanceByRetailerId = new Map(
+      latestLedgers.map((entry) => {
+        const balance = Number(entry.currentBalance);
+        return [entry.retailerId, Number.isFinite(balance) ? balance : 0];
+      }),
+    );
+
+    const result = retailers.map((retailer) => ({
+      ...retailer,
+      currentBalance: balanceByRetailerId.get(retailer.id) ?? 0,
+    }));
+
+    return { result };
   }
 
   async listPjps(tenantDb: DataSource, user: { userId: string }) {
