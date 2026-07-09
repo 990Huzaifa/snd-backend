@@ -39,6 +39,7 @@ import { RetailerCategoryController } from './controller/retailer-category.contr
 import { RetailerChannelController } from './controller/retailer-channel.controller';
 import { RetailerController } from './controller/retailer.controller';
 import { SchemeController } from './controller/scheme.controller';
+import { TargetPlanController } from './controller/target-plan.controller';
 import { StockController } from './controller/stock.controller';
 import { SaleOrderController } from './controller/saleorder.controller';
 import { SaleVoucherController } from './controller/sale-voucher.controller';
@@ -90,6 +91,7 @@ import { RetailerService } from './service/retailer/retailer.service';
 import { AssetController } from './controller/asset.controller';
 import { AssetService } from './service/asset.service';
 import { SchemeService } from './service/scheme.service';
+import { TargetPlanService } from './service/target-plan.service';
 import { StockImportService } from './service/stock-import.service';
 import { RetailerSchemeEngineService } from './service/retailer/retailer-scheme-engine.service';
 import { ProductSchemeEngineService } from './service/product/product-scheme-engine.service';
@@ -167,6 +169,7 @@ import { RetailerCheckInReportService } from './service/report/retailer-checkin-
     RetailerController,
     AssetController,
     SchemeController,
+    TargetPlanController,
     StockController,
     SaleOrderController,
     SaleVoucherController,
@@ -219,6 +222,7 @@ import { RetailerCheckInReportService } from './service/report/retailer-checkin-
     RetailerService,
     AssetService,
     SchemeService,
+    TargetPlanService,
     StockImportService,
     RetailerSchemeEngineService,
     ProductSchemeEngineService,
