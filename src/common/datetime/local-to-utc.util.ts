@@ -10,8 +10,8 @@ export type LocalDateTimeParts = {
 };
 
 /**
- * Parse a local wall-clock datetime string (no timezone required).
- * Accepts: 2026-07-10T09:00:00, 2026-07-10 09:00:00
+ * Parse wall-clock parts from a datetime string.
+ * Strips trailing Z / ±offset so components are treated as local numbers.
  */
 export function parseLocalDateTimeParts(
   value: string,
@@ -54,18 +54,65 @@ export function parseLocalDateTimeParts(
   return { year, month, day, hour, minute, second };
 }
 
-/** Interpret parts as local time and return a Date (stored as UTC instant). */
-export function localDateTimeToUtc(parts: LocalDateTimeParts): Date {
-  return new Date(
-    parts.year,
-    parts.month - 1,
-    parts.day,
-    parts.hour,
-    parts.minute,
-    parts.second,
-  );
-}
-
 export function localCalendarDate(parts: LocalDateTimeParts): Date {
   return new Date(parts.year, parts.month - 1, parts.day, 0, 0, 0, 0);
+}
+
+/**
+ * Convert client local datetime → UTC Date for DB storage.
+ *
+ * timezoneOffsetMinutes must match Date#getTimezoneOffset() on the device
+ * (e.g. Pakistan UTC+5 → -300).
+ *
+ * Formula: UTC = Date.UTC(localParts) + offsetMinutes * 60_000
+ *
+ * Example: local 2026-07-10T09:00:00 with offset -300 → 2026-07-10T04:00:00.000Z
+ */
+export function convertLocalDateTimeToUtc(
+  value: string,
+  fieldName: string,
+  timezoneOffsetMinutes?: number,
+): { utc: Date; attendanceDate: Date } {
+  const trimmed = value.trim().replace(' ', 'T');
+
+  // Already has timezone → absolute instant (no extra conversion)
+  if (/Z$/i.test(trimmed) || /[+-]\d{2}:?\d{2}$/.test(trimmed)) {
+    const utc = new Date(trimmed);
+    if (Number.isNaN(utc.getTime())) {
+      throw new BadRequestException(`Invalid ${fieldName}: ${value}`);
+    }
+    const parts = parseLocalDateTimeParts(trimmed, fieldName);
+    return { utc, attendanceDate: localCalendarDate(parts) };
+  }
+
+  const parts = parseLocalDateTimeParts(trimmed, fieldName);
+  const offsetMinutes =
+    timezoneOffsetMinutes ??
+    new Date(
+      parts.year,
+      parts.month - 1,
+      parts.day,
+      parts.hour,
+      parts.minute,
+      parts.second,
+    ).getTimezoneOffset();
+
+  // Treat parts as local wall clock, shift to UTC using offset
+  const utc = new Date(
+    Date.UTC(
+      parts.year,
+      parts.month - 1,
+      parts.day,
+      parts.hour,
+      parts.minute,
+      parts.second,
+    ) +
+      offsetMinutes * 60_000,
+  );
+
+  if (Number.isNaN(utc.getTime())) {
+    throw new BadRequestException(`Invalid ${fieldName}: ${value}`);
+  }
+
+  return { utc, attendanceDate: localCalendarDate(parts) };
 }

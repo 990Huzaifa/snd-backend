@@ -25,9 +25,7 @@ import { CheckOutAttendanceDto } from '../dto/attendance/check-out-attendance.dt
 import { ListAttendanceDto } from '../dto/attendance/list-attendance.dto';
 import { CreateTrackingLogDto } from '../dto/attendance/create-tracking-log.dto';
 import {
-  localCalendarDate,
-  localDateTimeToUtc,
-  parseLocalDateTimeParts,
+  convertLocalDateTimeToUtc,
 } from 'src/common/datetime/local-to-utc.util';
 
 type AttendanceDayCode = 'P' | 'A' | 'HD' | 'L' | 'W' | 'NA';
@@ -78,21 +76,17 @@ export class AttendanceService {
   private resolveClientLocalDateTime(
     value: string | undefined,
     fieldName: string,
+    timezoneOffsetMinutes?: number,
   ): { utc: Date; attendanceDate: Date } | undefined {
     if (!value?.trim()) {
       return undefined;
     }
 
-    const parts = parseLocalDateTimeParts(value, fieldName);
-    const utc = localDateTimeToUtc(parts);
-    if (Number.isNaN(utc.getTime())) {
-      throw new BadRequestException(`Invalid ${fieldName}: ${value}`);
-    }
-
-    return {
-      utc,
-      attendanceDate: localCalendarDate(parts),
-    };
+    return convertLocalDateTimeToUtc(
+      value,
+      fieldName,
+      timezoneOffsetMinutes,
+    );
   }
 
   private getDayRange(reference: Date) {
@@ -459,6 +453,7 @@ export class AttendanceService {
     const resolvedTime = this.resolveClientLocalDateTime(
       dto.checkInTime,
       'checkInTime',
+      dto.timezoneOffsetMinutes,
     );
     const checkInTime = resolvedTime?.utc ?? new Date();
     const attendanceDate =
@@ -543,6 +538,7 @@ export class AttendanceService {
     const resolvedTime = this.resolveClientLocalDateTime(
       dto.checkOutTime,
       'checkOutTime',
+      dto.timezoneOffsetMinutes,
     );
     const checkOutTime = resolvedTime?.utc ?? new Date();
     const attendanceDate =
