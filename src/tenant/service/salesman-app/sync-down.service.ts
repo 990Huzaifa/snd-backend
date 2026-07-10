@@ -17,6 +17,11 @@ import {
 } from 'src/tenant-db/entities/sale-voucher.entity';
 import { SalesmanDistributor } from 'src/tenant-db/entities/user.entity';
 import { StockBalance } from 'src/tenant-db/entities/stock.entity';
+import {
+  TargetPlanAssigneeEntity,
+  TargetPlanAssigneeStatus,
+  TargetPlanStatus,
+} from 'src/tenant-db/entities/target-plan.entity';
 
 const SCHEME_RELATIONS = [
   'slabs',
@@ -289,5 +294,43 @@ export class SalesmanSyncDownService {
       order: { name: 'ASC' },
     });
     return { result: channels };
+  }
+
+  async listAssignedTargetPlans(
+    tenantDb: DataSource,
+    user: { userId: string },
+  ) {
+    const assignees = await tenantDb
+      .getRepository(TargetPlanAssigneeEntity)
+      .createQueryBuilder('assignee')
+      .innerJoinAndSelect('assignee.targetPlan', 'plan')
+      .leftJoinAndSelect('plan.metrics', 'metric')
+      .leftJoinAndSelect('metric.items', 'item')
+      .leftJoinAndSelect('item.product', 'product')
+      .leftJoinAndSelect('item.category', 'category')
+      .leftJoinAndSelect('assignee.snapshots', 'snapshot')
+      .leftJoinAndSelect('snapshot.targetMetric', 'snapshotMetric')
+      .where('assignee.assigneeId = :userId', { userId: user.userId })
+      .andWhere('assignee.status = :activeStatus', {
+        activeStatus: TargetPlanAssigneeStatus.ACTIVE,
+      })
+      .andWhere('plan.status IN (:...statuses)', {
+        statuses: [
+          TargetPlanStatus.PUBLISHED,
+          TargetPlanStatus.LOCKED,
+          TargetPlanStatus.CLOSED,
+        ],
+      })
+      .orderBy('plan.startDate', 'DESC')
+      .addOrderBy('metric.createdAt', 'ASC')
+      .getMany();
+
+    const result = assignees.map((assignee) => ({
+      ...assignee.targetPlan,
+      assigneeId: assignee.id,
+      snapshots: assignee.snapshots ?? [],
+    }));
+
+    return { result };
   }
 }

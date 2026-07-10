@@ -109,4 +109,16 @@ export class SalesmanSyncDownController {
   listRetailerChannels(@TenantConnection() tenantDb: DataSource) {
     return this.syncDownService.listRetailerChannels(tenantDb);
   }
+
+  @Get('assigned-target-plans')
+  @RequirePermissions('SALESMAN_SYNC_DOWN')
+  listAssignedTargetPlans(
+    @TenantConnection() tenantDb: DataSource,
+    @Req() req: Request,
+  ) {
+    return this.syncDownService.listAssignedTargetPlans(
+      tenantDb,
+      req.user as { userId: string },
+    );
+  }
 }
