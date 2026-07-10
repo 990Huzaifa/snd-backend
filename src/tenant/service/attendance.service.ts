@@ -18,6 +18,7 @@ import {
 } from 'src/tenant-db/entities/attendence.entity';
 import { User, UserType } from 'src/tenant-db/entities/user.entity';
 import { ActivityLogService } from './activity-log.service';
+import { AppAttendanceOverviewDto } from '../dto/attendance/app-attendance-overview.dto';
 import { AttendanceOverviewDto } from '../dto/attendance/attendance-overview.dto';
 import { CheckInAttendanceDto } from '../dto/attendance/check-in-attendance.dto';
 import { CheckOutAttendanceDto } from '../dto/attendance/check-out-attendance.dto';
@@ -25,6 +26,13 @@ import { ListAttendanceDto } from '../dto/attendance/list-attendance.dto';
 import { CreateTrackingLogDto } from '../dto/attendance/create-tracking-log.dto';
 
 type AttendanceDayCode = 'P' | 'A' | 'HD' | 'L' | 'W' | 'NA';
+
+type AttendanceRecordStatus =
+  | 'present'
+  | 'absent'
+  | 'leave'
+  | 'weekend'
+  | 'future';
 
 type AttendanceGeofence = {
   centerLat: number;
@@ -205,6 +213,51 @@ export class AttendanceService {
 
   private roundAttendanceRate(value: number): number {
     return Math.round(value * 10) / 10;
+  }
+
+  private mapDayCodeToStatus(code: AttendanceDayCode): AttendanceRecordStatus {
+    if (code === 'P' || code === 'HD') {
+      return 'present';
+    }
+    if (code === 'A') {
+      return 'absent';
+    }
+    if (code === 'L') {
+      return 'leave';
+    }
+    if (code === 'W') {
+      return 'weekend';
+    }
+    return 'future';
+  }
+
+  private formatTime(date: Date): string {
+    return date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
+  }
+
+  private formatWorkingHours(checkIn: Date, checkOut: Date): string {
+    const diffMs = checkOut.getTime() - checkIn.getTime();
+    const totalMinutes = Math.max(0, Math.floor(diffMs / 60000));
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    return `${hours}h ${minutes}m`;
+  }
+
+  private resolveAttendanceMessage(rate: number): string {
+    if (rate >= 90) {
+      return 'Excellent attendance! Keep it up.';
+    }
+    if (rate >= 75) {
+      return 'Good attendance. Keep improving.';
+    }
+    if (rate >= 50) {
+      return 'Attendance needs improvement.';
+    }
+    return 'Poor attendance. Please be more regular.';
   }
 
   private resolveUserGeofence(
@@ -664,6 +717,119 @@ export class AttendanceService {
     );
 
     return logs;
+  }
+
+  async getAppOverview(
+    tenantDb: DataSource,
+    filters: AppAttendanceOverviewDto,
+    user: { userId: string },
+  ) {
+    const { year, month } = filters;
+    const { start, end, daysInMonth } = this.getMonthDateRange(year, month);
+    const working = this.countWorkableDaysInMonth(year, month);
+
+    const attendanceRows = await tenantDb
+      .getRepository(Attendence)
+      .createQueryBuilder('a')
+      .where('a."userId" = :userId', { userId: user.userId })
+      .andWhere('a."attendenceDate" >= :start', { start })
+      .andWhere('a."attendenceDate" <= :end', { end })
+      .getMany();
+
+    const byDate = new Map<string, Attendence[]>();
+    for (const row of attendanceRows) {
+      const dateKey = this.toDateKey(row.attendenceDate);
+      if (!byDate.has(dateKey)) {
+        byDate.set(dateKey, []);
+      }
+      byDate.get(dateKey)!.push(row);
+    }
+
+    let present = 0;
+    let absent = 0;
+    let leave = 0;
+    const records: Array<{
+      id: string | null;
+      date: string;
+      day: number;
+      weekday: string;
+      status: AttendanceRecordStatus;
+      checkIn?: string;
+      checkOut?: string;
+      workingHours?: string;
+      location?: string;
+    }> = [];
+
+    for (let day = 1; day <= daysInMonth; day += 1) {
+      const weekend = this.isWeekend(year, month, day);
+      const isFuture = this.isFutureDay(year, month, day);
+      const dateKey = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const dayRecords = byDate.get(dateKey) ?? [];
+      const code = this.resolveDayCode(dayRecords, weekend, isFuture);
+
+      if (code === 'NA') {
+        continue;
+      }
+
+      if (code === 'P' || code === 'HD') {
+        present += 1;
+      } else if (code === 'A') {
+        absent += 1;
+      } else if (code === 'L') {
+        leave += 1;
+      }
+
+      const primaryRecord = this.pickPrimaryAttendanceRecord(dayRecords);
+      const status = this.mapDayCodeToStatus(code);
+      const record: (typeof records)[number] = {
+        id: primaryRecord?.id ?? null,
+        date: dateKey,
+        day,
+        weekday: this.weekdayLabel(year, month, day),
+        status,
+      };
+
+      if ((code === 'P' || code === 'HD') && primaryRecord?.checkInTime) {
+        record.checkIn = this.formatTime(primaryRecord.checkInTime);
+        if (primaryRecord.checkOutTime) {
+          record.checkOut = this.formatTime(primaryRecord.checkOutTime);
+          record.workingHours = this.formatWorkingHours(
+            primaryRecord.checkInTime,
+            primaryRecord.checkOutTime,
+          );
+        }
+        if (primaryRecord.checkInLocation?.trim()) {
+          record.location = primaryRecord.checkInLocation.trim();
+        }
+      }
+
+      records.push(record);
+    }
+
+    records.sort((left, right) => right.day - left.day);
+
+    const attendanceRate =
+      working > 0 ? Math.round((present / working) * 100) : 0;
+
+    await this.activityLogService.recordActivityLog(tenantDb, {
+      actorId: user.userId,
+      action: 'ATTENDANCE_APP_OVERVIEW_VIEWED',
+      description: 'App attendance overview viewed',
+      metadata: { year, month, present, absent, leave, working },
+    });
+
+    return {
+      filters: { month, year },
+      summary: {
+        present,
+        absent,
+        leave,
+        working,
+        attendanceRate,
+        message: this.resolveAttendanceMessage(attendanceRate),
+      },
+      records,
+    };
   }
 
   async getOverview(

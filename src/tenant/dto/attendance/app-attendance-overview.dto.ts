@@ -1,7 +1,7 @@
 import { Type } from 'class-transformer';
 import { IsInt, Max, Min } from 'class-validator';
 
-export class SalesmanAttendanceHistoryDto {
+export class AppAttendanceOverviewDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
