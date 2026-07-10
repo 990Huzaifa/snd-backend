@@ -301,4 +301,12 @@ export class SalesmanAttendanceService {
       records,
     };
   }
+
+
+  // testing delete api service
+
+  async deleteAttendance(tenantDb: DataSource, userId: string) {
+    await tenantDb.getRepository(Attendence).delete({ "userId": userId });
+    return { success: true };
+  }
 }

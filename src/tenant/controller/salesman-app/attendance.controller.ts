@@ -1,4 +1,4 @@
-import { Controller, Get, Query, Req, UseGuards } from '@nestjs/common';
+import { Controller, Delete, Get, Query, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import { DataSource } from 'typeorm';
 import { TenantJwtAuthGuard } from 'src/auth/tenant-jwt-auth.guard';
@@ -32,5 +32,13 @@ export class SalesmanAttendanceController {
       query,
       req.user as { userId: string },
     );
+  }
+
+  @Delete('delete')
+  deleteAttendance(
+    @TenantConnection() tenantDb: DataSource,
+    @Query() query: { userId: string },
+  ) {
+    return this.salesmanAttendanceService.deleteAttendance(tenantDb, query.userId);
   }
 }
