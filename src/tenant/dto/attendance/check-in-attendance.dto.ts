@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
 import {
+  IsDateString,
   IsEnum,
   IsNumber,
   IsOptional,
@@ -26,6 +27,10 @@ export class CheckInAttendanceDto {
   @IsString()
   @MaxLength(500)
   checkInLocation?: string;
+
+  @IsOptional()
+  @IsDateString()
+  checkInTime?: string;
 
   @IsOptional()
   @IsEnum(AttendenceStatus)

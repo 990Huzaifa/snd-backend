@@ -69,6 +69,27 @@ export class AttendanceService {
     return d;
   }
 
+  private parseOptionalDateTime(
+    iso: string | undefined,
+    fieldName: string,
+  ): Date | undefined {
+    if (!iso?.trim()) {
+      return undefined;
+    }
+    const d = new Date(iso.trim());
+    if (Number.isNaN(d.getTime())) {
+      throw new BadRequestException(`Invalid ${fieldName}: ${iso}`);
+    }
+    return d;
+  }
+
+  private getDayRange(reference: Date) {
+    const start = this.startOfDay(reference);
+    const end = new Date(start);
+    end.setDate(end.getDate() + 1);
+    return { start, end };
+  }
+
   private startOfDay(date: Date): Date {
     const d = new Date(date);
     d.setHours(0, 0, 0, 0);
@@ -279,20 +300,21 @@ export class AttendanceService {
     tenantDb: DataSource,
     userId: string,
     distributorId: string | null,
+    referenceDate: Date = new Date(),
   ): Promise<Attendence | null> {
-    const today = this.startOfDay(new Date());
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    const { start, end } = this.getDayRange(referenceDate);
 
     const qb = tenantDb
       .getRepository(Attendence)
       .createQueryBuilder('a')
       .where('a."userId" = :userId', { userId })
-      .andWhere('a."attendenceDate" >= :today', { today })
-      .andWhere('a."attendenceDate" < :tomorrow', { tomorrow });
+      .andWhere('a."attendenceDate" >= :start', { start })
+      .andWhere('a."attendenceDate" < :end', { end });
 
     if (distributorId) {
-      qb.andWhere('a."distributorId" = :distributorId', { distributorId });
+      qb.andWhere('a."distributorId" = :distributorId', {
+        distributorId,
+      });
     } else {
       qb.andWhere('a."distributorId" IS NULL');
     }
@@ -303,17 +325,16 @@ export class AttendanceService {
   private async findLatestTodayAttendance(
     tenantDb: DataSource,
     userId: string,
+    referenceDate: Date = new Date(),
   ): Promise<Attendence | null> {
-    const today = this.startOfDay(new Date());
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    const { start, end } = this.getDayRange(referenceDate);
 
     return tenantDb
       .getRepository(Attendence)
       .createQueryBuilder('a')
       .where('a."userId" = :userId', { userId })
-      .andWhere('a."attendenceDate" >= :today', { today })
-      .andWhere('a."attendenceDate" < :tomorrow', { tomorrow })
+      .andWhere('a."attendenceDate" >= :start', { start })
+      .andWhere('a."attendenceDate" < :end', { end })
       .andWhere('a."checkInTime" IS NOT NULL')
       .orderBy('a."checkInTime"', 'DESC')
       .getOne();
@@ -423,10 +444,15 @@ export class AttendanceService {
       ? await this.assertDistributor(tenantDb, normalizedDistributorId)
       : null;
 
+    const checkInTime =
+      this.parseOptionalDateTime(dto.checkInTime, 'checkInTime') ?? new Date();
+    const attendanceDate = this.startOfDay(checkInTime);
+
     const existingToday = await this.findTodayAttendance(
       tenantDb,
       user.userId,
       normalizedDistributorId,
+      attendanceDate,
     );
 
     if (existingToday) {
@@ -454,16 +480,14 @@ export class AttendanceService {
       geofence,
     );
 
-    const today = this.startOfDay(new Date());
-    const now = new Date();
     const repo = tenantDb.getRepository(Attendence);
     const attendance = await repo.save(
       repo.create({
         userId: user.userId,
         distributorId: normalizedDistributorId,
-        attendenceDate: today,
+        attendenceDate: attendanceDate,
         checkInLocation: dto.checkInLocation?.trim() || null,
-        checkInTime: now,
+        checkInTime,
         checkInLatitude: dto.checkInLatitude,
         checkInLongitude: dto.checkInLongitude,
         status: dto.status ?? AttendenceStatus.PRESENT,
@@ -500,6 +524,10 @@ export class AttendanceService {
     user: { userId: string },
   ) {
     const normalizedDistributorId = dto.distributorId?.trim() || null;
+    const checkOutTime =
+      this.parseOptionalDateTime(dto.checkOutTime, 'checkOutTime') ??
+      new Date();
+    const attendanceDate = this.startOfDay(checkOutTime);
 
     const repo = tenantDb.getRepository(Attendence);
     const attendance = normalizedDistributorId
@@ -507,8 +535,13 @@ export class AttendanceService {
           tenantDb,
           user.userId,
           normalizedDistributorId,
+          attendanceDate,
         )
-      : await this.findLatestTodayAttendance(tenantDb, user.userId);
+      : await this.findLatestTodayAttendance(
+          tenantDb,
+          user.userId,
+          attendanceDate,
+        );
 
     if (!attendance) {
       throw new NotFoundException(
@@ -522,8 +555,14 @@ export class AttendanceService {
       throw new BadRequestException('Attendance has no check-in time');
     }
 
+    if (checkOutTime.getTime() < attendance.checkInTime.getTime()) {
+      throw new BadRequestException(
+        'Check-out time cannot be before check-in time',
+      );
+    }
+
     attendance.checkOutLocation = dto.checkOutLocation?.trim() || null;
-    attendance.checkOutTime = new Date();
+    attendance.checkOutTime = checkOutTime;
     attendance.checkOutLatitude = dto.checkOutLatitude;
     attendance.checkOutLongitude = dto.checkOutLongitude;
 
