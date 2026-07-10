@@ -62,7 +62,7 @@ export class AttendanceController {
     );
   }
 
-  @Get('app-overview')
+  @Get('history')
   appOverview(
     @TenantConnection() tenantDb: DataSource,
     @Query() query: AppAttendanceOverviewDto,
