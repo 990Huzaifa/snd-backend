@@ -24,9 +24,6 @@ import { CheckInAttendanceDto } from '../dto/attendance/check-in-attendance.dto'
 import { CheckOutAttendanceDto } from '../dto/attendance/check-out-attendance.dto';
 import { ListAttendanceDto } from '../dto/attendance/list-attendance.dto';
 import { CreateTrackingLogDto } from '../dto/attendance/create-tracking-log.dto';
-import {
-  convertLocalDateTimeToUtc,
-} from 'src/common/datetime/local-to-utc.util';
 
 type AttendanceDayCode = 'P' | 'A' | 'HD' | 'L' | 'W' | 'NA';
 
@@ -72,13 +69,12 @@ export class AttendanceService {
     return d;
   }
 
-  /** Client local wall-clock time → UTC Date for storage. */
-  private resolveClientLocalDateTime(
-    value: string,
-    fieldName: string,
-    timezoneOffsetMinutes?: number,
-  ): { utc: Date; attendanceDate: Date } {
-    return convertLocalDateTimeToUtc(value, fieldName, timezoneOffsetMinutes);
+  private parseRequiredDateTime(value: string, fieldName: string): Date {
+    const d = new Date(value.trim().replace(' ', 'T'));
+    if (Number.isNaN(d.getTime())) {
+      throw new BadRequestException(`Invalid ${fieldName}: ${value}`);
+    }
+    return d;
   }
 
   private getDayRange(reference: Date) {
@@ -442,13 +438,11 @@ export class AttendanceService {
       ? await this.assertDistributor(tenantDb, normalizedDistributorId)
       : null;
 
-    const resolvedTime = this.resolveClientLocalDateTime(
+    const checkInTime = this.parseRequiredDateTime(
       dto.checkInTime,
       'checkInTime',
-      dto.timezoneOffsetMinutes,
     );
-    const checkInTime = resolvedTime.utc;
-    const attendanceDate = resolvedTime.attendanceDate;
+    const attendanceDate = this.startOfDay(checkInTime);
 
     const existingToday = await this.findTodayAttendance(
       tenantDb,
@@ -526,13 +520,11 @@ export class AttendanceService {
     user: { userId: string },
   ) {
     const normalizedDistributorId = dto.distributorId?.trim() || null;
-    const resolvedTime = this.resolveClientLocalDateTime(
+    const checkOutTime = this.parseRequiredDateTime(
       dto.checkOutTime,
       'checkOutTime',
-      dto.timezoneOffsetMinutes,
     );
-    const checkOutTime = resolvedTime.utc;
-    const attendanceDate = resolvedTime.attendanceDate;
+    const attendanceDate = this.startOfDay(checkOutTime);
 
     const repo = tenantDb.getRepository(Attendence);
     const attendance = normalizedDistributorId
