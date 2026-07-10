@@ -117,7 +117,7 @@ export class TargetPlanController {
     updateStatus(
         @TenantConnection() tenantDb: DataSource,
         @Param('id') id: string,
-        @Body() dto: UpdateTargetPlanStatusDto,
+        @Query() dto: UpdateTargetPlanStatusDto,
         @Req() req: Request,
     ) {
         return this.targetPlanService.updateStatus(
