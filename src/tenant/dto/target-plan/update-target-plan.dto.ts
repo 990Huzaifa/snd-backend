@@ -3,6 +3,7 @@ import {
     IsArray,
     IsDateString,
     IsOptional,
+    IsString,
     IsUUID,
     ValidateNested,
 } from 'class-validator';
@@ -10,7 +11,7 @@ import { CreateTargetMetricDto } from './create-target-plan.dto';
 
 export class UpdateTargetPlanDto {
     @IsOptional()
-    @IsUUID()
+    @IsString()
     cityId?: string;
 
     @IsOptional()

@@ -6,6 +6,7 @@ import {
     IsEnum,
     IsNumber,
     IsOptional,
+    IsString,
     IsUUID,
     Min,
     ValidateNested,
@@ -60,7 +61,7 @@ export class CreateTargetMetricDto {
 }
 
 export class CreateTargetPlanDto {
-    @IsUUID()
+    @IsString()
     cityId: string;
 
     @IsDateString()

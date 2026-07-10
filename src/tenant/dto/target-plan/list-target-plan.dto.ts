@@ -24,7 +24,7 @@ export class ListTargetPlanDto {
     status?: string;
 
     @IsOptional()
-    @IsUUID()
+    @IsString()
     cityId?: string;
 
     @IsOptional()
