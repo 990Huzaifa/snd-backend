@@ -300,7 +300,7 @@ export class AttendanceService {
     return qb.getOne();
   }
 
-  private async findActiveTodayAttendance(
+  private async findLatestTodayAttendance(
     tenantDb: DataSource,
     userId: string,
   ): Promise<Attendence | null> {
@@ -314,7 +314,7 @@ export class AttendanceService {
       .where('a."userId" = :userId', { userId })
       .andWhere('a."attendenceDate" >= :today', { today })
       .andWhere('a."attendenceDate" < :tomorrow', { tomorrow })
-      .andWhere('a."checkOutTime" IS NULL')
+      .andWhere('a."checkInTime" IS NOT NULL')
       .orderBy('a."checkInTime"', 'DESC')
       .getOne();
   }
@@ -508,22 +508,18 @@ export class AttendanceService {
           user.userId,
           normalizedDistributorId,
         )
-      : await this.findActiveTodayAttendance(tenantDb, user.userId);
+      : await this.findLatestTodayAttendance(tenantDb, user.userId);
 
     if (!attendance) {
       throw new NotFoundException(
         normalizedDistributorId
           ? 'No check-in found for this distributor today'
-          : 'No active check-in found for today',
+          : 'No check-in found for today',
       );
     }
 
     if (!attendance.checkInTime) {
       throw new BadRequestException('Attendance has no check-in time');
-    }
-
-    if (attendance.checkOutTime) {
-      throw new BadRequestException('Already checked out for today');
     }
 
     attendance.checkOutLocation = dto.checkOutLocation?.trim() || null;
