@@ -24,6 +24,11 @@ import { CheckInAttendanceDto } from '../dto/attendance/check-in-attendance.dto'
 import { CheckOutAttendanceDto } from '../dto/attendance/check-out-attendance.dto';
 import { ListAttendanceDto } from '../dto/attendance/list-attendance.dto';
 import { CreateTrackingLogDto } from '../dto/attendance/create-tracking-log.dto';
+import {
+  localCalendarDate,
+  localDateTimeToUtc,
+  parseLocalDateTimeParts,
+} from 'src/common/datetime/local-to-utc.util';
 
 type AttendanceDayCode = 'P' | 'A' | 'HD' | 'L' | 'W' | 'NA';
 
@@ -69,18 +74,25 @@ export class AttendanceService {
     return d;
   }
 
-  private parseOptionalDateTime(
-    iso: string | undefined,
+  /** Client local wall-clock time → UTC Date for storage. */
+  private resolveClientLocalDateTime(
+    value: string | undefined,
     fieldName: string,
-  ): Date | undefined {
-    if (!iso?.trim()) {
+  ): { utc: Date; attendanceDate: Date } | undefined {
+    if (!value?.trim()) {
       return undefined;
     }
-    const d = new Date(iso.trim());
-    if (Number.isNaN(d.getTime())) {
-      throw new BadRequestException(`Invalid ${fieldName}: ${iso}`);
+
+    const parts = parseLocalDateTimeParts(value, fieldName);
+    const utc = localDateTimeToUtc(parts);
+    if (Number.isNaN(utc.getTime())) {
+      throw new BadRequestException(`Invalid ${fieldName}: ${value}`);
     }
-    return d;
+
+    return {
+      utc,
+      attendanceDate: localCalendarDate(parts),
+    };
   }
 
   private getDayRange(reference: Date) {
@@ -444,9 +456,13 @@ export class AttendanceService {
       ? await this.assertDistributor(tenantDb, normalizedDistributorId)
       : null;
 
-    const checkInTime =
-      this.parseOptionalDateTime(dto.checkInTime, 'checkInTime') ?? new Date();
-    const attendanceDate = this.startOfDay(checkInTime);
+    const resolvedTime = this.resolveClientLocalDateTime(
+      dto.checkInTime,
+      'checkInTime',
+    );
+    const checkInTime = resolvedTime?.utc ?? new Date();
+    const attendanceDate =
+      resolvedTime?.attendanceDate ?? this.startOfDay(checkInTime);
 
     const existingToday = await this.findTodayAttendance(
       tenantDb,
@@ -524,10 +540,13 @@ export class AttendanceService {
     user: { userId: string },
   ) {
     const normalizedDistributorId = dto.distributorId?.trim() || null;
-    const checkOutTime =
-      this.parseOptionalDateTime(dto.checkOutTime, 'checkOutTime') ??
-      new Date();
-    const attendanceDate = this.startOfDay(checkOutTime);
+    const resolvedTime = this.resolveClientLocalDateTime(
+      dto.checkOutTime,
+      'checkOutTime',
+    );
+    const checkOutTime = resolvedTime?.utc ?? new Date();
+    const attendanceDate =
+      resolvedTime?.attendanceDate ?? this.startOfDay(checkOutTime);
 
     const repo = tenantDb.getRepository(Attendence);
     const attendance = normalizedDistributorId

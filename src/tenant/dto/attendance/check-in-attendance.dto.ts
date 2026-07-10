@@ -1,12 +1,12 @@
 import { Type } from 'class-transformer';
 import {
-  IsDateString,
   IsEnum,
   IsNumber,
   IsOptional,
   IsString,
   IsUUID,
   MaxLength,
+  Matches,
 } from 'class-validator';
 import { AttendenceStatus } from 'src/tenant-db/entities/attendence.entity';
 
@@ -28,8 +28,16 @@ export class CheckInAttendanceDto {
   @MaxLength(500)
   checkInLocation?: string;
 
+  /** Local wall-clock time. Converted to UTC on the server. */
   @IsOptional()
-  @IsDateString()
+  @IsString()
+  @Matches(
+    /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2})?(\.\d+)?(Z|[+-]\d{2}:?\d{2})?$/,
+    {
+      message:
+        'checkInTime must be a local datetime like 2026-07-10T09:00:00',
+    },
+  )
   checkInTime?: string;
 
   @IsOptional()
