@@ -32,7 +32,6 @@ export class CheckInAttendanceDto {
   checkInLocation?: string;
 
   /** Local wall-clock time, e.g. 2026-07-10T09:00:00 */
-  @IsOptional()
   @IsString()
   @Matches(
     /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2})?(\.\d+)?(Z|[+-]\d{2}:?\d{2})?$/,
@@ -41,7 +40,7 @@ export class CheckInAttendanceDto {
         'checkInTime must be a local datetime like 2026-07-10T09:00:00',
     },
   )
-  checkInTime?: string;
+  checkInTime: string;
 
   /**
    * Device offset from Date.getTimezoneOffset() (minutes).

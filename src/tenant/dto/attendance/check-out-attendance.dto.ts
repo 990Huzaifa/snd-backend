@@ -30,7 +30,6 @@ export class CheckOutAttendanceDto {
   checkOutLocation?: string;
 
   /** Local wall-clock time, e.g. 2026-07-10T17:30:00 */
-  @IsOptional()
   @IsString()
   @Matches(
     /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2})?(\.\d+)?(Z|[+-]\d{2}:?\d{2})?$/,
@@ -39,7 +38,7 @@ export class CheckOutAttendanceDto {
         'checkOutTime must be a local datetime like 2026-07-10T17:30:00',
     },
   )
-  checkOutTime?: string;
+  checkOutTime: string;
 
   /**
    * Device offset from Date.getTimezoneOffset() (minutes).

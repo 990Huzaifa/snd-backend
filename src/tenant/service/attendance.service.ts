@@ -74,19 +74,11 @@ export class AttendanceService {
 
   /** Client local wall-clock time → UTC Date for storage. */
   private resolveClientLocalDateTime(
-    value: string | undefined,
+    value: string,
     fieldName: string,
     timezoneOffsetMinutes?: number,
-  ): { utc: Date; attendanceDate: Date } | undefined {
-    if (!value?.trim()) {
-      return undefined;
-    }
-
-    return convertLocalDateTimeToUtc(
-      value,
-      fieldName,
-      timezoneOffsetMinutes,
-    );
+  ): { utc: Date; attendanceDate: Date } {
+    return convertLocalDateTimeToUtc(value, fieldName, timezoneOffsetMinutes);
   }
 
   private getDayRange(reference: Date) {
@@ -455,9 +447,8 @@ export class AttendanceService {
       'checkInTime',
       dto.timezoneOffsetMinutes,
     );
-    const checkInTime = resolvedTime?.utc ?? new Date();
-    const attendanceDate =
-      resolvedTime?.attendanceDate ?? this.startOfDay(checkInTime);
+    const checkInTime = resolvedTime.utc;
+    const attendanceDate = resolvedTime.attendanceDate;
 
     const existingToday = await this.findTodayAttendance(
       tenantDb,
@@ -540,9 +531,8 @@ export class AttendanceService {
       'checkOutTime',
       dto.timezoneOffsetMinutes,
     );
-    const checkOutTime = resolvedTime?.utc ?? new Date();
-    const attendanceDate =
-      resolvedTime?.attendanceDate ?? this.startOfDay(checkOutTime);
+    const checkOutTime = resolvedTime.utc;
+    const attendanceDate = resolvedTime.attendanceDate;
 
     const repo = tenantDb.getRepository(Attendence);
     const attendance = normalizedDistributorId
