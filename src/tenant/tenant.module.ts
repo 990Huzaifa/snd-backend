@@ -47,6 +47,7 @@ import { SaleReturnController } from './controller/sale-return.controller';
 import { SaleInvoiceController } from './controller/sale-invoice.controller';
 import { LoadsheetController } from './controller/loadsheet.controller';
 import { RiderLoadsheetController } from './controller/rider-app/loadsheet.controller';
+import { SalesmanAttendanceController } from './controller/salesman-app/attendance.controller';
 import { SalesmanRetailerVisitController } from './controller/salesman-app/retailer-visit.controller';
 import { SalesmanSyncDownController } from './controller/salesman-app/sync-down.controller';
 import { SalesmanSyncUpController } from './controller/salesman-app/sync-up.controller';
@@ -105,6 +106,7 @@ import { RiderSaleOrderDeliveryService } from './service/rider-app/sale-order-de
 import { RetailerVisitService } from './service/salesman-app/retailer-visit.service';
 import { MerchandiserSyncDownService } from './service/merchandiser-app/sync-down.service';
 import { MerchandiserSyncUpService } from './service/merchandiser-app/sync-up.service';
+import { SalesmanAttendanceService } from './service/salesman-app/attendance.service';
 import { SalesmanSyncDownService } from './service/salesman-app/sync-down.service';
 import { SalesmanSyncUpService } from './service/salesman-app/sync-up.service';
 import { AttendanceService } from './service/attendance.service';
@@ -177,6 +179,7 @@ import { RetailerCheckInReportService } from './service/report/retailer-checkin-
     SaleInvoiceController,
     LoadsheetController,
     RiderLoadsheetController,
+    SalesmanAttendanceController,
     SalesmanRetailerVisitController,
     SalesmanSyncDownController,
     SalesmanSyncUpController,
@@ -236,6 +239,7 @@ import { RetailerCheckInReportService } from './service/report/retailer-checkin-
     RetailerVisitService,
     MerchandiserSyncDownService,
     MerchandiserSyncUpService,
+    SalesmanAttendanceService,
     SalesmanSyncDownService,
     SalesmanSyncUpService,
     AttendanceService,

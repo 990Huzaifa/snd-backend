@@ -609,6 +609,14 @@ Separate from retailer geo check-in. Base path: `/tenant/attendance`.
 | `GET` | `/tenant/attendance/:id/tracking-logs` | `VIEW_ATTENDANCE` | GPS tracking logs |
 | `POST` | `/tenant/attendance/:id/tracking-logs` | `CHECK_IN_ATTENDANCE` | Append tracking log |
 
+### Salesman attendance history
+
+Base path: `/tenant/salesman/attendance`.
+
+| Method | Path | Permission | Description |
+|--------|------|------------|-------------|
+| `GET` | `/tenant/salesman/attendance/history` | — | Monthly attendance summary and daily records for the logged-in user (`month`, `year` query params) |
+
 ---
 
 ## Enums reference
@@ -666,6 +674,7 @@ Separate from retailer geo check-in. Base path: `/tenant/attendance`.
 | 14 | `POST` | `/tenant/salesman/retailer-visits/check-in` | `CREATE_RETAILER_VISIT` |
 | 15 | `GET` | `/tenant/salesman/retailer-visits` | `LIST_RETAILER_VISIT` |
 | 16 | `GET` | `/tenant/salesman/retailer-visits/:id` | `VIEW_RETAILER_VISIT` |
+| 17 | `GET` | `/tenant/salesman/attendance/history` | — |
 
 ---
 
