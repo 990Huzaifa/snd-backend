@@ -417,16 +417,60 @@ export class TargetPlanService {
 
         const [rows, total] = await qb.getManyAndCount();
 
+        if (!rows.length) {
+            return {
+                result: [],
+                meta: { total, page, limit },
+            };
+        }
+
+        const planIds = rows.map((plan) => plan.id);
+
+        const [assignees, metricCountRows] = await Promise.all([
+            tenantDb.getRepository(TargetPlanAssigneeEntity).find({
+                where: {
+                    targetPlanId: In(planIds),
+                    status: TargetPlanAssigneeStatus.ACTIVE,
+                },
+                relations: ['assignee'],
+                order: { createdAt: 'ASC' },
+            }),
+            tenantDb
+                .getRepository(TargetMetricEntity)
+                .createQueryBuilder('metric')
+                .select('metric.targetPlanId', 'targetPlanId')
+                .addSelect('COUNT(metric.id)', 'count')
+                .where('metric.targetPlanId IN (:...planIds)', { planIds })
+                .groupBy('metric.targetPlanId')
+                .getRawMany<{ targetPlanId: string; count: string }>(),
+        ]);
+
+        const assigneesByPlanId = new Map<string, TargetPlanAssigneeEntity[]>();
+        for (const assignee of assignees) {
+            const existing = assigneesByPlanId.get(assignee.targetPlanId) ?? [];
+            existing.push(assignee);
+            assigneesByPlanId.set(assignee.targetPlanId, existing);
+        }
+
+        const metricCountByPlanId = new Map(
+            metricCountRows.map((row) => [row.targetPlanId, Number(row.count)]),
+        );
+
         const result = await Promise.all(
             rows.map(async (plan) => {
                 const cityName = await this.masterGeoHelperService.getCityNameById(plan.cityId);
-                const assigneeCount = await tenantDb.getRepository(TargetPlanAssigneeEntity).count({
-                    where: {
-                        targetPlanId: plan.id,
-                        status: TargetPlanAssigneeStatus.ACTIVE,
-                    },
-                });
-                return { ...plan, cityName, assigneeCount };
+                const planAssignees = assigneesByPlanId.get(plan.id) ?? [];
+                const assigneeNames = planAssignees
+                    .map((assignee) => assignee.assignee?.name)
+                    .filter((name): name is string => Boolean(name));
+
+                return {
+                    ...plan,
+                    cityName,
+                    assigneeCount: planAssignees.length,
+                    assigneeNames,
+                    metricCount: metricCountByPlanId.get(plan.id) ?? 0,
+                };
             }),
         );
 
