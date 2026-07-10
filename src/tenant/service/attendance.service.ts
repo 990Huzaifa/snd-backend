@@ -496,6 +496,7 @@ export class AttendanceService {
         attendenceId: attendance.id,
         latitude: dto.checkInLatitude,
         longitude: dto.checkInLongitude,
+        logTime: checkInTime,
       }),
     );
 
@@ -571,6 +572,7 @@ export class AttendanceService {
         attendenceId: attendance.id,
         latitude: dto.checkOutLatitude,
         longitude: dto.checkOutLongitude,
+        logTime: checkOutTime,
       }),
     );
 
@@ -744,6 +746,7 @@ export class AttendanceService {
           attendenceId: attendanceId,
           latitude: entry.latitude,
           longitude: entry.longitude,
+          logTime: this.parseRequiredDateTime(entry.logTime, 'logTime'),
         }),
       ),
     );

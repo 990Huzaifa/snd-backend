@@ -93,6 +93,9 @@ export class TrackingLog {
     @Column({type: 'decimal', precision: 10, scale: 8})
     longitude: number;
 
+    @Column()
+    logTime: Date;
+    
     @CreateDateColumn()
     createdAt: Date;
 
