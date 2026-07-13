@@ -134,6 +134,9 @@ export class PurchaseStockService {
     const lineItems = stock.items.map((line) => ({
       id: line.id,
       quantity: line.quantity,
+      productId: line.productId,
+      productFlavourId: line.productFlavourId,
+      productPricingId: line.productPricingId,
       product: line.product
         ? {
             id: line.product.id,
@@ -197,7 +200,7 @@ export class PurchaseStockService {
 
     for (const line of dto.items) {
       const flavour = await tenantDb.getRepository(ProductFlavour).findOne({
-        where: { id: line.productFlavourId.toString(), productId: line.productId },
+        where: { id: line.productFlavourId, productId: line.productId },
         select: ['id'],
       });
       if (!flavour) {
@@ -234,7 +237,7 @@ export class PurchaseStockService {
           itemRepo.create({
             purchaseStockId: stock.id,
             productId: line.productId,
-            productFlavourId: line.productFlavourId.toString(),
+            productFlavourId: line.productFlavourId,
             productPricingId: line.productPricingId,
             quantity: Number(line.quantity),
           }),
@@ -245,7 +248,7 @@ export class PurchaseStockService {
         await this.stockService.applyStockMovement(manager, {
           distributorId: dto.distributorId,
           productId: line.productId,
-          productFlavourId: line.productFlavourId.toString(),
+          productFlavourId: line.productFlavourId,
           productPricingId: line.productPricingId,
           quantity: Number(line.quantity),
           type: StockMovementType.IN,

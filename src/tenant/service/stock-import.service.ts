@@ -230,7 +230,7 @@ export class StockImportService {
           remarks: `Imported via CSV: ${fileName}`,
           items: validRows.map((row) => ({
             productId: row.productId,
-            productFlavourId: Number(row.productFlavourId),
+            productFlavourId: row.productFlavourId,
             productPricingId: row.productPricingId,
             quantity: row.quantity,
           })),
@@ -243,7 +243,7 @@ export class StockImportService {
           remarks: `Imported via CSV: ${fileName}`,
           items: validRows.map((row) => ({
             productId: row.productId,
-            productFlavourId: Number(row.productFlavourId),
+            productFlavourId: row.productFlavourId,
             productPricingId: row.productPricingId,
             quantity: row.quantity,
           })),
