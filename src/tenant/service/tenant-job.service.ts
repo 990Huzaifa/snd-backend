@@ -105,7 +105,7 @@ export class TenantJobService {
 
   getJobById(jobId: string, tenantCode: string, userId: string): TenantJob {
     const job = this.mustGetJob(jobId);
-    if (job.tenantCode !== tenantCode || job.createdBy !== userId) {
+    if (job.tenantCode !== tenantCode) {
       throw new NotFoundException('Import job not found');
     }
     return job;
@@ -113,7 +113,7 @@ export class TenantJobService {
 
   listJobsForUser(tenantCode: string, userId: string): TenantJob[] {
     return [...this.jobs.values()]
-      .filter((job) => job.tenantCode === tenantCode && job.createdBy === userId)
+      .filter((job) => job.tenantCode === tenantCode)
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   }
 
