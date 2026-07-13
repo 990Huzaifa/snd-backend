@@ -44,6 +44,12 @@ import {
 } from '../../dto/salesman-app/sale-return/bulk-create-sale-return.dto';
 import { CreateSaleReturnDto } from '../../dto/sale-return/create-sale-return.dto';
 import { SaleReturnService } from '../sale-return.service';
+import {
+    BulkSyncRetailerInventoryDto,
+    SALESMAN_RETAILER_INVENTORY_SYNC_MAX,
+    SyncRetailerInventoryItemDto,
+} from '../../dto/salesman-app/retailer-inventory/sync-retailer-inventory.dto';
+import { RetailerInventoryService } from '../retailer/retailer-inventory.service';
 
 const DEFAULT_MAX_RADIUS = '1';
 const DEFAULT_CREDIT_LIMIT = '0.00';
@@ -81,6 +87,11 @@ type SaleReturnSyncRow = {
     saleReturn: CreateSaleReturnDto;
 };
 
+type RetailerInventorySyncRow = {
+    row: number;
+    item: SyncRetailerInventoryItemDto;
+};
+
 @Injectable()
 export class SalesmanSyncUpService {
     constructor(
@@ -91,6 +102,7 @@ export class SalesmanSyncUpService {
         private readonly saleOrderService: SaleOrderService,
         private readonly saleVoucherService: SaleVoucherService,
         private readonly saleReturnService: SaleReturnService,
+        private readonly retailerInventoryService: RetailerInventoryService,
     ) {}
 
     private normalize(value: string): string {
@@ -1218,6 +1230,225 @@ export class SalesmanSyncUpService {
 
         return {
             message: 'Sale voucher sync started',
+            jobId: job.id,
+            status: job.status,
+            totalRows: job.totalRows,
+        };
+    }
+
+    private buildRetailerInventorySyncRows(
+        dto: BulkSyncRetailerInventoryDto,
+    ): RetailerInventorySyncRow[] {
+        return dto.inventories.map((item, index) => ({
+            row: index + 1,
+            item,
+        }));
+    }
+
+    private retailerInventoryRowLabel(
+        item: SyncRetailerInventoryItemDto,
+        row: number,
+    ): string {
+        return item.retailerId
+            ? `Retailer ${item.retailerId}`
+            : `Row ${row}`;
+    }
+
+    private async notifyRetailerInventorySyncCompletion(
+        tenantDb: DataSource,
+        job: TenantJob,
+        user: { userId: string },
+        tenantCode: string,
+        status: 'completed' | 'failed',
+    ) {
+        const title =
+            status === 'completed'
+                ? 'Retailer inventory sync completed'
+                : 'Retailer inventory sync failed';
+        const message =
+            status === 'completed'
+                ? `Sync finished. Inserted: ${job.inserted}, Failed: ${job.failed}, Total: ${job.totalRows}`
+                : 'Retailer inventory sync failed. Please review sync logs.';
+
+        await this.notificationService.createNotification(
+            tenantDb,
+            {
+                userId: user.userId,
+                title,
+                message,
+                type: 'salesman_retailer_inventory_sync',
+            },
+            tenantCode,
+            {
+                job: {
+                    id: job.id,
+                    jobType: job.jobType,
+                    status,
+                    fileName: job.fileName,
+                    totalRows: job.totalRows,
+                    inserted: job.inserted,
+                    failed: job.failed,
+                    completedAt: job.completedAt,
+                    logs: job.logs,
+                },
+            },
+        );
+    }
+
+    private async processSyncRetailerInventoriesJob(
+        tenantDb: DataSource,
+        jobId: string,
+        rows: RetailerInventorySyncRow[],
+        user: { userId: string },
+        tenantCode: string,
+    ) {
+        this.tenantJobService.startJob(jobId);
+
+        for (const row of rows) {
+            const label = this.retailerInventoryRowLabel(row.item, row.row);
+
+            try {
+                const result = await this.retailerInventoryService.syncItem(
+                    tenantDb,
+                    row.item,
+                );
+
+                this.tenantJobService.appendLog(jobId, {
+                    row: row.row,
+                    name: label,
+                    status: 'success',
+                    metadata: {
+                        action: result.action,
+                        inventoryId: result.inventoryId,
+                        retailerId: row.item.retailerId,
+                        productId: row.item.productId,
+                        productFlavourId: row.item.productFlavourId,
+                        uomId: row.item.uomId,
+                    },
+                });
+            } catch (error) {
+                this.tenantJobService.appendLog(jobId, {
+                    row: row.row,
+                    name: label,
+                    status: 'error',
+                    error: error instanceof Error ? error.message : 'Unknown error',
+                });
+            }
+        }
+
+        const completedJob = this.tenantJobService.completeJob(jobId);
+
+        await this.activityLogService.recordActivityLog(tenantDb, {
+            actorId: user.userId,
+            action: 'TENANT_JOB_COMPLETED',
+            description: `Salesman retailer inventory sync completed for ${completedJob.fileName}`,
+            metadata: {
+                jobId: completedJob.id,
+                jobType: completedJob.jobType,
+                fileName: completedJob.fileName,
+                totalRows: completedJob.totalRows,
+                inserted: completedJob.inserted,
+                failed: completedJob.failed,
+            },
+        });
+
+        await this.notifyRetailerInventorySyncCompletion(
+            tenantDb,
+            completedJob,
+            user,
+            tenantCode,
+            'completed',
+        );
+    }
+
+    async syncRetailerInventories(
+        tenantDb: DataSource,
+        dto: BulkSyncRetailerInventoryDto,
+        user: { userId: string },
+        tenantCode: string,
+    ) {
+        if (!dto.inventories?.length) {
+            throw new BadRequestException(
+                'At least one retailer inventory item is required',
+            );
+        }
+
+        if (dto.inventories.length > SALESMAN_RETAILER_INVENTORY_SYNC_MAX) {
+            throw new BadRequestException(
+                `At most ${SALESMAN_RETAILER_INVENTORY_SYNC_MAX} inventory items are allowed per sync`,
+            );
+        }
+
+        const rows = this.buildRetailerInventorySyncRows(dto);
+        const fileName = `salesman-retailer-inventory-sync-${new Date().toISOString()}`;
+
+        const job = this.tenantJobService.createJob({
+            tenantCode,
+            jobType: 'SALESMAN_RETAILER_INVENTORY_SYNC',
+            fileName,
+            createdBy: user.userId,
+            totalRows: rows.length,
+        });
+
+        await this.activityLogService.recordActivityLog(tenantDb, {
+            actorId: user.userId,
+            action: 'TENANT_JOB_STARTED',
+            description: `Salesman retailer inventory sync started (${rows.length} items)`,
+            metadata: {
+                jobId: job.id,
+                jobType: job.jobType,
+                fileName,
+                totalRows: rows.length,
+            },
+        });
+
+        void this.processSyncRetailerInventoriesJob(
+            tenantDb,
+            job.id,
+            rows,
+            user,
+            tenantCode,
+        ).catch(async (error) => {
+            this.tenantJobService.failJob(job.id);
+            this.tenantJobService.appendLog(job.id, {
+                row: 0,
+                name: '',
+                status: 'error',
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : 'Unknown processing failure',
+            });
+
+            const failedJob = this.tenantJobService.getJobById(
+                job.id,
+                tenantCode,
+                user.userId,
+            );
+
+            await this.activityLogService.recordActivityLog(tenantDb, {
+                actorId: user.userId,
+                action: 'TENANT_JOB_FAILED',
+                description: 'Salesman retailer inventory sync failed',
+                metadata: {
+                    jobId: job.id,
+                    jobType: job.jobType,
+                    fileName,
+                    error: error instanceof Error ? error.message : String(error),
+                },
+            });
+
+            await this.notifyRetailerInventorySyncCompletion(
+                tenantDb,
+                failedJob,
+                user,
+                tenantCode,
+                'failed',
+            );
+        });
+
+        return {
+            message: 'Retailer inventory sync started',
             jobId: job.id,
             status: job.status,
             totalRows: job.totalRows,

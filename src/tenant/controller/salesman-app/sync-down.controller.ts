@@ -8,6 +8,7 @@ import { TenantConnectionGuard } from 'src/common/guards/tenant-connection.guard
 import { TenantJwtGuard } from 'src/common/guards/tenant-jwt.guard';
 import { TenantConnection } from 'src/common/tenant/tenant-connection.decorator';
 import { SalesmanDistributorQueryDto } from '../../dto/salesman-app/sync-down/sync-down.dto';
+import { RetailerInventoryQueryDto } from '../../dto/salesman-app/retailer-inventory/retailer-inventory-query.dto';
 import { SalesmanSyncDownService } from '../../service/salesman-app/sync-down.service';
 
 @Controller('tenant/salesman')
@@ -120,5 +121,23 @@ export class SalesmanSyncDownController {
       tenantDb,
       req.user as { userId: string },
     );
+  }
+
+  @Get('retailer-inventories')
+  @RequirePermissions('SALESMAN_SYNC_DOWN')
+  listRetailerInventories(
+    @TenantConnection() tenantDb: DataSource,
+    @Query() query: RetailerInventoryQueryDto,
+  ) {
+    return this.syncDownService.listRetailerInventories(
+      tenantDb,
+      query.retailerId,
+    );
+  }
+
+  @Get('active-products')
+  @RequirePermissions('SALESMAN_SYNC_DOWN')
+  listActiveProducts(@TenantConnection() tenantDb: DataSource) {
+    return this.syncDownService.listActiveProducts(tenantDb);
   }
 }

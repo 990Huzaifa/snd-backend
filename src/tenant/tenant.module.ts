@@ -89,6 +89,7 @@ import { StockTransferService } from './service/stock-transfer.service';
 import { RetailerCategoryService } from './service/retailer/retailer-category.service';
 import { RetailerChannelService } from './service/retailer/retailer-channel.service';
 import { RetailerService } from './service/retailer/retailer.service';
+import { RetailerInventoryService } from './service/retailer/retailer-inventory.service';
 import { AssetController } from './controller/asset.controller';
 import { AssetService } from './service/asset.service';
 import { SchemeService } from './service/scheme.service';
@@ -223,6 +224,7 @@ import { RetailerCheckInReportService } from './service/report/retailer-checkin-
     RetailerCategoryService,
     RetailerChannelService,
     RetailerService,
+    RetailerInventoryService,
     AssetService,
     SchemeService,
     TargetPlanService,

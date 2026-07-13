@@ -22,6 +22,7 @@ import {
   TargetPlanAssigneeStatus,
   TargetPlanStatus,
 } from 'src/tenant-db/entities/target-plan.entity';
+import { RetailerInventoryService } from '../retailer/retailer-inventory.service';
 
 const SCHEME_RELATIONS = [
   'slabs',
@@ -83,6 +84,9 @@ const SALE_INVOICE_RELATIONS = [
 
 @Injectable()
 export class SalesmanSyncDownService {
+  constructor(
+    private readonly retailerInventoryService: RetailerInventoryService,
+  ) {}
 
   private normalizeDistributorId(distributorId?: string): string {
     const normalized = (distributorId ?? '').trim();
@@ -332,5 +336,13 @@ export class SalesmanSyncDownService {
     }));
 
     return { result };
+  }
+
+  async listRetailerInventories(tenantDb: DataSource, retailerId?: string) {
+    return this.retailerInventoryService.list(tenantDb, retailerId);
+  }
+
+  async listActiveProducts(tenantDb: DataSource) {
+    return this.retailerInventoryService.listActiveProducts(tenantDb);
   }
 }

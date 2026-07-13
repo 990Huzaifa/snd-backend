@@ -335,7 +335,7 @@ export class RetailerInventory {
     product: Product;
 
     @Column()
-    productFlavourId: string;
+    productFlavourId: number;
 
     @ManyToOne(() => ProductFlavour, { onDelete: 'RESTRICT' })
     @JoinColumn({ name: 'productFlavourId' })

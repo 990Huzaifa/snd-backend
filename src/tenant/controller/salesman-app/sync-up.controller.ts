@@ -25,6 +25,7 @@ import { BulkCreateRetailerDto } from '../../dto/salesman-app/retailer/create-re
 import { BulkCreateSaleOrderDto } from '../../dto/salesman-app/saleorder/bulk-create-saleorder.dto';
 import { BulkCreateSaleVoucherDto } from '../../dto/salesman-app/sale-voucher/bulk-create-sale-voucher.dto';
 import { BulkCreateSaleReturnDto } from '../../dto/salesman-app/sale-return/bulk-create-sale-return.dto';
+import { BulkSyncRetailerInventoryDto } from '../../dto/salesman-app/retailer-inventory/sync-retailer-inventory.dto';
 import { SalesmanSyncUpService } from '../../service/salesman-app/sync-up.service';
 
 @Controller('tenant/salesman')
@@ -102,6 +103,22 @@ export class SalesmanSyncUpController {
             tenantDb,
             dto,
             files,
+            req.user as { userId: string },
+            tenantCode,
+        );
+    }
+
+    @Post('retailer-inventories')
+    @RequirePermissions('SALESMAN_SYNC_UP')
+    syncRetailerInventories(
+        @TenantConnection() tenantDb: DataSource,
+        @TenantCode() tenantCode: string,
+        @Body() dto: BulkSyncRetailerInventoryDto,
+        @Req() req: Request,
+    ) {
+        return this.syncUpService.syncRetailerInventories(
+            tenantDb,
+            dto,
             req.user as { userId: string },
             tenantCode,
         );
