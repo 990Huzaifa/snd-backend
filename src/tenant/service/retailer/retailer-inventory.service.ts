@@ -19,14 +19,14 @@ export type RetailerInventoryListItem = {
   id: string;
   retailerId: string;
   productId: string;
-  productFlavourId: number;
+  productFlavourId: string;
   uomId: string;
   quantity: number;
   updatedAt: Date;
   retailer: { id: string; shopName: string };
   product: { id: string; name: string; skuCode: string };
   productFlavour: {
-    id: number;
+    id: string;
     flavour: { id: string; name: string };
   };
   uom: { id: string; name: string };
@@ -186,7 +186,7 @@ export class RetailerInventoryService {
         skuCode: row.product.skuCode,
       },
       productFlavour: {
-        id: row.productFlavour.id as unknown as number,
+        id: row.productFlavour.id,
         flavour: {
           id: row.productFlavour.flavour.id,
           name: row.productFlavour.flavour.name,
@@ -266,7 +266,7 @@ export class RetailerInventoryService {
     refs: {
       retailerId: string;
       productId: string;
-      productFlavourId: number;
+      productFlavourId: string;
       uomId: string;
     },
   ) {
@@ -287,7 +287,7 @@ export class RetailerInventoryService {
     }
 
     const productFlavour = await tenantDb.getRepository(ProductFlavour).findOne({
-      where: { id: refs.productFlavourId },
+      where: { id: refs.productFlavourId as unknown as string },
       select: ['id', 'productId'],
     });
     if (!productFlavour) {

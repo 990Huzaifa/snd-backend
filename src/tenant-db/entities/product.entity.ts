@@ -189,7 +189,7 @@ export class Product {
 
 @Entity('product_flavours')
 export class ProductFlavour {
-    @PrimaryGeneratedColumn()
+    @PrimaryGeneratedColumn('uuid')
     id: string;
 
     @ManyToOne(() => Product, (product) => product.flavours, { onDelete: 'CASCADE' })

@@ -22,7 +22,7 @@ export class SyncRetailerInventoryItemDto {
 
   @Type(() => Number)
   @IsInt()
-  productFlavourId: number;
+  productFlavourId: string;
 
   @IsUUID()
   uomId: string;
