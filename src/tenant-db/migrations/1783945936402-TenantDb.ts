@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from "typeorm";
 
-export class TenantDb1783686897177 implements MigrationInterface {
-    name = 'TenantDb1783686897177'
+export class TenantDb1783945936402 implements MigrationInterface {
+    name = 'TenantDb1783945936402'
 
     public async up(queryRunner: QueryRunner): Promise<void> {
         await queryRunner.query(`CREATE TABLE "permissions" ("id" SERIAL NOT NULL, "code" character varying NOT NULL, "name" character varying NOT NULL, "isActive" boolean NOT NULL DEFAULT true, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "UQ_8dad765629e83229da6feda1c1d" UNIQUE ("code"), CONSTRAINT "PK_920331560282b8bd21bb02290df" PRIMARY KEY ("id"))`);
@@ -54,6 +54,7 @@ export class TenantDb1783686897177 implements MigrationInterface {
         await queryRunner.query(`CREATE TABLE "retailer_visits" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "userId" uuid NOT NULL, "retailerId" uuid NOT NULL, "routeId" uuid NOT NULL, "visitStatus" "public"."retailer_visits_visitstatus_enum" NOT NULL, "notes" character varying, "shopImages" text array, "shelfImages" text array, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_43d38bf7d151f6da5261ba32a9e" PRIMARY KEY ("id")); COMMENT ON COLUMN "retailer_visits"."userId" IS 'Salesman ID, MERCHANDISER ID, etc.'`);
         await queryRunner.query(`CREATE TABLE "retailer_merchandising" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "retailerId" uuid NOT NULL, "userId" uuid NOT NULL, "shelfImages" text array, "notes" character varying, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_b495c5c1b5388c4bc59430d0531" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE TABLE "retailer_attendences" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "retailerId" uuid NOT NULL, "attendenceDate" TIMESTAMP NOT NULL, "checkinLatitude" numeric(10,8), "checkinLongitude" numeric(10,8), "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_77e7aad763f2944d1705517d4aa" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE TABLE "retailer_inventories" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "retailerId" uuid NOT NULL, "productId" uuid NOT NULL, "productFlavourId" integer NOT NULL, "uomId" uuid NOT NULL, "quantity" integer NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_42ebca6349a1e276cb1f340fc17" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE TYPE "public"."sale_orders_orderstatus_enum" AS ENUM('PENDING', 'APPROVED', 'REJECTED', 'PROCESSING', 'CANCELLED', 'DELIVERED')`);
         await queryRunner.query(`CREATE TABLE "sale_orders" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "orderNumber" character varying NOT NULL, "distributorId" uuid NOT NULL, "salesmanId" uuid NOT NULL, "retailerId" uuid NOT NULL, "routeId" uuid NOT NULL, "orderStatus" "public"."sale_orders_orderstatus_enum" NOT NULL, "orderTotal" integer NOT NULL, "taxPercentage" integer NOT NULL DEFAULT '0', "taxAmount" integer NOT NULL DEFAULT '0', "discountPercentage" integer NOT NULL DEFAULT '0', "discountAmount" integer NOT NULL DEFAULT '0', "totalAmount" integer NOT NULL DEFAULT '0', "schemeId" uuid, "schemeSlabId" uuid, "notes" character varying, "executedBy" uuid, "orderDate" TIMESTAMP NOT NULL, "executedDate" TIMESTAMP, "deliveredDate" TIMESTAMP, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "UQ_ca1959beef162c2ccace1481cec" UNIQUE ("orderNumber"), CONSTRAINT "PK_ba301b7939d3333e8821ff92637" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE TABLE "sale_order_items" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "saleOrderId" uuid NOT NULL, "productId" uuid NOT NULL, "productFlavourId" integer NOT NULL, "productPricingId" uuid NOT NULL, "schemeId" uuid, "slabId" uuid, "quantity" integer NOT NULL, "discountPercentage" integer NOT NULL DEFAULT '0', "discountAmount" integer NOT NULL DEFAULT '0', "totalAmount" integer NOT NULL DEFAULT '0', "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_6c46724b3d93b4c233ca288871a" PRIMARY KEY ("id"))`);
@@ -169,6 +170,10 @@ export class TenantDb1783686897177 implements MigrationInterface {
         await queryRunner.query(`ALTER TABLE "retailer_merchandising" ADD CONSTRAINT "FK_aaf82f22c648381de9985b714f6" FOREIGN KEY ("retailerId") REFERENCES "retailers"("id") ON DELETE RESTRICT ON UPDATE NO ACTION`);
         await queryRunner.query(`ALTER TABLE "retailer_merchandising" ADD CONSTRAINT "FK_9a9ed521f327b9205381702c798" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE NO ACTION`);
         await queryRunner.query(`ALTER TABLE "retailer_attendences" ADD CONSTRAINT "FK_7e04ed57ba029a59e0a4a327ca3" FOREIGN KEY ("retailerId") REFERENCES "retailers"("id") ON DELETE RESTRICT ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "retailer_inventories" ADD CONSTRAINT "FK_075408f4302a3724004cbe19fb8" FOREIGN KEY ("retailerId") REFERENCES "retailers"("id") ON DELETE RESTRICT ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "retailer_inventories" ADD CONSTRAINT "FK_2c154f29ad25c5b6bcb1a2cab3a" FOREIGN KEY ("productId") REFERENCES "products"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "retailer_inventories" ADD CONSTRAINT "FK_6f09c04ea9693c32065b87eab1e" FOREIGN KEY ("productFlavourId") REFERENCES "product_flavours"("id") ON DELETE RESTRICT ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "retailer_inventories" ADD CONSTRAINT "FK_4ff12e1c8c874c4799b24a3fbef" FOREIGN KEY ("uomId") REFERENCES "uoms"("id") ON DELETE RESTRICT ON UPDATE NO ACTION`);
         await queryRunner.query(`ALTER TABLE "sale_orders" ADD CONSTRAINT "FK_c2c3628be596f219d2b24446988" FOREIGN KEY ("distributorId") REFERENCES "distributors"("id") ON DELETE RESTRICT ON UPDATE NO ACTION`);
         await queryRunner.query(`ALTER TABLE "sale_orders" ADD CONSTRAINT "FK_fa3d2c4fecf3295858c9d25e7af" FOREIGN KEY ("salesmanId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE NO ACTION`);
         await queryRunner.query(`ALTER TABLE "sale_orders" ADD CONSTRAINT "FK_ea0e9727c2adc940bf21c51a30a" FOREIGN KEY ("retailerId") REFERENCES "retailers"("id") ON DELETE RESTRICT ON UPDATE NO ACTION`);
@@ -320,6 +325,10 @@ export class TenantDb1783686897177 implements MigrationInterface {
         await queryRunner.query(`ALTER TABLE "sale_orders" DROP CONSTRAINT "FK_ea0e9727c2adc940bf21c51a30a"`);
         await queryRunner.query(`ALTER TABLE "sale_orders" DROP CONSTRAINT "FK_fa3d2c4fecf3295858c9d25e7af"`);
         await queryRunner.query(`ALTER TABLE "sale_orders" DROP CONSTRAINT "FK_c2c3628be596f219d2b24446988"`);
+        await queryRunner.query(`ALTER TABLE "retailer_inventories" DROP CONSTRAINT "FK_4ff12e1c8c874c4799b24a3fbef"`);
+        await queryRunner.query(`ALTER TABLE "retailer_inventories" DROP CONSTRAINT "FK_6f09c04ea9693c32065b87eab1e"`);
+        await queryRunner.query(`ALTER TABLE "retailer_inventories" DROP CONSTRAINT "FK_2c154f29ad25c5b6bcb1a2cab3a"`);
+        await queryRunner.query(`ALTER TABLE "retailer_inventories" DROP CONSTRAINT "FK_075408f4302a3724004cbe19fb8"`);
         await queryRunner.query(`ALTER TABLE "retailer_attendences" DROP CONSTRAINT "FK_7e04ed57ba029a59e0a4a327ca3"`);
         await queryRunner.query(`ALTER TABLE "retailer_merchandising" DROP CONSTRAINT "FK_9a9ed521f327b9205381702c798"`);
         await queryRunner.query(`ALTER TABLE "retailer_merchandising" DROP CONSTRAINT "FK_aaf82f22c648381de9985b714f6"`);
@@ -435,6 +444,7 @@ export class TenantDb1783686897177 implements MigrationInterface {
         await queryRunner.query(`DROP TABLE "sale_order_items"`);
         await queryRunner.query(`DROP TABLE "sale_orders"`);
         await queryRunner.query(`DROP TYPE "public"."sale_orders_orderstatus_enum"`);
+        await queryRunner.query(`DROP TABLE "retailer_inventories"`);
         await queryRunner.query(`DROP TABLE "retailer_attendences"`);
         await queryRunner.query(`DROP TABLE "retailer_merchandising"`);
         await queryRunner.query(`DROP TABLE "retailer_visits"`);

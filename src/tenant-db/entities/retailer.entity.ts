@@ -5,6 +5,7 @@ import { SchemeRetailer, SchemeRetailerChannel } from "./scheme.entity";
 import { SaleOrder } from "./saleorder.entity";
 import { SaleVoucher } from "./sale-voucher.entity";
 import { SaleReturn } from "./sale-return.entity";
+import { Product, ProductFlavour, Uom } from "./product.entity";
 
 @Entity('retailer_categories')
 export class RetailerCategory {
@@ -313,3 +314,46 @@ export class RetailerAttendence {
     @UpdateDateColumn()
     updatedAt: Date;
 }  
+
+@Entity('retailer_inventories')
+export class RetailerInventory {
+    @PrimaryGeneratedColumn('uuid')
+    id: string;
+
+    @Column()
+    retailerId: string;
+
+    @ManyToOne(() => Retailer, { onDelete: 'RESTRICT' })
+    @JoinColumn({ name: 'retailerId' })
+    retailer: Retailer;
+
+    @Column()
+    productId: string;
+
+    @ManyToOne(() => Product, { onDelete: 'CASCADE' })
+    @JoinColumn({ name: 'productId' })
+    product: Product;
+
+    @Column()
+    productFlavourId: string;
+
+    @ManyToOne(() => ProductFlavour, { onDelete: 'RESTRICT' })
+    @JoinColumn({ name: 'productFlavourId' })
+    productFlavour: ProductFlavour;
+
+    @Column()
+    uomId: string;
+
+    @ManyToOne(() => Uom, { onDelete: 'RESTRICT' })
+    @JoinColumn({ name: 'uomId' })
+    uom: Uom;
+
+    @Column()
+    quantity: number;
+
+    @CreateDateColumn()
+    createdAt: Date;
+
+    @UpdateDateColumn()
+    updatedAt: Date;
+}
