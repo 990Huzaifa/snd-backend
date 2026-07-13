@@ -5,10 +5,8 @@ export class CreateOpeningStockItemDto {
   @IsUUID()
   productId: string;
 
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  productFlavourId: number;
+  @IsUUID()
+  productFlavourId: string;
 
   @IsUUID()
   productPricingId: string;

@@ -5,10 +5,8 @@ export class CreateStockTransferItemDto {
   @IsUUID()
   productId: string;
 
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  productFlavourId: number;
+  @IsUUID()
+  productFlavourId: string;
 
   @IsUUID()
   productPricingId: string;
