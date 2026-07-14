@@ -555,8 +555,11 @@ export class SaleReturnService {
       where: { id },
       relations: [
         'retailer',
+        'distributor',
+        'salesman',
         'order',
         'order.distributor',
+        'order.salesman',
         'items',
         'items.product',
         'items.productFlavour',
@@ -857,9 +860,9 @@ export class SaleReturnService {
       .getRepository(SaleReturn)
       .createQueryBuilder('sr')
       .innerJoinAndSelect('sr.retailer', 'r')
-      .leftJoinAndSelect('sr.order', 'o')
-      .leftJoinAndSelect('o.distributor', 'd')
-      .leftJoinAndSelect('o.salesman', 's');
+      .leftJoinAndSelect('sr.distributor', 'd')
+      .leftJoinAndSelect('sr.salesman', 's')
+      .leftJoinAndSelect('sr.order', 'o');
 
     if (statusFilter) {
       qb.andWhere('sr."returnStatus" = :returnStatus', {
@@ -889,7 +892,9 @@ export class SaleReturnService {
               search: `%${search}%`,
             })
             .orWhere('r."shopName" ILIKE :search', { search: `%${search}%` })
-            .orWhere('o."orderNumber" ILIKE :search', { search: `%${search}%` });
+            .orWhere('o."orderNumber" ILIKE :search', { search: `%${search}%` })
+            .orWhere('d.name ILIKE :search', { search: `%${search}%` })
+            .orWhere('s.name ILIKE :search', { search: `%${search}%` });
         }),
       );
     }
@@ -919,8 +924,12 @@ export class SaleReturnService {
         'sr.returnType',
         'sr.returnAmount',
         'sr.note',
+        'sr.distributorId',
+        'sr.salesmanId',
         'r.shopName',
+        'd.id',
         'd.name',
+        's.id',
         's.name',
         'o.orderNumber',
         'o.orderDate',
@@ -928,8 +937,6 @@ export class SaleReturnService {
         'o.createdAt',
         'o.executedDate',
         'o.deliveredDate',
-        'o.distributorId',
-        'o.salesmanId',
       ])
       .orderBy('sr.returnDate', 'DESC')
       .skip((page - 1) * limit)
