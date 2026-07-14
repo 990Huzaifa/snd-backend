@@ -34,6 +34,11 @@ export class CreateSaleReturnDto {
   @IsUUID()
   orderId?: string;
 
+  /** Optional on normal create; sync-up sets this from the authenticated salesman. */
+  @IsOptional()
+  @IsUUID()
+  salesmanId?: string;
+
   @IsOptional()
   @IsString()
   @MaxLength(1000)

@@ -181,18 +181,36 @@ export class SaleReturnService {
     manager: EntityManager,
     saleReturn: Pick<SaleReturn, 'returnType' | 'orderId' | 'retailerId'>,
   ): Promise<string> {
+    const resolved = await this.resolveDistributorAndSalesman(manager, saleReturn);
+    return resolved.distributorId;
+  }
+
+  /**
+   * distributorId always comes from the linked sale order (ORDER) or retailer route (RETAILER).
+   * salesmanId prefers an explicit value, otherwise the sale order salesman when present.
+   */
+  private async resolveDistributorAndSalesman(
+    manager: EntityManager,
+    saleReturn: Pick<SaleReturn, 'returnType' | 'orderId' | 'retailerId'>,
+    salesmanIdFromDto?: string | null,
+  ): Promise<{ distributorId: string; salesmanId: string | null }> {
+    let salesmanId: string | null = salesmanIdFromDto ?? null;
+
     if (saleReturn.returnType === ReturnType.ORDER) {
       if (!saleReturn.orderId) {
         throw new BadRequestException('Order id is required for order returns');
       }
       const order = await manager.getRepository(SaleOrder).findOne({
         where: { id: saleReturn.orderId },
-        select: ['id', 'distributorId'],
+        select: ['id', 'distributorId', 'salesmanId'],
       });
       if (!order) {
         throw new NotFoundException('Sale order not found');
       }
-      return order.distributorId;
+      if (!salesmanId) {
+        salesmanId = order.salesmanId ?? null;
+      }
+      return { distributorId: order.distributorId, salesmanId };
     }
 
     const retailer = await manager.getRepository(Retailer).findOne({
@@ -217,7 +235,10 @@ export class SaleReturnService {
       throw new NotFoundException('Distributor not found');
     }
 
-    return retailer.route.distributorId;
+    return {
+      distributorId: retailer.route.distributorId,
+      salesmanId,
+    };
   }
 
   private async getApprovedReturnedQuantities(
@@ -364,7 +385,9 @@ export class SaleReturnService {
       return;
     }
 
-    const distributorId = await this.resolveDistributorId(manager, saleReturn);
+    const distributorId =
+      saleReturn.distributorId ??
+      (await this.resolveDistributorId(manager, saleReturn));
 
     await this.stockService.applyOrderStockMovement(manager, {
       distributorId,
@@ -433,6 +456,9 @@ export class SaleReturnService {
     this.assertReturnTypeConsistency(dto);
     await this.ensureUser(tenantDb, user.userId);
     await this.ensureRetailer(tenantDb, dto.retailerId);
+    if (dto.salesmanId) {
+      await this.ensureUser(tenantDb, dto.salesmanId);
+    }
     await this.assertItems(tenantDb, dto.items);
 
     const initialStatus = dto.returnStatus ?? ReturnStatus.PENDING;
@@ -445,6 +471,17 @@ export class SaleReturnService {
         items: dto.items,
       });
 
+      const { distributorId, salesmanId } =
+        await this.resolveDistributorAndSalesman(
+          manager,
+          {
+            returnType: dto.returnType,
+            orderId: dto.orderId ?? null,
+            retailerId: dto.retailerId,
+          },
+          dto.salesmanId ?? null,
+        );
+
       const returnRepo = manager.getRepository(SaleReturn);
       const itemRepo = manager.getRepository(SaleReturnItem);
       const returnNumber = await this.nextReturnNumberWithManager(manager);
@@ -454,6 +491,8 @@ export class SaleReturnService {
         returnType: dto.returnType,
         returnDate: new Date(dto.returnDate),
         retailerId: dto.retailerId,
+        distributorId,
+        salesmanId,
         orderId: dto.returnType === ReturnType.ORDER ? dto.orderId! : null,
         note: dto.note?.trim() ?? null,
         returnAmount: dto.returnAmount,
@@ -577,6 +616,9 @@ export class SaleReturnService {
     if (dto.retailerId) {
       await this.ensureRetailer(tenantDb, dto.retailerId);
     }
+    if (dto.salesmanId) {
+      await this.ensureUser(tenantDb, dto.salesmanId);
+    }
     if (dto.items) {
       await this.assertItems(tenantDb, dto.items);
     }
@@ -601,8 +643,24 @@ export class SaleReturnService {
         excludeReturnId: id,
       });
 
+      const { distributorId, salesmanId } =
+        await this.resolveDistributorAndSalesman(
+          manager,
+          {
+            returnType: nextReturnType,
+            orderId:
+              nextReturnType === ReturnType.ORDER ? nextOrderId ?? null : null,
+            retailerId: nextRetailerId,
+          },
+          dto.salesmanId !== undefined
+            ? dto.salesmanId
+            : existing.salesmanId,
+        );
+
       existing.returnType = nextReturnType;
       existing.retailerId = nextRetailerId;
+      existing.distributorId = distributorId;
+      existing.salesmanId = salesmanId;
       existing.orderId =
         nextReturnType === ReturnType.ORDER ? nextOrderId ?? null : null;
       if (dto.returnDate !== undefined) {

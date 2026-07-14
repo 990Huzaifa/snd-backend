@@ -3,6 +3,8 @@ import { SaleOrder } from "./saleorder.entity";
 import { JoinColumn } from "typeorm";
 import { Product, ProductFlavour, ProductPricing } from "./product.entity";
 import { Retailer } from "./retailer.entity";
+import { Distributor } from "./distributor.entity";
+import { User } from "./user.entity";
 
 
 export enum ReturnType {
@@ -34,6 +36,20 @@ export class SaleReturn {
 
     @Column()
     retailerId: string;
+
+    @Column({nullable: true})
+    distributorId: string;
+
+    @ManyToOne(() => Distributor, { onDelete: 'RESTRICT' })
+    @JoinColumn({ name: 'distributorId' })
+    distributor: Distributor;
+
+    @Column({nullable: true})
+    salesmanId: string;
+
+    @ManyToOne(() => User, { onDelete: 'RESTRICT' })
+    @JoinColumn({ name: 'salesmanId' })
+    salesman: User;
 
     @ManyToOne(() => Retailer, { onDelete: 'RESTRICT' })
     @JoinColumn({ name: 'retailerId' })

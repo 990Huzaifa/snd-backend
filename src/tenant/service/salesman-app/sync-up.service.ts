@@ -816,7 +816,10 @@ export class SalesmanSyncUpService {
             try {
                 const created = await this.saleReturnService.create(
                     tenantDb,
-                    row.saleReturn,
+                    {
+                        ...row.saleReturn,
+                        salesmanId: user.userId,
+                    },
                     user,
                 );
 
