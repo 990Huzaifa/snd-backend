@@ -12,8 +12,8 @@ export class CreateSaleReturnItemDto {
   @IsUUID()
   productId: string;
 
-  @IsInt()
-  productFlavourId: number;
+  @IsUUID()
+  productFlavourId: string;
 
   @IsUUID()
   productPricingId: string;

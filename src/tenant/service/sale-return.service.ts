@@ -58,7 +58,7 @@ export class SaleReturnService {
 
   private stockLineKey(item: {
     productId: string;
-    productFlavourId: string | number;
+    productFlavourId: string;
     productPricingId: string;
   }): string {
     return `${item.productId}:${item.productFlavourId}:${item.productPricingId}`;
@@ -154,8 +154,8 @@ export class SaleReturnService {
     for (const item of items) {
       const flavour = await tenantDb.getRepository(ProductFlavour).findOne({
         where: {
-          id: item.productFlavourId.toString(),
-          productId: item.productId.toString(),
+          id: item.productFlavourId,
+          productId: item.productId,
         },
         select: ['id'],
       });
@@ -273,9 +273,9 @@ export class SaleReturnService {
   ): Promise<ResolvedReturnItem[]> {
     if (input.returnType === ReturnType.RETAILER) {
       return input.items.map((item) => ({
-        productId: item.productId.toString(),
-        productFlavourId: item.productFlavourId.toString(),
-        productPricingId: item.productPricingId.toString(),
+        productId: item.productId,
+        productFlavourId: item.productFlavourId,
+        productPricingId: item.productPricingId,
         orderedQuantity: item.orderedQuantity ?? 0,
         returnedQuantity: item.returnedQuantity,
         total: item.total,
@@ -334,9 +334,9 @@ export class SaleReturnService {
       }
 
       return {
-        productId: item.productId.toString(),
-        productFlavourId: item.productFlavourId.toString(),
-        productPricingId: item.productPricingId.toString(),
+        productId: item.productId,
+        productFlavourId: item.productFlavourId,
+        productPricingId: item.productPricingId,
         orderedQuantity: orderItem.quantity,
         returnedQuantity: item.returnedQuantity,
         total: item.total,
@@ -591,7 +591,7 @@ export class SaleReturnService {
         orderId: nextOrderId,
         items: dto.items ?? existing.items.map((item) => ({
           productId: item.productId,
-          productFlavourId: Number(item.productFlavourId),
+          productFlavourId: item.productFlavourId,
           productPricingId: item.productPricingId,
           orderedQuantity: item.orderedQuantity,
           returnedQuantity: item.returnedQuantity,

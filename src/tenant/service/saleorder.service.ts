@@ -115,7 +115,7 @@ export class SaleOrderService {
   private async assertItems(tenantDb: DataSource, items: CreateSaleOrderDto['items']) {
     for (const item of items) {
       const flavour = await tenantDb.getRepository(ProductFlavour).findOne({
-        where: { id: item.productFlavourId.toString(), productId: item.productId.toString() },
+        where: { id: item.productFlavourId, productId: item.productId },
         select: ['id'],
       });
       if (!flavour) {
@@ -169,7 +169,7 @@ export class SaleOrderService {
 
   private stockLineKey(item: {
     productId: string;
-    productFlavourId: string | number;
+    productFlavourId: string;
     productPricingId: string;
   }): string {
     return `${item.productId}:${item.productFlavourId}:${item.productPricingId}`;
@@ -178,15 +178,15 @@ export class SaleOrderService {
   private mapItemsForStock(
     items: Array<{
       productId: string;
-      productFlavourId: string | number;
+      productFlavourId: string;
       productPricingId: string;
       quantity: number;
     }>,
   ) {
     return items.map((item) => ({
-      productId: item.productId.toString(),
-      productFlavourId: item.productFlavourId.toString(),
-      productPricingId: item.productPricingId.toString(),
+      productId: item.productId,
+      productFlavourId: item.productFlavourId,
+      productPricingId: item.productPricingId,
       quantity: item.quantity,
     }));
   }
@@ -429,9 +429,9 @@ export class SaleOrderService {
         dto.items.map((item) =>
           itemRepo.create({
             saleOrderId: order.id,
-            productId: item.productId.toString(),
-            productFlavourId: item.productFlavourId.toString(),
-            productPricingId: item.productPricingId.toString(),
+            productId: item.productId,
+            productFlavourId: item.productFlavourId,
+            productPricingId: item.productPricingId,
             schemeId: item.schemeId ?? null,
             slabId: item.schemeSlabId ?? null,
             quantity: item.quantity,
@@ -572,9 +572,9 @@ export class SaleOrderService {
           dto.items.map((item) =>
             itemRepo.create({
               saleOrderId: id,
-              productId: item.productId.toString(),
-              productFlavourId: item.productFlavourId.toString(),
-              productPricingId: item.productPricingId.toString(),
+              productId: item.productId,
+              productFlavourId: item.productFlavourId,
+              productPricingId: item.productPricingId,
               schemeId: item.schemeId ?? null,
               slabId: item.schemeSlabId ?? null,
               quantity: item.quantity,
