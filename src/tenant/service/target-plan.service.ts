@@ -17,7 +17,11 @@ import {
 } from 'src/tenant-db/entities/target-plan.entity';
 import { User } from 'src/tenant-db/entities/user.entity';
 import { Product, ProductCategory } from 'src/tenant-db/entities/product.entity';
-import { SaleInvoice, SaleInvoiceItem } from 'src/tenant-db/entities/sale-invoice.entity';
+import {
+    OrderStatus,
+    SaleOrder,
+    SaleOrderItem,
+} from 'src/tenant-db/entities/saleorder.entity';
 import { Retailer, RetailerVisit } from 'src/tenant-db/entities/retailer.entity';
 import { ActivityLogService } from './activity-log.service';
 import { MasterGeoHelperService } from './master-geo-helper.service';
@@ -33,6 +37,12 @@ import { AssignTargetPlanDto } from '../dto/target-plan/assign-target-plan.dto';
 import { RemoveTargetPlanAssigneesDto } from '../dto/target-plan/remove-target-plan-assignees.dto';
 
 type AssigneeInput = CreateTargetPlanAssigneeDto;
+
+const COUNTABLE_SALE_ORDER_STATUSES = [
+    OrderStatus.APPROVED,
+    OrderStatus.PROCESSING,
+    OrderStatus.DELIVERED,
+] as const;
 
 @Injectable()
 export class TargetPlanService {
@@ -712,6 +722,12 @@ export class TargetPlanService {
         return { success: true };
     }
 
+    private endOfDay(date: Date): Date {
+        const end = new Date(date);
+        end.setHours(23, 59, 59, 999);
+        return end;
+    }
+
     private async computeAchievementValue(
         tenantDb: DataSource,
         metric: TargetMetricEntity,
@@ -719,15 +735,20 @@ export class TargetPlanService {
         startDate: Date,
         endDate: Date,
     ): Promise<number> {
+        const rangeEnd = this.endOfDay(endDate);
+
         switch (metric.metricType) {
             case MetricType.SALES_VALUE: {
                 const result = await tenantDb
-                    .getRepository(SaleInvoice)
-                    .createQueryBuilder('invoice')
-                    .select('COALESCE(SUM(invoice.totalAmount), 0)', 'total')
-                    .where('invoice.salesmanId = :assigneeId', { assigneeId })
-                    .andWhere('invoice.invoiceDate >= :startDate', { startDate })
-                    .andWhere('invoice.invoiceDate <= :endDate', { endDate })
+                    .getRepository(SaleOrder)
+                    .createQueryBuilder('saleOrder')
+                    .select('COALESCE(SUM(saleOrder.totalAmount), 0)', 'total')
+                    .where('saleOrder.salesmanId = :assigneeId', { assigneeId })
+                    .andWhere('saleOrder.orderStatus IN (:...statuses)', {
+                        statuses: COUNTABLE_SALE_ORDER_STATUSES,
+                    })
+                    .andWhere('saleOrder.orderDate >= :startDate', { startDate })
+                    .andWhere('saleOrder.orderDate <= :endDate', { endDate: rangeEnd })
                     .getRawOne<{ total: string }>();
                 return Number(result?.total ?? 0);
             }
@@ -739,13 +760,16 @@ export class TargetPlanService {
                     return 0;
                 }
                 const result = await tenantDb
-                    .getRepository(SaleInvoiceItem)
+                    .getRepository(SaleOrderItem)
                     .createQueryBuilder('item')
-                    .innerJoin('item.saleInvoice', 'invoice')
+                    .innerJoin('item.saleOrder', 'saleOrder')
                     .select('COALESCE(SUM(item.quantity), 0)', 'total')
-                    .where('invoice.salesmanId = :assigneeId', { assigneeId })
-                    .andWhere('invoice.invoiceDate >= :startDate', { startDate })
-                    .andWhere('invoice.invoiceDate <= :endDate', { endDate })
+                    .where('saleOrder.salesmanId = :assigneeId', { assigneeId })
+                    .andWhere('saleOrder.orderStatus IN (:...statuses)', {
+                        statuses: COUNTABLE_SALE_ORDER_STATUSES,
+                    })
+                    .andWhere('saleOrder.orderDate >= :startDate', { startDate })
+                    .andWhere('saleOrder.orderDate <= :endDate', { endDate: rangeEnd })
                     .andWhere('item.productId IN (:...productIds)', { productIds })
                     .getRawOne<{ total: string }>();
                 return Number(result?.total ?? 0);
@@ -758,14 +782,17 @@ export class TargetPlanService {
                     return 0;
                 }
                 const result = await tenantDb
-                    .getRepository(SaleInvoiceItem)
+                    .getRepository(SaleOrderItem)
                     .createQueryBuilder('item')
-                    .innerJoin('item.saleInvoice', 'invoice')
+                    .innerJoin('item.saleOrder', 'saleOrder')
                     .innerJoin('item.product', 'product')
                     .select('COALESCE(SUM(item.quantity), 0)', 'total')
-                    .where('invoice.salesmanId = :assigneeId', { assigneeId })
-                    .andWhere('invoice.invoiceDate >= :startDate', { startDate })
-                    .andWhere('invoice.invoiceDate <= :endDate', { endDate })
+                    .where('saleOrder.salesmanId = :assigneeId', { assigneeId })
+                    .andWhere('saleOrder.orderStatus IN (:...statuses)', {
+                        statuses: COUNTABLE_SALE_ORDER_STATUSES,
+                    })
+                    .andWhere('saleOrder.orderDate >= :startDate', { startDate })
+                    .andWhere('saleOrder.orderDate <= :endDate', { endDate: rangeEnd })
                     .andWhere('product.categoryId IN (:...categoryIds)', { categoryIds })
                     .getRawOne<{ total: string }>();
                 return Number(result?.total ?? 0);
@@ -776,7 +803,7 @@ export class TargetPlanService {
                     .createQueryBuilder('visit')
                     .where('visit.userId = :assigneeId', { assigneeId })
                     .andWhere('visit.createdAt >= :startDate', { startDate })
-                    .andWhere('visit.createdAt <= :endDate', { endDate })
+                    .andWhere('visit.createdAt <= :endDate', { endDate: rangeEnd })
                     .getCount();
             }
             case MetricType.NEW_RETAILERS: {
@@ -785,7 +812,7 @@ export class TargetPlanService {
                     .createQueryBuilder('retailer')
                     .where('retailer.createdBy = :assigneeId', { assigneeId })
                     .andWhere('retailer.createdAt >= :startDate', { startDate })
-                    .andWhere('retailer.createdAt <= :endDate', { endDate })
+                    .andWhere('retailer.createdAt <= :endDate', { endDate: rangeEnd })
                     .getCount();
                 return count;
             }
