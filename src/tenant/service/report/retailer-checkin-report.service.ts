@@ -301,16 +301,24 @@ export class RetailerCheckInReportService {
     const rows = (await this.buildCheckInFilterQuery(tenantDb, filters)
       .select('"user".id', 'key')
       .addSelect('"user".name', 'label')
+      .addSelect('"user".type', 'userType')
       .addSelect('COUNT(DISTINCT ra.id)::int', 'cnt')
       .groupBy('"user".id')
       .addGroupBy('"user".name')
+      .addGroupBy('"user".type')
       .orderBy('COUNT(DISTINCT ra.id)', 'DESC')
       .limit(limit)
-      .getRawMany()) as Array<{ key: string; label: string; cnt: string }>;
+      .getRawMany()) as Array<{
+      key: string;
+      label: string;
+      userType: string;
+      cnt: string;
+    }>;
 
     return rows.map((row) => ({
       userId: row.key,
       userName: row.label,
+      userType: row.userType,
       count: this.toNumber(row.cnt),
     }));
   }
