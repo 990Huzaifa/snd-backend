@@ -12,7 +12,7 @@ import {
 
 export enum RetailerCheckInReportType {
   DAY_WISE = 'DAY_WISE',
-  SALESMAN_WISE = 'SALESMAN_WISE',
+  USER_WISE = 'USER_WISE',
   ROUTE_WISE = 'ROUTE_WISE',
   RETAILER_WISE = 'RETAILER_WISE',
 }
@@ -24,7 +24,7 @@ export class RetailerCheckInReportDto {
 
   @IsOptional()
   @IsUUID()
-  salesmanId?: string;
+  userId?: string;
 
   @IsOptional()
   @IsUUID()

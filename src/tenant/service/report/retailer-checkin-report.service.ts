@@ -1,6 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { Brackets, DataSource, In, SelectQueryBuilder } from 'typeorm';
-import { PJPRoute } from 'src/tenant-db/entities/pjp.entity';
 import { RetailerAttendence } from 'src/tenant-db/entities/retailer.entity';
 import {
   RetailerCheckInReportDto,
@@ -9,7 +8,7 @@ import {
 import { ActivityLogService } from '../activity-log.service';
 
 type CheckInFilterInput = {
-  salesmanId: string | null;
+  userId: string | null;
   routeId: string | null;
   distributorId: string | null;
   areaId: string | null;
@@ -22,7 +21,7 @@ type SummaryRow = {
   totalCheckIns: string;
   uniqueRetailers: string;
   uniqueRoutes: string;
-  uniqueSalesmen: string;
+  uniqueUsers: string;
 };
 
 type ChartCountRow = {
@@ -97,7 +96,7 @@ export class RetailerCheckInReportService {
     }
 
     return {
-      salesmanId: (dto.salesmanId ?? '').trim() || null,
+      userId: (dto.userId ?? '').trim() || null,
       routeId: (dto.routeId ?? '').trim() || null,
       distributorId: (dto.distributorId ?? '').trim() || null,
       areaId: (dto.areaId ?? '').trim() || null,
@@ -107,29 +106,23 @@ export class RetailerCheckInReportService {
     };
   }
 
-  private readonly pjpRouteJoinOn = `
-    "pjpRoute"."routeId" = "retailer"."routeId"
-    AND DATE("pjpRoute"."visitDate") = DATE(ra."attendenceDate")
-  `;
-
   private applyCheckInJoins(qb: SelectQueryBuilder<RetailerAttendence>) {
     return qb
+      .innerJoin('ra.user', 'user')
       .innerJoin('ra.retailer', 'retailer')
       .innerJoin('retailer.route', 'route')
       .innerJoin('route.area', 'area')
       .innerJoin('route.distributor', 'distributor')
-      .leftJoin(PJPRoute, 'pjpRoute', this.pjpRouteJoinOn)
-      .leftJoin('pjpRoute.pjp', 'pjp')
-      .leftJoin('pjp.salesman', 'salesman');
+      .leftJoin('user.designation', 'designation');
   }
 
   private applyCheckInFilters(
     qb: SelectQueryBuilder<RetailerAttendence>,
     filters: CheckInFilterInput,
   ) {
-    if (filters.salesmanId) {
-      qb.andWhere('salesman.id = :salesmanId', {
-        salesmanId: filters.salesmanId,
+    if (filters.userId) {
+      qb.andWhere('ra."userId" = :userId', {
+        userId: filters.userId,
       });
     }
 
@@ -174,10 +167,10 @@ export class RetailerCheckInReportService {
             .orWhere('route.name ILIKE :search', {
               search: `%${filters.search}%`,
             })
-            .orWhere('salesman.name ILIKE :search', {
+            .orWhere('"user".name ILIKE :search', {
               search: `%${filters.search}%`,
             })
-            .orWhere('salesman.code ILIKE :search', {
+            .orWhere('"user".code ILIKE :search', {
               search: `%${filters.search}%`,
             });
         }),
@@ -217,7 +210,7 @@ export class RetailerCheckInReportService {
       .select('COUNT(DISTINCT ra.id)::int', 'totalCheckIns')
       .addSelect('COUNT(DISTINCT ra."retailerId")::int', 'uniqueRetailers')
       .addSelect('COUNT(DISTINCT retailer."routeId")::int', 'uniqueRoutes')
-      .addSelect('COUNT(DISTINCT salesman.id)::int', 'uniqueSalesmen')
+      .addSelect('COUNT(DISTINCT ra."userId")::int', 'uniqueUsers')
       .getRawOne()) as SummaryRow;
 
     const totalCheckIns = this.toNumber(summary?.totalCheckIns);
@@ -227,7 +220,7 @@ export class RetailerCheckInReportService {
       totalCheckIns,
       uniqueRetailers: this.toNumber(summary?.uniqueRetailers),
       uniqueRoutes: this.toNumber(summary?.uniqueRoutes),
-      uniqueSalesmen: this.toNumber(summary?.uniqueSalesmen),
+      uniqueUsers: this.toNumber(summary?.uniqueUsers),
       avgCheckInsPerDay:
         daySpan > 0 ? Math.round((totalCheckIns / daySpan) * 100) / 100 : 0,
     };
@@ -300,25 +293,24 @@ export class RetailerCheckInReportService {
     }));
   }
 
-  private async fetchSalesmanChart(
+  private async fetchUserChart(
     tenantDb: DataSource,
     filters: CheckInFilterInput,
     limit = 10,
   ) {
     const rows = (await this.buildCheckInFilterQuery(tenantDb, filters)
-      .select('salesman.id', 'key')
-      .addSelect('salesman.name', 'label')
+      .select('"user".id', 'key')
+      .addSelect('"user".name', 'label')
       .addSelect('COUNT(DISTINCT ra.id)::int', 'cnt')
-      .andWhere('salesman.id IS NOT NULL')
-      .groupBy('salesman.id')
-      .addGroupBy('salesman.name')
+      .groupBy('"user".id')
+      .addGroupBy('"user".name')
       .orderBy('COUNT(DISTINCT ra.id)', 'DESC')
       .limit(limit)
       .getRawMany()) as Array<{ key: string; label: string; cnt: string }>;
 
     return rows.map((row) => ({
-      salesmanId: row.key,
-      salesmanName: row.label,
+      userId: row.key,
+      userName: row.label,
       count: this.toNumber(row.cnt),
     }));
   }
@@ -377,14 +369,13 @@ export class RetailerCheckInReportService {
       .addSelect('COUNT(DISTINCT ra."retailerId")::int', 'uniqueRetailers');
 
     switch (reportType) {
-      case RetailerCheckInReportType.SALESMAN_WISE:
+      case RetailerCheckInReportType.USER_WISE:
         groupQb
-          .addSelect('salesman.id', 'key')
-          .addSelect('salesman.name', 'label')
-          .andWhere('salesman.id IS NOT NULL')
-          .groupBy('salesman.id')
-          .addGroupBy('salesman.name')
-          .orderBy('salesman.name', 'ASC');
+          .addSelect('"user".id', 'key')
+          .addSelect('"user".name', 'label')
+          .groupBy('"user".id')
+          .addGroupBy('"user".name')
+          .orderBy('"user".name', 'ASC');
         break;
       case RetailerCheckInReportType.ROUTE_WISE:
         groupQb
@@ -422,55 +413,6 @@ export class RetailerCheckInReportService {
     }));
   }
 
-  private async fetchSalesmanMap(
-    tenantDb: DataSource,
-    checkInIds: string[],
-  ): Promise<
-    Map<
-      string,
-      { id: string; name: string; code: string; type: string } | null
-    >
-  > {
-    if (!checkInIds.length) {
-      return new Map();
-    }
-
-    const rows = await tenantDb
-      .getRepository(RetailerAttendence)
-      .createQueryBuilder('ra')
-      .select('ra.id', 'checkInId')
-      .addSelect('salesman.id', 'salesmanId')
-      .addSelect('salesman.name', 'salesmanName')
-      .addSelect('salesman.code', 'salesmanCode')
-      .addSelect('salesman.type', 'salesmanType')
-      .innerJoin('ra.retailer', 'retailer')
-      .leftJoin(PJPRoute, 'pjpRoute', this.pjpRouteJoinOn)
-      .leftJoin('pjpRoute.pjp', 'pjp')
-      .leftJoin('pjp.salesman', 'salesman')
-      .where('ra.id IN (:...checkInIds)', { checkInIds })
-      .getRawMany<{
-        checkInId: string;
-        salesmanId: string | null;
-        salesmanName: string | null;
-        salesmanCode: string | null;
-        salesmanType: string | null;
-      }>();
-
-    return new Map(
-      rows.map((row) => [
-        row.checkInId,
-        row.salesmanId
-          ? {
-              id: row.salesmanId,
-              name: row.salesmanName ?? '',
-              code: row.salesmanCode ?? '',
-              type: row.salesmanType ?? '',
-            }
-          : null,
-      ]),
-    );
-  }
-
   async getOverview(
     tenantDb: DataSource,
     dto: RetailerCheckInReportDto,
@@ -487,7 +429,7 @@ export class RetailerCheckInReportService {
       total,
       trend,
       byRoute,
-      bySalesman,
+      byUser,
       byDayOfWeek,
       byHour,
     ] = await Promise.all([
@@ -496,7 +438,7 @@ export class RetailerCheckInReportService {
       this.countCheckIns(tenantDb, filters),
       this.fetchTrendChart(tenantDb, filters),
       this.fetchRouteChart(tenantDb, filters),
-      this.fetchSalesmanChart(tenantDb, filters),
+      this.fetchUserChart(tenantDb, filters),
       this.fetchDayOfWeekChart(tenantDb, filters),
       this.fetchHourlyChart(tenantDb, filters),
     ]);
@@ -518,6 +460,8 @@ export class RetailerCheckInReportService {
       ? await tenantDb.getRepository(RetailerAttendence).find({
           where: { id: In(checkInIds) },
           relations: [
+            'user',
+            'user.designation',
             'retailer',
             'retailer.route',
             'retailer.route.area',
@@ -530,11 +474,6 @@ export class RetailerCheckInReportService {
     const orderedCheckIns = checkInIds
       .map((id) => checkInById.get(id))
       .filter((checkIn): checkIn is RetailerAttendence => Boolean(checkIn));
-
-    const salesmanMap = await this.fetchSalesmanMap(
-      tenantDb,
-      orderedCheckIns.map((checkIn) => checkIn.id),
-    );
 
     const checkInRows = orderedCheckIns.map((checkIn) => ({
       id: checkIn.id,
@@ -564,7 +503,20 @@ export class RetailerCheckInReportService {
         id: checkIn.retailer.route.distributor.id,
         name: checkIn.retailer.route.distributor.name,
       },
-      salesman: salesmanMap.get(checkIn.id) ?? null,
+      user: checkIn.user
+        ? {
+            id: checkIn.user.id,
+            name: checkIn.user.name,
+            code: checkIn.user.code,
+            type: checkIn.user.type,
+            designation: checkIn.user.designation
+              ? {
+                  id: checkIn.user.designation.id,
+                  name: checkIn.user.designation.name,
+                }
+              : null,
+          }
+        : null,
     }));
 
     await this.activityLogService.recordActivityLog(tenantDb, {
@@ -582,7 +534,7 @@ export class RetailerCheckInReportService {
     return {
       filters: {
         reportType,
-        salesmanId: filters.salesmanId,
+        userId: filters.userId,
         routeId: filters.routeId,
         distributorId: filters.distributorId,
         areaId: filters.areaId,
@@ -594,7 +546,7 @@ export class RetailerCheckInReportService {
       charts: {
         trend,
         byRoute,
-        bySalesman,
+        byUser,
         byDayOfWeek,
         byHour,
       },
