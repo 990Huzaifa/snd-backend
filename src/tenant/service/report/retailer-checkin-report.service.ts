@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { Brackets, DataSource, SelectQueryBuilder } from 'typeorm';
+import { Brackets, DataSource, In, SelectQueryBuilder } from 'typeorm';
 import { PJPRoute } from 'src/tenant-db/entities/pjp.entity';
 import { RetailerAttendence } from 'src/tenant-db/entities/retailer.entity';
 import {
@@ -107,17 +107,18 @@ export class RetailerCheckInReportService {
     };
   }
 
+  private readonly pjpRouteJoinOn = `
+    "pjpRoute"."routeId" = "retailer"."routeId"
+    AND DATE("pjpRoute"."visitDate") = DATE(ra."attendenceDate")
+  `;
+
   private applyCheckInJoins(qb: SelectQueryBuilder<RetailerAttendence>) {
     return qb
       .innerJoin('ra.retailer', 'retailer')
       .innerJoin('retailer.route', 'route')
       .innerJoin('route.area', 'area')
       .innerJoin('route.distributor', 'distributor')
-      .leftJoin(
-        PJPRoute,
-        'pjpRoute',
-        `pjpRoute.routeId = retailer.routeId AND DATE(pjpRoute.visitDate) = DATE(ra.attendenceDate)`,
-      )
+      .leftJoin(PJPRoute, 'pjpRoute', this.pjpRouteJoinOn)
       .leftJoin('pjpRoute.pjp', 'pjp')
       .leftJoin('pjp.salesman', 'salesman');
   }
@@ -198,26 +199,14 @@ export class RetailerCheckInReportService {
     return this.applyCheckInFilters(qb, filters);
   }
 
-  private buildCheckInListQuery(
+  private async countCheckIns(
     tenantDb: DataSource,
     filters: CheckInFilterInput,
-  ) {
-    const qb = tenantDb
-      .getRepository(RetailerAttendence)
-      .createQueryBuilder('ra')
-      .innerJoinAndSelect('ra.retailer', 'retailer')
-      .innerJoinAndSelect('retailer.route', 'route')
-      .innerJoinAndSelect('route.area', 'area')
-      .innerJoinAndSelect('route.distributor', 'distributor')
-      .leftJoin(
-        PJPRoute,
-        'pjpRoute',
-        `pjpRoute.routeId = retailer.routeId AND DATE(pjpRoute.visitDate) = DATE(ra.attendenceDate)`,
-      )
-      .leftJoin('pjpRoute.pjp', 'pjp')
-      .leftJoin('pjp.salesman', 'salesman');
-
-    return this.applyCheckInFilters(qb, filters);
+  ): Promise<number> {
+    const row = await this.buildCheckInFilterQuery(tenantDb, filters)
+      .select('COUNT(DISTINCT ra.id)', 'cnt')
+      .getRawOne<{ cnt: string }>();
+    return this.toNumber(row?.cnt);
   }
 
   private async fetchSummary(
@@ -225,7 +214,7 @@ export class RetailerCheckInReportService {
     filters: CheckInFilterInput,
   ) {
     const summary = (await this.buildCheckInFilterQuery(tenantDb, filters)
-      .select('COUNT(ra.id)::int', 'totalCheckIns')
+      .select('COUNT(DISTINCT ra.id)::int', 'totalCheckIns')
       .addSelect('COUNT(DISTINCT ra."retailerId")::int', 'uniqueRetailers')
       .addSelect('COUNT(DISTINCT retailer."routeId")::int', 'uniqueRoutes')
       .addSelect('COUNT(DISTINCT salesman.id)::int', 'uniqueSalesmen')
@@ -277,7 +266,7 @@ export class RetailerCheckInReportService {
     const rows = (await this.buildCheckInFilterQuery(tenantDb, filters)
       .select(`TO_CHAR(ra."attendenceDate", 'YYYY-MM-DD')`, 'key')
       .addSelect(`TO_CHAR(ra."attendenceDate", 'YYYY-MM-DD')`, 'label')
-      .addSelect('COUNT(ra.id)::int', 'count')
+      .addSelect('COUNT(DISTINCT ra.id)::int', 'count')
       .groupBy(`TO_CHAR(ra."attendenceDate", 'YYYY-MM-DD')`)
       .orderBy(`TO_CHAR(ra."attendenceDate", 'YYYY-MM-DD')`, 'ASC')
       .getRawMany()) as ChartCountRow[];
@@ -297,17 +286,17 @@ export class RetailerCheckInReportService {
     const rows = (await this.buildCheckInFilterQuery(tenantDb, filters)
       .select('route.id', 'key')
       .addSelect('route.name', 'label')
-      .addSelect('COUNT(ra.id)::int', 'count')
+      .addSelect('COUNT(DISTINCT ra.id)::int', 'cnt')
       .groupBy('route.id')
       .addGroupBy('route.name')
-      .orderBy('count', 'DESC')
+      .orderBy('COUNT(DISTINCT ra.id)', 'DESC')
       .limit(limit)
-      .getRawMany()) as ChartCountRow[];
+      .getRawMany()) as Array<{ key: string; label: string; cnt: string }>;
 
     return rows.map((row) => ({
       routeId: row.key,
       routeName: row.label,
-      count: this.toNumber(row.count),
+      count: this.toNumber(row.cnt),
     }));
   }
 
@@ -319,18 +308,18 @@ export class RetailerCheckInReportService {
     const rows = (await this.buildCheckInFilterQuery(tenantDb, filters)
       .select('salesman.id', 'key')
       .addSelect('salesman.name', 'label')
-      .addSelect('COUNT(ra.id)::int', 'count')
+      .addSelect('COUNT(DISTINCT ra.id)::int', 'cnt')
       .andWhere('salesman.id IS NOT NULL')
       .groupBy('salesman.id')
       .addGroupBy('salesman.name')
-      .orderBy('count', 'DESC')
+      .orderBy('COUNT(DISTINCT ra.id)', 'DESC')
       .limit(limit)
-      .getRawMany()) as ChartCountRow[];
+      .getRawMany()) as Array<{ key: string; label: string; cnt: string }>;
 
     return rows.map((row) => ({
       salesmanId: row.key,
       salesmanName: row.label,
-      count: this.toNumber(row.count),
+      count: this.toNumber(row.cnt),
     }));
   }
 
@@ -340,13 +329,13 @@ export class RetailerCheckInReportService {
   ) {
     const rows = await this.buildCheckInFilterQuery(tenantDb, filters)
       .select('EXTRACT(DOW FROM ra."attendenceDate")::int', 'dayIndex')
-      .addSelect('COUNT(ra.id)::int', 'count')
+      .addSelect('COUNT(DISTINCT ra.id)::int', 'cnt')
       .groupBy('EXTRACT(DOW FROM ra."attendenceDate")')
-      .orderBy('dayIndex', 'ASC')
-      .getRawMany<{ dayIndex: string; count: string }>();
+      .orderBy('EXTRACT(DOW FROM ra."attendenceDate")', 'ASC')
+      .getRawMany<{ dayIndex: string; cnt: string }>();
 
     const countByDay = new Map(
-      rows.map((row) => [this.toNumber(row.dayIndex), this.toNumber(row.count)]),
+      rows.map((row) => [this.toNumber(row.dayIndex), this.toNumber(row.cnt)]),
     );
 
     return DAY_OF_WEEK_LABELS.map((label, dayIndex) => ({
@@ -362,13 +351,13 @@ export class RetailerCheckInReportService {
   ) {
     const rows = await this.buildCheckInFilterQuery(tenantDb, filters)
       .select('EXTRACT(HOUR FROM ra."createdAt")::int', 'hour')
-      .addSelect('COUNT(ra.id)::int', 'count')
+      .addSelect('COUNT(DISTINCT ra.id)::int', 'cnt')
       .groupBy('EXTRACT(HOUR FROM ra."createdAt")')
-      .orderBy('hour', 'ASC')
-      .getRawMany<{ hour: string; count: string }>();
+      .orderBy('EXTRACT(HOUR FROM ra."createdAt")', 'ASC')
+      .getRawMany<{ hour: string; cnt: string }>();
 
     const countByHour = new Map(
-      rows.map((row) => [this.toNumber(row.hour), this.toNumber(row.count)]),
+      rows.map((row) => [this.toNumber(row.hour), this.toNumber(row.cnt)]),
     );
 
     return Array.from({ length: 24 }, (_, hour) => ({
@@ -384,7 +373,7 @@ export class RetailerCheckInReportService {
     reportType: RetailerCheckInReportType,
   ) {
     const groupQb = this.buildCheckInFilterQuery(tenantDb, filters)
-      .select('COUNT(ra.id)::int', 'totalCheckIns')
+      .select('COUNT(DISTINCT ra.id)::int', 'totalCheckIns')
       .addSelect('COUNT(DISTINCT ra."retailerId")::int', 'uniqueRetailers');
 
     switch (reportType) {
@@ -455,11 +444,7 @@ export class RetailerCheckInReportService {
       .addSelect('salesman.code', 'salesmanCode')
       .addSelect('salesman.type', 'salesmanType')
       .innerJoin('ra.retailer', 'retailer')
-      .leftJoin(
-        PJPRoute,
-        'pjpRoute',
-        `pjpRoute.routeId = retailer.routeId AND DATE(pjpRoute.visitDate) = DATE(ra.attendenceDate)`,
-      )
+      .leftJoin(PJPRoute, 'pjpRoute', this.pjpRouteJoinOn)
       .leftJoin('pjpRoute.pjp', 'pjp')
       .leftJoin('pjp.salesman', 'salesman')
       .where('ra.id IN (:...checkInIds)', { checkInIds })
@@ -508,7 +493,7 @@ export class RetailerCheckInReportService {
     ] = await Promise.all([
       this.fetchSummary(tenantDb, filters),
       this.fetchGroups(tenantDb, filters, reportType),
-      this.buildCheckInFilterQuery(tenantDb, filters).getCount(),
+      this.countCheckIns(tenantDb, filters),
       this.fetchTrendChart(tenantDb, filters),
       this.fetchRouteChart(tenantDb, filters),
       this.fetchSalesmanChart(tenantDb, filters),
@@ -516,19 +501,42 @@ export class RetailerCheckInReportService {
       this.fetchHourlyChart(tenantDb, filters),
     ]);
 
-    const checkIns = await this.buildCheckInListQuery(tenantDb, filters)
-      .orderBy('ra.attendenceDate', 'DESC')
-      .addOrderBy('ra.createdAt', 'DESC')
-      .skip((page - 1) * limit)
-      .take(limit)
-      .getMany();
+    const checkInIds = (
+      await this.buildCheckInFilterQuery(tenantDb, filters)
+        .select('ra.id', 'id')
+        .addSelect('MAX(ra."attendenceDate")', 'attendenceDate')
+        .addSelect('MAX(ra."createdAt")', 'createdAt')
+        .groupBy('ra.id')
+        .orderBy('MAX(ra."attendenceDate")', 'DESC')
+        .addOrderBy('MAX(ra."createdAt")', 'DESC')
+        .offset((page - 1) * limit)
+        .limit(limit)
+        .getRawMany<{ id: string }>()
+    ).map((row) => row.id);
+
+    const checkIns = checkInIds.length
+      ? await tenantDb.getRepository(RetailerAttendence).find({
+          where: { id: In(checkInIds) },
+          relations: [
+            'retailer',
+            'retailer.route',
+            'retailer.route.area',
+            'retailer.route.distributor',
+          ],
+        })
+      : [];
+
+    const checkInById = new Map(checkIns.map((checkIn) => [checkIn.id, checkIn]));
+    const orderedCheckIns = checkInIds
+      .map((id) => checkInById.get(id))
+      .filter((checkIn): checkIn is RetailerAttendence => Boolean(checkIn));
 
     const salesmanMap = await this.fetchSalesmanMap(
       tenantDb,
-      checkIns.map((checkIn) => checkIn.id),
+      orderedCheckIns.map((checkIn) => checkIn.id),
     );
 
-    const checkInRows = checkIns.map((checkIn) => ({
+    const checkInRows = orderedCheckIns.map((checkIn) => ({
       id: checkIn.id,
       attendenceDate: checkIn.attendenceDate,
       checkInTime: checkIn.createdAt,

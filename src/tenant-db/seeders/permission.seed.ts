@@ -72,6 +72,7 @@ export const TENANT_PERMISSIONS = [
   { code: 'VIEW_INVENTORY_REPORT', name: 'View Inventory Report' },
   { code: 'VIEW_RETAILER_VISIT_REPORT', name: 'View Retailer Visit Report' },
   { code: 'VIEW_RETAILER_CHECKIN_REPORT', name: 'View Retailer Check-In Report' },
+  { code: 'VIEW_RETAILER_MERCHANDISING_REPORT', name: 'View Retailer Merchandising Report' },
 
   { code: 'UPDATE_USER', name: 'Update Users' },
   { code: 'UPDATE_ROLE', name: 'Update Role' },
