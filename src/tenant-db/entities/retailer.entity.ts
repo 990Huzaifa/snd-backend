@@ -292,6 +292,13 @@ export class RetailerAttendence {
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
+    @Column({comment: 'Salesman ID, MERCHANDISER ID, etc.'})
+    userId: string;
+
+    @ManyToOne(() => User, { onDelete: 'RESTRICT' })
+    @JoinColumn({ name: 'userId' })
+    user: User;
+
     @Column()
     retailerId: string;
 

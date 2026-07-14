@@ -810,6 +810,7 @@ export class RetailerVisitService {
         row,
         label,
         entity: {
+          userId: user.userId,
           retailerId: row.checkIn.retailerId,
           attendenceDate: today,
           checkinLatitude: row.checkIn.checkInLatitude,
