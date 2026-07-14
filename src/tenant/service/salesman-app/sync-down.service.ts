@@ -7,6 +7,7 @@ import {
   RetailerCategory,
   RetailerChannel,
   RetailerLedger,
+  Status,
 } from 'src/tenant-db/entities/retailer.entity';
 import { Route } from 'src/tenant-db/entities/route.entity';
 import { Scheme } from 'src/tenant-db/entities/scheme.entity';
@@ -169,6 +170,7 @@ export class SalesmanSyncDownService {
     const retailers = await tenantDb.getRepository(Retailer).find({
       relations: [...RETAILER_RELATIONS],
       order: { shopName: 'ASC' },
+      where: { status: Status.ACTIVE },
     });
 
     if (!retailers.length) {
