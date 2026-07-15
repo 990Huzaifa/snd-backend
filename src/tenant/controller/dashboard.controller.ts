@@ -12,6 +12,8 @@ import {
   DashboardOrdersQueryDto,
   DashboardOverviewQueryDto,
   DashboardSalesQueryDto,
+  DashboardTargetAchievementGroupBy,
+  DashboardTargetAchievementQueryDto,
 } from '../dto/dashboard/dashboard.dto';
 import { DashboardService } from '../service/dashboard.service';
 
@@ -89,6 +91,20 @@ export class DashboardController {
     @Req() req: Request,
   ) {
     return this.dashboardService.getAttendanceLive(
+      tenantDb,
+      query,
+      req.user as { userId: string },
+    );
+  }
+
+  @Get('target-achievement')
+  @RequirePermissions('VIEW_DASHBOARD')
+  targetAchievement(
+    @TenantConnection() tenantDb: DataSource,
+    @Query() query: DashboardTargetAchievementQueryDto,
+    @Req() req: Request,
+  ) {
+    return this.dashboardService.getTargetAchievement(
       tenantDb,
       query,
       req.user as { userId: string },

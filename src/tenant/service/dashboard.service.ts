@@ -12,6 +12,8 @@ import {
 import {
   MetricType,
   TargetMetricEntity,
+  TargetPlanAssigneeStatus,
+  TargetPlanEntity,
   TargetPlanStatus,
 } from 'src/tenant-db/entities/target-plan.entity';
 import { User, UserType } from 'src/tenant-db/entities/user.entity';
@@ -20,7 +22,10 @@ import {
   DashboardOrdersQueryDto,
   DashboardOverviewQueryDto,
   DashboardSalesQueryDto,
+  DashboardTargetAchievementGroupBy,
+  DashboardTargetAchievementQueryDto,
 } from '../dto/dashboard/dashboard.dto';
+import { MasterGeoHelperService } from './master-geo-helper.service';
 
 /** Approved/executed sale orders (same set used by target plans). */
 const APPROVED_SALE_ORDER_STATUSES = [
@@ -58,9 +63,25 @@ const LATE_ARRIVAL_THRESHOLD = { hour: 9, minute: 30 } as const;
 type SalesPeriod = 'MTD' | 'YTD';
 type DateRange = { start: Date; end: Date };
 
+type AchievementGroupKey = {
+  key: string;
+  label: string;
+  cityId: string | null;
+  areaId: string | null;
+};
+
+type AchievementPlanMeta = {
+  planId: string;
+  cityId: string;
+  status: TargetPlanStatus;
+  target: number;
+};
+
 @Injectable()
 export class DashboardService {
   private readonly logger = new Logger(DashboardService.name);
+
+  constructor(private readonly masterGeoHelperService: MasterGeoHelperService) {}
 
   // ---------------------------------------------------------------------------
   // Public card endpoints
@@ -315,6 +336,716 @@ export class DashboardService {
     ]);
 
     return { mtdSales, ytdSales, orders, attendance };
+  }
+
+  async getTargetAchievement(
+    tenantDb: DataSource,
+    query: DashboardTargetAchievementQueryDto,
+    _user: { userId: string },
+  ) {
+    try {
+      return await this.buildTargetAchievement(tenantDb, query);
+    } catch (error) {
+      this.logger.error(
+        `getTargetAchievement failed: ${error instanceof Error ? error.message : error}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw error;
+    }
+  }
+
+  private async buildTargetAchievement(
+    tenantDb: DataSource,
+    query: DashboardTargetAchievementQueryDto,
+  ) {
+    const range = this.resolveDateRange(query.dateFrom, query.dateTo);
+    const distributorId = this.normalizeOptionalId(query.distributorId);
+    const categoryId = this.normalizeOptionalId(query.categoryId);
+    const groupBy = query.groupBy ?? DashboardTargetAchievementGroupBy.CITY;
+
+    const [achievedByGroup, trendByGroup, planMetaByCity, areaTargets] =
+      await Promise.all([
+        this.sumAchievementSalesByGroup(
+          tenantDb,
+          range,
+          groupBy,
+          distributorId,
+          categoryId,
+        ),
+        this.sumAchievementTrendByGroup(
+          tenantDb,
+          range,
+          groupBy,
+          distributorId,
+          categoryId,
+        ),
+        this.loadCityPlanTargets(tenantDb, range),
+        groupBy === DashboardTargetAchievementGroupBy.AREA
+          ? this.loadAreaTargetsFromAssignees(
+              tenantDb,
+              range,
+              distributorId,
+            )
+          : Promise.resolve(new Map<string, number>()),
+      ]);
+
+    const groups = await this.buildAchievementGroups(
+      tenantDb,
+      groupBy,
+      range,
+      achievedByGroup,
+      trendByGroup,
+      planMetaByCity,
+      areaTargets,
+      distributorId,
+    );
+
+    const totalAchieved = groups.reduce((sum, row) => sum + row.achieved, 0);
+    const totalTarget = groups.reduce((sum, row) => sum + row.target, 0);
+    const remaining = Math.max(totalTarget - totalAchieved, 0);
+    const achievementPercent = this.percentOf(totalAchieved, totalTarget);
+
+    const today = this.startOfDay(new Date());
+    const elapsedEnd =
+      today < range.end ? today : this.startOfDay(range.end);
+    const elapsedDays = Math.max(
+      1,
+      Math.floor(
+        (elapsedEnd.getTime() - range.start.getTime()) / (24 * 60 * 60 * 1000),
+      ) + 1,
+    );
+    const totalDays = Math.max(
+      1,
+      Math.floor(
+        (range.end.getTime() - range.start.getTime()) / (24 * 60 * 60 * 1000),
+      ) + 1,
+    );
+    const remainingDays = Math.max(totalDays - elapsedDays, 0);
+    const dailyRequiredAvg =
+      remainingDays > 0 ? Math.round((remaining / remainingDays) * 100) / 100 : 0;
+    const projectedAchievement =
+      (totalAchieved / elapsedDays) * totalDays;
+    const projectionPercent = this.percentOf(projectedAchievement, totalTarget);
+
+    const legend = { onTrack: 0, atRisk: 0, behind: 0 };
+    const rows = groups
+      .map((row) => {
+      const progressPercent = this.percentOf(row.achieved, row.target);
+      const displayStatus = this.resolveAchievementStatus(
+        row.planStatus,
+        progressPercent,
+      );
+      const health = this.resolveAchievementHealth(progressPercent);
+      legend[health] += 1;
+
+      return {
+        key: row.key,
+        label: row.label,
+        cityId: row.cityId,
+        areaId: row.areaId,
+        planId: row.planId,
+        status: displayStatus,
+        achieved: row.achieved,
+        target: row.target,
+        progressPercent,
+        remaining: Math.max(row.target - row.achieved, 0),
+        trendSeries: row.trendSeries,
+        health,
+      };
+    })
+      .sort((a, b) => b.achieved - a.achieved || a.label.localeCompare(b.label));
+
+    return {
+      filters: {
+        distributorId,
+        categoryId,
+        dateFrom: this.toDateString(range.start),
+        dateTo: this.toDateString(range.end),
+        groupBy,
+        orderStatuses: [...APPROVED_SALE_ORDER_STATUSES],
+      },
+      summary: {
+        achievementPercent,
+        achieved: totalAchieved,
+        target: totalTarget,
+        remaining,
+        dailyRequiredAvg,
+        projectionPercent,
+        elapsedDays,
+        totalDays,
+        remainingDays,
+      },
+      legend,
+      groups: rows,
+    };
+  }
+
+  private async buildAchievementGroups(
+    tenantDb: DataSource,
+    groupBy: DashboardTargetAchievementGroupBy,
+    range: DateRange,
+    achievedByGroup: Map<string, number>,
+    trendByGroup: Map<string, Array<{ date: string; value: number }>>,
+    planMetaByCity: Map<string, AchievementPlanMeta>,
+    areaTargets: Map<string, number>,
+    distributorId: string | null,
+  ) {
+    const groupKeys = await this.loadAchievementGroupKeys(
+      tenantDb,
+      groupBy,
+      distributorId,
+      achievedByGroup,
+      planMetaByCity,
+      areaTargets,
+    );
+    const zeroTrend = this.buildZeroTrendSeries(range);
+
+    return groupKeys.map((group) => {
+      const achieved = achievedByGroup.get(group.key) ?? 0;
+      const planMeta =
+        group.cityId != null ? planMetaByCity.get(group.cityId) : undefined;
+      const target =
+        groupBy === DashboardTargetAchievementGroupBy.AREA
+          ? areaTargets.get(group.key) ?? 0
+          : planMeta?.target ?? 0;
+
+      return {
+        key: group.key,
+        label: group.label,
+        cityId: group.cityId,
+        areaId: group.areaId,
+        planId: planMeta?.planId ?? null,
+        planStatus: planMeta?.status ?? null,
+        achieved,
+        target,
+        trendSeries: trendByGroup.get(group.key) ?? zeroTrend,
+      };
+    });
+  }
+
+  private async loadAchievementGroupKeys(
+    tenantDb: DataSource,
+    groupBy: DashboardTargetAchievementGroupBy,
+    distributorId: string | null,
+    achievedByGroup: Map<string, number>,
+    planMetaByCity: Map<string, AchievementPlanMeta>,
+    areaTargets: Map<string, number>,
+  ): Promise<AchievementGroupKey[]> {
+    const keys = new Set<string>([
+      ...achievedByGroup.keys(),
+      ...planMetaByCity.keys(),
+      ...areaTargets.keys(),
+    ]);
+
+    if (groupBy === DashboardTargetAchievementGroupBy.CITY) {
+      const hierarchyCityIds = await this.loadCityIdsFromHierarchy(
+        tenantDb,
+        distributorId,
+      );
+      for (const cityId of hierarchyCityIds) {
+        keys.add(cityId);
+      }
+
+      const cityNames = await Promise.all(
+        [...keys].map(async (cityId) => ({
+          cityId,
+          name:
+            (await this.masterGeoHelperService.getCityNameById(cityId)) ??
+            cityId,
+        })),
+      );
+      const nameByCityId = new Map(
+        cityNames.map((row) => [row.cityId, row.name]),
+      );
+
+      return [...keys].map((cityId) => ({
+        key: cityId,
+        label: nameByCityId.get(cityId) ?? cityId,
+        cityId,
+        areaId: null,
+      }));
+    }
+
+    const hierarchyAreas = await this.loadAreasFromHierarchy(
+      tenantDb,
+      distributorId,
+    );
+    for (const area of hierarchyAreas) {
+      keys.add(area.key);
+    }
+
+    if (!keys.size) {
+      return [];
+    }
+
+    const areaIds = [...keys].map((id) => `'${id}'`).join(', ');
+    let sql = `
+      SELECT a.id AS key, a.name AS label, region."cityId" AS "cityId"
+      FROM areas a
+      INNER JOIN regions region ON region.id = a."regionId"
+      WHERE a.id IN (${areaIds})
+    `;
+
+    const params: unknown[] = [];
+    if (distributorId) {
+      params.push(distributorId);
+      sql += `
+        AND EXISTS (
+          SELECT 1 FROM routes r
+          WHERE r."areaId" = a.id AND r."distributorId" = $1
+        )
+      `;
+    }
+
+    const rows = (await tenantDb.query(sql, params)) as Array<{
+      key: string;
+      label: string;
+      cityId: string;
+    }>;
+
+    const mapped = new Map(
+      rows.map((row) => [
+        row.key,
+        {
+          key: row.key,
+          label: row.label,
+          cityId: row.cityId,
+          areaId: row.key,
+        },
+      ]),
+    );
+
+    for (const area of hierarchyAreas) {
+      if (!mapped.has(area.key)) {
+        mapped.set(area.key, area);
+      }
+    }
+
+    return [...keys].map((key) => {
+      const existing = mapped.get(key);
+      if (existing) {
+        return existing;
+      }
+      return {
+        key,
+        label: key,
+        cityId: null,
+        areaId: key,
+      };
+    });
+  }
+
+  private async loadCityIdsFromHierarchy(
+    tenantDb: DataSource,
+    distributorId: string | null,
+  ): Promise<string[]> {
+    const params: unknown[] = [];
+    let sql = `
+      SELECT DISTINCT region."cityId" AS "cityId"
+      FROM routes r
+      INNER JOIN areas a ON a.id = r."areaId"
+      INNER JOIN regions region ON region.id = a."regionId"
+      WHERE region."isActive" = true
+    `;
+
+    if (distributorId) {
+      params.push(distributorId);
+      sql += ` AND r."distributorId" = $1`;
+    }
+
+    const rows = (await tenantDb.query(sql, params)) as Array<{ cityId: string }>;
+    return rows.map((row) => row.cityId);
+  }
+
+  private async loadAreasFromHierarchy(
+    tenantDb: DataSource,
+    distributorId: string | null,
+  ): Promise<AchievementGroupKey[]> {
+    const params: unknown[] = [];
+    let sql = `
+      SELECT DISTINCT a.id AS key, a.name AS label, region."cityId" AS "cityId"
+      FROM routes r
+      INNER JOIN areas a ON a.id = r."areaId"
+      INNER JOIN regions region ON region.id = a."regionId"
+      WHERE region."isActive" = true
+    `;
+
+    if (distributorId) {
+      params.push(distributorId);
+      sql += ` AND r."distributorId" = $1`;
+    }
+
+    const rows = (await tenantDb.query(sql, params)) as Array<{
+      key: string;
+      label: string;
+      cityId: string;
+    }>;
+
+    return rows.map((row) => ({
+      key: row.key,
+      label: row.label,
+      cityId: row.cityId,
+      areaId: row.key,
+    }));
+  }
+
+  private async sumAchievementSalesByGroup(
+    tenantDb: DataSource,
+    range: DateRange,
+    groupBy: DashboardTargetAchievementGroupBy,
+    distributorId: string | null,
+    categoryId: string | null,
+  ): Promise<Map<string, number>> {
+    const statusList = APPROVED_SALE_ORDER_STATUSES.map((s) => `'${s}'`).join(
+      ', ',
+    );
+    const groupExpr =
+      groupBy === DashboardTargetAchievementGroupBy.CITY
+        ? `region."cityId"`
+        : `a.id::text`;
+
+    const params: unknown[] = [range.start, this.endOfDay(range.end)];
+    let paramIndex = 3;
+
+    let sql = `
+      SELECT ${groupExpr} AS key,
+             COALESCE(SUM(so."totalAmount"), 0) AS achieved
+      FROM sale_orders so
+      INNER JOIN routes r ON r.id = so."routeId"
+      INNER JOIN areas a ON a.id = r."areaId"
+      INNER JOIN regions region ON region.id = a."regionId"
+      WHERE so."orderStatus" IN (${statusList})
+        AND so."orderDate" >= $1
+        AND so."orderDate" <= $2
+    `;
+
+    if (distributorId) {
+      sql += ` AND r."distributorId" = $${paramIndex}`;
+      params.push(distributorId);
+      paramIndex += 1;
+    }
+
+    if (categoryId) {
+      sql += `
+        AND EXISTS (
+          SELECT 1
+          FROM sale_order_items soi
+          INNER JOIN products p ON p.id = soi."productId"
+          WHERE soi."saleOrderId" = so.id
+            AND p."categoryId" = $${paramIndex}
+        )
+      `;
+      params.push(categoryId);
+      paramIndex += 1;
+    }
+
+    sql += ` GROUP BY ${groupExpr}`;
+
+    const rows = (await tenantDb.query(sql, params)) as Array<{
+      key: string;
+      achieved: string | number;
+    }>;
+
+    return new Map(rows.map((row) => [String(row.key), this.toNumber(row.achieved)]));
+  }
+
+  private async sumAchievementTrendByGroup(
+    tenantDb: DataSource,
+    range: DateRange,
+    groupBy: DashboardTargetAchievementGroupBy,
+    distributorId: string | null,
+    categoryId: string | null,
+  ): Promise<Map<string, Array<{ date: string; value: number }>>> {
+    const statusList = APPROVED_SALE_ORDER_STATUSES.map((s) => `'${s}'`).join(
+      ', ',
+    );
+    const groupExpr =
+      groupBy === DashboardTargetAchievementGroupBy.CITY
+        ? `region."cityId"`
+        : `a.id::text`;
+
+    const params: unknown[] = [range.start, this.endOfDay(range.end)];
+    let paramIndex = 3;
+
+    let sql = `
+      SELECT ${groupExpr} AS key,
+             TO_CHAR(so."orderDate", 'YYYY-MM-DD') AS bucket,
+             COALESCE(SUM(so."totalAmount"), 0) AS value
+      FROM sale_orders so
+      INNER JOIN routes r ON r.id = so."routeId"
+      INNER JOIN areas a ON a.id = r."areaId"
+      INNER JOIN regions region ON region.id = a."regionId"
+      WHERE so."orderStatus" IN (${statusList})
+        AND so."orderDate" >= $1
+        AND so."orderDate" <= $2
+    `;
+
+    if (distributorId) {
+      sql += ` AND r."distributorId" = $${paramIndex}`;
+      params.push(distributorId);
+      paramIndex += 1;
+    }
+
+    if (categoryId) {
+      sql += `
+        AND EXISTS (
+          SELECT 1
+          FROM sale_order_items soi
+          INNER JOIN products p ON p.id = soi."productId"
+          WHERE soi."saleOrderId" = so.id
+            AND p."categoryId" = $${paramIndex}
+        )
+      `;
+      params.push(categoryId);
+      paramIndex += 1;
+    }
+
+    sql += ` GROUP BY 1, 2 ORDER BY 1, 2`;
+
+    const rows = (await tenantDb.query(sql, params)) as Array<{
+      key: string;
+      bucket: string;
+      value: string | number;
+    }>;
+
+    const dateKeys = this.buildDateKeys(range);
+    const byGroup = new Map<string, Map<string, number>>();
+
+    for (const row of rows) {
+      const key = String(row.key);
+      if (!byGroup.has(key)) {
+        byGroup.set(key, new Map());
+      }
+      byGroup.get(key)!.set(row.bucket, this.toNumber(row.value));
+    }
+
+    const result = new Map<string, Array<{ date: string; value: number }>>();
+    for (const [key, values] of byGroup.entries()) {
+      result.set(
+        key,
+        dateKeys.map((date) => ({
+          date,
+          value: values.get(date) ?? 0,
+        })),
+      );
+    }
+
+    return result;
+  }
+
+  private async loadCityPlanTargets(
+    tenantDb: DataSource,
+    range: DateRange,
+  ): Promise<Map<string, AchievementPlanMeta>> {
+    const rows = await tenantDb
+      .getRepository(TargetPlanEntity)
+      .createQueryBuilder('plan')
+      .innerJoin(
+        TargetMetricEntity,
+        'metric',
+        'metric.targetPlanId = plan.id AND metric.metricType = :metricType',
+        { metricType: MetricType.SALES_VALUE },
+      )
+      .select('plan.id', 'planId')
+      .addSelect('plan.cityId', 'cityId')
+      .addSelect('plan.status', 'status')
+      .addSelect('plan.endDate', 'endDate')
+      .addSelect('COALESCE(SUM(CAST(metric.targetValue AS DECIMAL)), 0)', 'target')
+      .where('plan.status IN (:...statuses)', {
+        statuses: [TargetPlanStatus.PUBLISHED, TargetPlanStatus.LOCKED],
+      })
+      .andWhere('plan.startDate <= :rangeEnd', {
+        rangeEnd: this.endOfDay(range.end),
+      })
+      .andWhere('plan.endDate >= :rangeStart', { rangeStart: range.start })
+      .groupBy('plan.id')
+      .addGroupBy('plan.cityId')
+      .addGroupBy('plan.status')
+      .addGroupBy('plan.endDate')
+      .orderBy('plan.endDate', 'DESC')
+      .getRawMany<{
+        planId: string;
+        cityId: string;
+        status: TargetPlanStatus;
+        target: string;
+      }>();
+
+    const byCity = new Map<string, AchievementPlanMeta>();
+    for (const row of rows) {
+      if (!byCity.has(row.cityId)) {
+        byCity.set(row.cityId, {
+          planId: row.planId,
+          cityId: row.cityId,
+          status: row.status,
+          target: this.toNumber(row.target),
+        });
+      }
+    }
+    return byCity;
+  }
+
+  private async loadAreaTargetsFromAssignees(
+    tenantDb: DataSource,
+    range: DateRange,
+    distributorId: string | null,
+  ): Promise<Map<string, number>> {
+    const plans = await tenantDb
+      .getRepository(TargetPlanEntity)
+      .createQueryBuilder('plan')
+      .innerJoinAndSelect(
+        'plan.metrics',
+        'metric',
+        'metric.metricType = :metricType',
+        { metricType: MetricType.SALES_VALUE },
+      )
+      .innerJoinAndSelect(
+        'plan.assignees',
+        'assignee',
+        'assignee.status = :activeStatus',
+        { activeStatus: TargetPlanAssigneeStatus.ACTIVE },
+      )
+      .where('plan.status IN (:...statuses)', {
+        statuses: [TargetPlanStatus.PUBLISHED, TargetPlanStatus.LOCKED],
+      })
+      .andWhere('plan.startDate <= :rangeEnd', {
+        rangeEnd: this.endOfDay(range.end),
+      })
+      .andWhere('plan.endDate >= :rangeStart', { rangeStart: range.start })
+      .getMany();
+
+    if (!plans.length) {
+      return new Map();
+    }
+
+    const assigneeAreas = await this.loadAssigneeAreaMap(
+      tenantDb,
+      range,
+      distributorId,
+    );
+    const areaTargets = new Map<string, number>();
+
+    for (const plan of plans) {
+      const activeAssignees = (plan.assignees ?? []).filter(
+        (row) => row.status === TargetPlanAssigneeStatus.ACTIVE,
+      );
+      const salesMetric = (plan.metrics ?? []).find(
+        (metric) => metric.metricType === MetricType.SALES_VALUE,
+      );
+      if (!activeAssignees.length || !salesMetric) {
+        continue;
+      }
+
+      const planTarget = this.toNumber(salesMetric.targetValue);
+      const sharePerAssignee = planTarget / activeAssignees.length;
+
+      for (const assignee of activeAssignees) {
+        const areas = assigneeAreas.get(assignee.assigneeId) ?? [];
+        if (!areas.length) {
+          continue;
+        }
+        const sharePerArea = sharePerAssignee / areas.length;
+        for (const areaId of areas) {
+          areaTargets.set(
+            areaId,
+            (areaTargets.get(areaId) ?? 0) + sharePerArea,
+          );
+        }
+      }
+    }
+
+    return areaTargets;
+  }
+
+  private async loadAssigneeAreaMap(
+    tenantDb: DataSource,
+    range: DateRange,
+    distributorId: string | null,
+  ): Promise<Map<string, string[]>> {
+    const statusList = APPROVED_SALE_ORDER_STATUSES.map((s) => `'${s}'`).join(
+      ', ',
+    );
+    const params: unknown[] = [range.start, this.endOfDay(range.end)];
+    let sql = `
+      SELECT DISTINCT so."salesmanId" AS "assigneeId", r."areaId" AS "areaId"
+      FROM sale_orders so
+      INNER JOIN routes r ON r.id = so."routeId"
+      WHERE so."orderStatus" IN (${statusList})
+        AND so."orderDate" >= $1
+        AND so."orderDate" <= $2
+    `;
+
+    if (distributorId) {
+      params.push(distributorId);
+      sql += ` AND r."distributorId" = $3`;
+    }
+
+    const rows = (await tenantDb.query(sql, params)) as Array<{
+      assigneeId: string;
+      areaId: string;
+    }>;
+
+    const map = new Map<string, Set<string>>();
+    for (const row of rows) {
+      if (!map.has(row.assigneeId)) {
+        map.set(row.assigneeId, new Set());
+      }
+      map.get(row.assigneeId)!.add(row.areaId);
+    }
+
+    return new Map(
+      [...map.entries()].map(([assigneeId, areas]) => [
+        assigneeId,
+        [...areas],
+      ]),
+    );
+  }
+
+  private resolveAchievementStatus(
+    planStatus: TargetPlanStatus | null,
+    progressPercent: number,
+  ): TargetPlanStatus | 'BUFFER' {
+    if (progressPercent >= 100) {
+      return 'BUFFER';
+    }
+    return planStatus ?? TargetPlanStatus.PUBLISHED;
+  }
+
+  private resolveAchievementHealth(
+    progressPercent: number,
+  ): 'onTrack' | 'atRisk' | 'behind' {
+    if (progressPercent >= 80) {
+      return 'onTrack';
+    }
+    if (progressPercent >= 50) {
+      return 'atRisk';
+    }
+    return 'behind';
+  }
+
+  private resolveDateRange(dateFrom: string, dateTo: string): DateRange {
+    const start = this.resolveAnchorDate(dateFrom);
+    const end = this.resolveAnchorDate(dateTo);
+    if (start > end) {
+      throw new BadRequestException('dateFrom must be before or equal to dateTo');
+    }
+    return { start, end };
+  }
+
+  private buildDateKeys(range: DateRange): string[] {
+    const keys: string[] = [];
+    const cursor = new Date(range.start);
+    const last = this.startOfDay(range.end);
+    while (cursor <= last) {
+      keys.push(this.toDateString(cursor));
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    return keys;
+  }
+
+  private buildZeroTrendSeries(
+    range: DateRange,
+  ): Array<{ date: string; value: number }> {
+    return this.buildDateKeys(range).map((date) => ({ date, value: 0 }));
   }
 
   // ---------------------------------------------------------------------------

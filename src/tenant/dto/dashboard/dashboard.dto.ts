@@ -1,4 +1,14 @@
-import { IsDateString, IsOptional, IsUUID } from 'class-validator';
+import {
+  IsDateString,
+  IsEnum,
+  IsOptional,
+  IsUUID,
+} from 'class-validator';
+
+export enum DashboardTargetAchievementGroupBy {
+  CITY = 'CITY',
+  AREA = 'AREA',
+}
 
 export class DashboardSalesQueryDto {
   @IsOptional()
@@ -41,4 +51,24 @@ export class DashboardOverviewQueryDto {
   @IsOptional()
   @IsDateString()
   date?: string;
+}
+
+export class DashboardTargetAchievementQueryDto {
+  @IsOptional()
+  @IsUUID()
+  distributorId?: string;
+
+  @IsDateString()
+  dateFrom: string;
+
+  @IsDateString()
+  dateTo: string;
+
+  @IsEnum(DashboardTargetAchievementGroupBy)
+  groupBy: DashboardTargetAchievementGroupBy;
+
+  /** Optional product category filter for achieved sales. */
+  @IsOptional()
+  @IsUUID()
+  categoryId?: string;
 }
