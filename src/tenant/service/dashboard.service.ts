@@ -10,10 +10,6 @@ import {
   SaleOrder,
 } from 'src/tenant-db/entities/saleorder.entity';
 import {
-  ReturnStatus,
-  SaleReturn,
-} from 'src/tenant-db/entities/sale-return.entity';
-import {
   MetricType,
   TargetMetricEntity,
   TargetPlanStatus,
@@ -26,15 +22,11 @@ import {
   DashboardSalesQueryDto,
 } from '../dto/dashboard/dashboard.dto';
 
-const COUNTABLE_SALE_ORDER_STATUSES = [
+/** Approved/executed sale orders (same set used by target plans). */
+const APPROVED_SALE_ORDER_STATUSES = [
   OrderStatus.APPROVED,
   OrderStatus.PROCESSING,
   OrderStatus.DELIVERED,
-] as const;
-
-const APPROVED_RETURN_STATUSES = [
-  ReturnStatus.APPROVED,
-  ReturnStatus.COMPLETED,
 ] as const;
 
 const ATTENDANCE_ROLE_TYPES = [
@@ -64,6 +56,7 @@ const PRESENT_LIKE_STATUSES = [
 const LATE_ARRIVAL_THRESHOLD = { hour: 9, minute: 30 } as const;
 
 type SalesPeriod = 'MTD' | 'YTD';
+type DateRange = { start: Date; end: Date };
 
 @Injectable()
 export class DashboardService {
@@ -345,16 +338,31 @@ export class DashboardService {
         : this.getPreviousYearToDateRange(anchor);
 
     const [netSales, previousNetSales, target, trendSeries] = await Promise.all([
-      this.getNetSales(tenantDb, currentRange, distributorId),
-      this.getNetSales(tenantDb, previousRange, distributorId),
-      this.getSalesTarget(tenantDb, currentRange, distributorId),
+      this.sumApprovedSales(tenantDb, currentRange, distributorId).catch(
+        (error) => {
+          this.logger.error(
+            `sumApprovedSales(current) failed: ${
+              error instanceof Error ? error.message : error
+            }`,
+          );
+          return 0;
+        },
+      ),
+      this.sumApprovedSales(tenantDb, previousRange, distributorId).catch(
+        (error) => {
+          this.logger.error(
+            `sumApprovedSales(previous) failed: ${
+              error instanceof Error ? error.message : error
+            }`,
+          );
+          return 0;
+        },
+      ),
+      this.getSalesTarget(tenantDb, currentRange),
       period === 'MTD'
         ? this.getDailySalesTrend(tenantDb, currentRange, distributorId)
         : this.getMonthlySalesTrend(tenantDb, currentRange, distributorId),
     ]);
-
-    const growthPercent = this.growthPercent(netSales, previousNetSales);
-    const achievementPercent = this.percentOf(netSales, target);
 
     return {
       filters: {
@@ -363,92 +371,59 @@ export class DashboardService {
         dateFrom: this.toDateString(currentRange.start),
         dateTo: this.toDateString(currentRange.end),
         distributorId,
+        orderStatuses: [...APPROVED_SALE_ORDER_STATUSES],
       },
       summary: {
         netSales,
         target,
-        growthPercent,
-        achievementPercent,
+        growthPercent: this.growthPercent(netSales, previousNetSales),
+        achievementPercent: this.percentOf(netSales, target),
         comparisonLabel: period === 'MTD' ? 'vs last month' : 'vs last year',
       },
       trendSeries,
     };
   }
 
-  private async getNetSales(
+  /** Sum totalAmount for approved/executed sale orders in range. */
+  private async sumApprovedSales(
     tenantDb: DataSource,
-    range: { start: Date; end: Date },
+    range: DateRange,
     distributorId: string | null,
   ): Promise<number> {
-    const salesQb = tenantDb
-      .getRepository(SaleOrder)
-      .createQueryBuilder('saleOrder')
-      .select('COALESCE(SUM(saleOrder.totalAmount), 0)', 'total')
-      .where('saleOrder.orderStatus IN (:...statuses)', {
-        statuses: [...COUNTABLE_SALE_ORDER_STATUSES],
-      })
-      .andWhere('saleOrder.orderDate >= :start', { start: range.start })
-      .andWhere('saleOrder.orderDate <= :end', {
-        end: this.endOfDay(range.end),
-      });
+    const statusList = APPROVED_SALE_ORDER_STATUSES.map((s) => `'${s}'`).join(
+      ', ',
+    );
+    const params: unknown[] = [range.start, this.endOfDay(range.end)];
+
+    let sql = `
+      SELECT COALESCE(SUM(so."totalAmount"), 0) AS total
+      FROM sale_orders so
+      WHERE so."orderStatus" IN (${statusList})
+        AND so."orderDate" >= $1
+        AND so."orderDate" <= $2
+    `;
 
     if (distributorId) {
-      salesQb.andWhere('saleOrder.distributorId = :distributorId', {
-        distributorId,
-      });
+      params.push(distributorId);
+      sql += ` AND so."distributorId" = $3`;
     }
 
-    const salesRow = await salesQb.getRawOne<{ total: string }>();
-    const gross = this.toNumber(salesRow?.total);
-
-    try {
-      const returnsQb = tenantDb
-        .getRepository(SaleReturn)
-        .createQueryBuilder('saleReturn')
-        .select('COALESCE(SUM(saleReturn.returnAmount), 0)', 'total')
-        .where('saleReturn.returnStatus IN (:...statuses)', {
-          statuses: [...APPROVED_RETURN_STATUSES],
-        })
-        .andWhere('saleReturn.createdAt >= :start', { start: range.start })
-        .andWhere('saleReturn.createdAt <= :end', {
-          end: this.endOfDay(range.end),
-        });
-
-      if (distributorId) {
-        returnsQb.andWhere('saleReturn.distributorId = :distributorId', {
-          distributorId,
-        });
-      }
-
-      const returnsRow = await returnsQb.getRawOne<{ total: string }>();
-      const returns = this.toNumber(returnsRow?.total);
-      return Math.max(gross - returns, 0);
-    } catch (error) {
-      this.logger.warn(
-        `Net sales returns subquery failed; using gross sales. ${
-          error instanceof Error ? error.message : error
-        }`,
-      );
-      return gross;
-    }
+    const rows = (await tenantDb.query(sql, params)) as Array<{
+      total: string | number;
+    }>;
+    return this.toNumber(rows[0]?.total);
   }
 
   private async getSalesTarget(
     tenantDb: DataSource,
-    range: { start: Date; end: Date },
-    distributorId: string | null,
+    range: DateRange,
   ): Promise<number> {
-    // Org-level target: sum SALES_VALUE metrics on published/locked plans
-    // that overlap the requested period. distributorId is reserved for
-    // future assignee/geo scoping when plans support it.
-    void distributorId;
-
     try {
       const row = await tenantDb
         .getRepository(TargetMetricEntity)
         .createQueryBuilder('metric')
         .innerJoin('metric.targetPlan', 'plan')
-        .select('COALESCE(SUM(metric.targetValue), 0)', 'total')
+        .select('COALESCE(SUM(CAST(metric.targetValue AS DECIMAL)), 0)', 'total')
         .where('metric.metricType = :metricType', {
           metricType: MetricType.SALES_VALUE,
         })
@@ -474,35 +449,48 @@ export class DashboardService {
 
   private async getDailySalesTrend(
     tenantDb: DataSource,
-    range: { start: Date; end: Date },
+    range: DateRange,
     distributorId: string | null,
   ): Promise<Array<{ date: string; value: number }>> {
-    const bucketExpr = `TO_CHAR(saleOrder."orderDate", 'YYYY-MM-DD')`;
-    const qb = tenantDb
-      .getRepository(SaleOrder)
-      .createQueryBuilder('saleOrder')
-      .select(bucketExpr, 'bucket')
-      .addSelect('COALESCE(SUM(saleOrder.totalAmount), 0)', 'value')
-      .where('saleOrder.orderStatus IN (:...statuses)', {
-        statuses: [...COUNTABLE_SALE_ORDER_STATUSES],
-      })
-      .andWhere('saleOrder.orderDate >= :start', { start: range.start })
-      .andWhere('saleOrder.orderDate <= :end', {
-        end: this.endOfDay(range.end),
-      })
-      .groupBy(bucketExpr)
-      .orderBy(bucketExpr, 'ASC');
+    const byDate = new Map<string, number>();
 
-    if (distributorId) {
-      qb.andWhere('saleOrder.distributorId = :distributorId', {
-        distributorId,
-      });
+    try {
+      const statusList = APPROVED_SALE_ORDER_STATUSES.map((s) => `'${s}'`).join(
+        ', ',
+      );
+      const params: unknown[] = [range.start, this.endOfDay(range.end)];
+
+      let sql = `
+        SELECT TO_CHAR(so."orderDate", 'YYYY-MM-DD') AS bucket,
+               COALESCE(SUM(so."totalAmount"), 0) AS value
+        FROM sale_orders so
+        WHERE so."orderStatus" IN (${statusList})
+          AND so."orderDate" >= $1
+          AND so."orderDate" <= $2
+      `;
+
+      if (distributorId) {
+        params.push(distributorId);
+        sql += ` AND so."distributorId" = $3`;
+      }
+
+      sql += ` GROUP BY 1 ORDER BY 1`;
+
+      const rows = (await tenantDb.query(sql, params)) as Array<{
+        bucket: string;
+        value: string | number;
+      }>;
+
+      for (const row of rows) {
+        byDate.set(row.bucket, this.toNumber(row.value));
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Daily sales trend failed; returning zero-filled series. ${
+          error instanceof Error ? error.message : error
+        }`,
+      );
     }
-
-    const rows = await qb.getRawMany<{ bucket: string; value: string }>();
-    const byDate = new Map(
-      rows.map((row) => [row.bucket, this.toNumber(row.value)]),
-    );
 
     const series: Array<{ date: string; value: number }> = [];
     const cursor = new Date(range.start);
@@ -517,38 +505,55 @@ export class DashboardService {
 
   private async getMonthlySalesTrend(
     tenantDb: DataSource,
-    range: { start: Date; end: Date },
+    range: DateRange,
     distributorId: string | null,
   ): Promise<Array<{ date: string; value: number }>> {
-    const bucketExpr = `TO_CHAR(DATE_TRUNC('month', saleOrder."orderDate"), 'YYYY-MM')`;
-    const qb = tenantDb
-      .getRepository(SaleOrder)
-      .createQueryBuilder('saleOrder')
-      .select(bucketExpr, 'bucket')
-      .addSelect('COALESCE(SUM(saleOrder.totalAmount), 0)', 'value')
-      .where('saleOrder.orderStatus IN (:...statuses)', {
-        statuses: [...COUNTABLE_SALE_ORDER_STATUSES],
-      })
-      .andWhere('saleOrder.orderDate >= :start', { start: range.start })
-      .andWhere('saleOrder.orderDate <= :end', {
-        end: this.endOfDay(range.end),
-      })
-      .groupBy(bucketExpr)
-      .orderBy(bucketExpr, 'ASC');
+    const byMonth = new Map<string, number>();
 
-    if (distributorId) {
-      qb.andWhere('saleOrder.distributorId = :distributorId', {
-        distributorId,
-      });
+    try {
+      const statusList = APPROVED_SALE_ORDER_STATUSES.map((s) => `'${s}'`).join(
+        ', ',
+      );
+      const params: unknown[] = [range.start, this.endOfDay(range.end)];
+
+      let sql = `
+        SELECT TO_CHAR(DATE_TRUNC('month', so."orderDate"), 'YYYY-MM') AS bucket,
+               COALESCE(SUM(so."totalAmount"), 0) AS value
+        FROM sale_orders so
+        WHERE so."orderStatus" IN (${statusList})
+          AND so."orderDate" >= $1
+          AND so."orderDate" <= $2
+      `;
+
+      if (distributorId) {
+        params.push(distributorId);
+        sql += ` AND so."distributorId" = $3`;
+      }
+
+      sql += ` GROUP BY 1 ORDER BY 1`;
+
+      const rows = (await tenantDb.query(sql, params)) as Array<{
+        bucket: string;
+        value: string | number;
+      }>;
+
+      for (const row of rows) {
+        byMonth.set(String(row.bucket), this.toNumber(row.value));
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Monthly sales trend failed; returning zero-filled series. ${
+          error instanceof Error ? error.message : error
+        }`,
+      );
     }
 
-    const rows = await qb.getRawMany<{ bucket: string; value: string }>();
-    const byMonth = new Map(
-      rows.map((row) => [row.bucket, this.toNumber(row.value)]),
-    );
-
     const series: Array<{ date: string; value: number }> = [];
-    const cursor = new Date(range.start.getFullYear(), range.start.getMonth(), 1);
+    const cursor = new Date(
+      range.start.getFullYear(),
+      range.start.getMonth(),
+      1,
+    );
     const last = new Date(range.end.getFullYear(), range.end.getMonth(), 1);
     while (cursor <= last) {
       const key = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}`;
