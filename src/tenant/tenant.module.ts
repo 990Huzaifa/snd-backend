@@ -123,6 +123,8 @@ import { InventoryReportService } from './service/report/inventory-report.servic
 import { RetailerVisitReportService } from './service/report/retailer-visit-report.service';
 import { RetailerCheckInReportService } from './service/report/retailer-checkin-report.service';
 import { RetailerMerchandisingReportService } from './service/report/retailer-merchandising-report.service';
+import { DashboardController } from './controller/dashboard.controller';
+import { DashboardService } from './service/dashboard.service';
 
 
 @Module({
@@ -195,6 +197,7 @@ import { RetailerMerchandisingReportService } from './service/report/retailer-me
     RetailerVisitReportController,
     RetailerCheckInReportController,
     RetailerMerchandisingReportController,
+    DashboardController,
   ],
   providers: [
     TenantAuthService,
@@ -256,6 +259,7 @@ import { RetailerMerchandisingReportService } from './service/report/retailer-me
     RetailerVisitReportService,
     RetailerCheckInReportService,
     RetailerMerchandisingReportService,
+    DashboardService,
   ],
 })
 export class TenantModule { }
