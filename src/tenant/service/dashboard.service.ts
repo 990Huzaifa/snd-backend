@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import {
   Attendence,
@@ -16,7 +16,6 @@ import {
 import {
   MetricType,
   TargetMetricEntity,
-  TargetPlanEntity,
   TargetPlanStatus,
 } from 'src/tenant-db/entities/target-plan.entity';
 import { User, UserType } from 'src/tenant-db/entities/user.entity';
@@ -28,13 +27,6 @@ import {
 } from '../dto/dashboard/dashboard.dto';
 
 const COUNTABLE_SALE_ORDER_STATUSES = [
-  OrderStatus.APPROVED,
-  OrderStatus.PROCESSING,
-  OrderStatus.DELIVERED,
-] as const;
-
-const FULFILLMENT_ORDER_STATUSES = [
-  OrderStatus.PENDING,
   OrderStatus.APPROVED,
   OrderStatus.PROCESSING,
   OrderStatus.DELIVERED,
@@ -75,6 +67,8 @@ type SalesPeriod = 'MTD' | 'YTD';
 
 @Injectable()
 export class DashboardService {
+  private readonly logger = new Logger(DashboardService.name);
+
   // ---------------------------------------------------------------------------
   // Public card endpoints
   // ---------------------------------------------------------------------------
@@ -84,7 +78,15 @@ export class DashboardService {
     query: DashboardSalesQueryDto,
     _user: { userId: string },
   ) {
-    return this.getSalesCard(tenantDb, query, 'MTD');
+    try {
+      return await this.getSalesCard(tenantDb, query, 'MTD');
+    } catch (error) {
+      this.logger.error(
+        `getMtdSales failed: ${error instanceof Error ? error.message : error}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw error;
+    }
   }
 
   async getYtdSales(
@@ -92,13 +94,36 @@ export class DashboardService {
     query: DashboardSalesQueryDto,
     _user: { userId: string },
   ) {
-    return this.getSalesCard(tenantDb, query, 'YTD');
+    try {
+      return await this.getSalesCard(tenantDb, query, 'YTD');
+    } catch (error) {
+      this.logger.error(
+        `getYtdSales failed: ${error instanceof Error ? error.message : error}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw error;
+    }
   }
 
   async getOrdersFulfillment(
     tenantDb: DataSource,
     query: DashboardOrdersQueryDto,
     _user: { userId: string },
+  ) {
+    try {
+      return await this.buildOrdersFulfillment(tenantDb, query);
+    } catch (error) {
+      this.logger.error(
+        `getOrdersFulfillment failed: ${error instanceof Error ? error.message : error}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw error;
+    }
+  }
+
+  private async buildOrdersFulfillment(
+    tenantDb: DataSource,
+    query: DashboardOrdersQueryDto,
   ) {
     const anchor = this.resolveAnchorDate(query.date);
     const dayRange = this.getDayRange(anchor);
@@ -373,32 +398,39 @@ export class DashboardService {
       });
     }
 
-    const returnsQb = tenantDb
-      .getRepository(SaleReturn)
-      .createQueryBuilder('saleReturn')
-      .select('COALESCE(SUM(saleReturn.returnAmount), 0)', 'total')
-      .where('saleReturn.returnStatus IN (:...statuses)', {
-        statuses: [...APPROVED_RETURN_STATUSES],
-      })
-      .andWhere('saleReturn.returnDate >= :start', { start: range.start })
-      .andWhere('saleReturn.returnDate <= :end', {
-        end: this.endOfDay(range.end),
-      });
-
-    if (distributorId) {
-      returnsQb.andWhere('saleReturn.distributorId = :distributorId', {
-        distributorId,
-      });
-    }
-
-    const [salesRow, returnsRow] = await Promise.all([
-      salesQb.getRawOne<{ total: string }>(),
-      returnsQb.getRawOne<{ total: string }>(),
-    ]);
-
+    const salesRow = await salesQb.getRawOne<{ total: string }>();
     const gross = this.toNumber(salesRow?.total);
-    const returns = this.toNumber(returnsRow?.total);
-    return Math.max(gross - returns, 0);
+
+    try {
+      const returnsQb = tenantDb
+        .getRepository(SaleReturn)
+        .createQueryBuilder('saleReturn')
+        .select('COALESCE(SUM(saleReturn.returnAmount), 0)', 'total')
+        .where('saleReturn.returnStatus IN (:...statuses)', {
+          statuses: [...APPROVED_RETURN_STATUSES],
+        })
+        .andWhere('saleReturn.createdAt >= :start', { start: range.start })
+        .andWhere('saleReturn.createdAt <= :end', {
+          end: this.endOfDay(range.end),
+        });
+
+      if (distributorId) {
+        returnsQb.andWhere('saleReturn.distributorId = :distributorId', {
+          distributorId,
+        });
+      }
+
+      const returnsRow = await returnsQb.getRawOne<{ total: string }>();
+      const returns = this.toNumber(returnsRow?.total);
+      return Math.max(gross - returns, 0);
+    } catch (error) {
+      this.logger.warn(
+        `Net sales returns subquery failed; using gross sales. ${
+          error instanceof Error ? error.message : error
+        }`,
+      );
+      return gross;
+    }
   }
 
   private async getSalesTarget(
@@ -411,28 +443,33 @@ export class DashboardService {
     // future assignee/geo scoping when plans support it.
     void distributorId;
 
-    const row = await tenantDb
-      .getRepository(TargetMetricEntity)
-      .createQueryBuilder('metric')
-      .innerJoin(
-        TargetPlanEntity,
-        'plan',
-        'plan.id = metric.targetPlanId',
-      )
-      .select('COALESCE(SUM(metric.targetValue), 0)', 'total')
-      .where('metric.metricType = :metricType', {
-        metricType: MetricType.SALES_VALUE,
-      })
-      .andWhere('plan.status IN (:...statuses)', {
-        statuses: [TargetPlanStatus.PUBLISHED, TargetPlanStatus.LOCKED],
-      })
-      .andWhere('plan.startDate <= :rangeEnd', {
-        rangeEnd: this.endOfDay(range.end),
-      })
-      .andWhere('plan.endDate >= :rangeStart', { rangeStart: range.start })
-      .getRawOne<{ total: string }>();
+    try {
+      const row = await tenantDb
+        .getRepository(TargetMetricEntity)
+        .createQueryBuilder('metric')
+        .innerJoin('metric.targetPlan', 'plan')
+        .select('COALESCE(SUM(metric.targetValue), 0)', 'total')
+        .where('metric.metricType = :metricType', {
+          metricType: MetricType.SALES_VALUE,
+        })
+        .andWhere('plan.status IN (:...statuses)', {
+          statuses: [TargetPlanStatus.PUBLISHED, TargetPlanStatus.LOCKED],
+        })
+        .andWhere('plan.startDate <= :rangeEnd', {
+          rangeEnd: this.endOfDay(range.end),
+        })
+        .andWhere('plan.endDate >= :rangeStart', { rangeStart: range.start })
+        .getRawOne<{ total: string }>();
 
-    return this.toNumber(row?.total);
+      return this.toNumber(row?.total);
+    } catch (error) {
+      this.logger.warn(
+        `Sales target query failed; returning 0. ${
+          error instanceof Error ? error.message : error
+        }`,
+      );
+      return 0;
+    }
   }
 
   private async getDailySalesTrend(
@@ -440,10 +477,11 @@ export class DashboardService {
     range: { start: Date; end: Date },
     distributorId: string | null,
   ): Promise<Array<{ date: string; value: number }>> {
+    const bucketExpr = `TO_CHAR(saleOrder."orderDate", 'YYYY-MM-DD')`;
     const qb = tenantDb
       .getRepository(SaleOrder)
       .createQueryBuilder('saleOrder')
-      .select(`TO_CHAR(DATE(saleOrder."orderDate"), 'YYYY-MM-DD')`, 'bucket')
+      .select(bucketExpr, 'bucket')
       .addSelect('COALESCE(SUM(saleOrder.totalAmount), 0)', 'value')
       .where('saleOrder.orderStatus IN (:...statuses)', {
         statuses: [...COUNTABLE_SALE_ORDER_STATUSES],
@@ -452,8 +490,8 @@ export class DashboardService {
       .andWhere('saleOrder.orderDate <= :end', {
         end: this.endOfDay(range.end),
       })
-      .groupBy('bucket')
-      .orderBy('bucket', 'ASC');
+      .groupBy(bucketExpr)
+      .orderBy(bucketExpr, 'ASC');
 
     if (distributorId) {
       qb.andWhere('saleOrder.distributorId = :distributorId', {
@@ -482,10 +520,11 @@ export class DashboardService {
     range: { start: Date; end: Date },
     distributorId: string | null,
   ): Promise<Array<{ date: string; value: number }>> {
+    const bucketExpr = `TO_CHAR(DATE_TRUNC('month', saleOrder."orderDate"), 'YYYY-MM')`;
     const qb = tenantDb
       .getRepository(SaleOrder)
       .createQueryBuilder('saleOrder')
-      .select(`TO_CHAR(DATE_TRUNC('month', saleOrder."orderDate"), 'YYYY-MM')`, 'bucket')
+      .select(bucketExpr, 'bucket')
       .addSelect('COALESCE(SUM(saleOrder.totalAmount), 0)', 'value')
       .where('saleOrder.orderStatus IN (:...statuses)', {
         statuses: [...COUNTABLE_SALE_ORDER_STATUSES],
@@ -494,8 +533,8 @@ export class DashboardService {
       .andWhere('saleOrder.orderDate <= :end', {
         end: this.endOfDay(range.end),
       })
-      .groupBy('bucket')
-      .orderBy('bucket', 'ASC');
+      .groupBy(bucketExpr)
+      .orderBy(bucketExpr, 'ASC');
 
     if (distributorId) {
       qb.andWhere('saleOrder.distributorId = :distributorId', {
@@ -532,61 +571,60 @@ export class DashboardService {
     // - Executed: DELIVERED, or APPROVED/PROCESSING already on a load sheet
     // - Pending: PENDING
     // - Unassigned: APPROVED/PROCESSING with no active load sheet
-    const assignedExists = `
-      EXISTS (
-        SELECT 1
-        FROM load_sheet_orders lso
-        INNER JOIN load_sheets ls ON ls.id = lso."loadSheetId"
-        WHERE lso."saleOrderId" = saleOrder.id
-          AND ls.status <> :cancelledLoadSheet
-      )
+    const baseQb = () => {
+      const qb = tenantDb
+        .getRepository(SaleOrder)
+        .createQueryBuilder('saleOrder')
+        .where('saleOrder.orderDate >= :start', { start: range.start })
+        .andWhere('saleOrder.orderDate < :end', { end: range.end });
+
+      if (distributorId) {
+        qb.andWhere('saleOrder.distributorId = :distributorId', {
+          distributorId,
+        });
+      }
+      return qb;
+    };
+
+    const assignedOrderIdsSql = `
+      SELECT lso."saleOrderId"
+      FROM load_sheet_orders lso
+      INNER JOIN load_sheets ls ON ls.id = lso."loadSheetId"
+      WHERE ls.status != :cancelledLoadSheet
     `;
 
-    const qb = tenantDb
-      .getRepository(SaleOrder)
-      .createQueryBuilder('saleOrder')
-      .select(
-        `SUM(CASE
-          WHEN saleOrder.orderStatus = '${OrderStatus.DELIVERED}' THEN 1
-          WHEN saleOrder.orderStatus IN ('${OrderStatus.APPROVED}', '${OrderStatus.PROCESSING}')
-            AND ${assignedExists} THEN 1
-          ELSE 0 END)`,
-        'executed',
-      )
-      .addSelect(
-        `SUM(CASE WHEN saleOrder.orderStatus = '${OrderStatus.PENDING}' THEN 1 ELSE 0 END)`,
-        'pending',
-      )
-      .addSelect(
-        `SUM(CASE
-          WHEN saleOrder.orderStatus IN ('${OrderStatus.APPROVED}', '${OrderStatus.PROCESSING}')
-            AND NOT ${assignedExists}
-          THEN 1 ELSE 0 END)`,
-        'unassigned',
-      )
-      .where('saleOrder.orderStatus IN (:...statuses)', {
-        statuses: [...FULFILLMENT_ORDER_STATUSES],
-      })
-      .andWhere('saleOrder.orderDate >= :start', { start: range.start })
-      .andWhere('saleOrder.orderDate < :end', { end: range.end })
-      .setParameter('cancelledLoadSheet', LoadSheetStatus.CANCELLED);
-
-    if (distributorId) {
-      qb.andWhere('saleOrder.distributorId = :distributorId', {
-        distributorId,
-      });
-    }
-
-    const row = await qb.getRawOne<{
-      executed: string;
-      pending: string;
-      unassigned: string;
-    }>();
+    const [delivered, pending, assignedInProgress, unassigned] =
+      await Promise.all([
+        baseQb()
+          .andWhere('saleOrder.orderStatus = :status', {
+            status: OrderStatus.DELIVERED,
+          })
+          .getCount(),
+        baseQb()
+          .andWhere('saleOrder.orderStatus = :status', {
+            status: OrderStatus.PENDING,
+          })
+          .getCount(),
+        baseQb()
+          .andWhere('saleOrder.orderStatus IN (:...statuses)', {
+            statuses: [OrderStatus.APPROVED, OrderStatus.PROCESSING],
+          })
+          .andWhere(`saleOrder.id IN (${assignedOrderIdsSql})`)
+          .setParameter('cancelledLoadSheet', LoadSheetStatus.CANCELLED)
+          .getCount(),
+        baseQb()
+          .andWhere('saleOrder.orderStatus IN (:...statuses)', {
+            statuses: [OrderStatus.APPROVED, OrderStatus.PROCESSING],
+          })
+          .andWhere(`saleOrder.id NOT IN (${assignedOrderIdsSql})`)
+          .setParameter('cancelledLoadSheet', LoadSheetStatus.CANCELLED)
+          .getCount(),
+      ]);
 
     return {
-      executed: this.toNumber(row?.executed),
-      pending: this.toNumber(row?.pending),
-      unassigned: this.toNumber(row?.unassigned),
+      executed: delivered + assignedInProgress,
+      pending,
+      unassigned,
     };
   }
 
