@@ -4,7 +4,6 @@ import {
   Attendence,
   AttendenceStatus,
 } from 'src/tenant-db/entities/attendence.entity';
-import { LoadSheetStatus } from 'src/tenant-db/entities/loadsheet.entity';
 import {
   OrderStatus,
   SaleOrder,
@@ -33,6 +32,24 @@ const APPROVED_SALE_ORDER_STATUSES = [
   OrderStatus.PROCESSING,
   OrderStatus.DELIVERED,
 ] as const;
+
+const ALL_ORDER_STATUSES = [
+  OrderStatus.PENDING,
+  OrderStatus.APPROVED,
+  OrderStatus.REJECTED,
+  OrderStatus.PROCESSING,
+  OrderStatus.CANCELLED,
+  OrderStatus.DELIVERED,
+] as const;
+
+const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
+  [OrderStatus.PENDING]: 'Pending',
+  [OrderStatus.APPROVED]: 'Approved',
+  [OrderStatus.REJECTED]: 'Rejected',
+  [OrderStatus.PROCESSING]: 'Processing',
+  [OrderStatus.CANCELLED]: 'Cancelled',
+  [OrderStatus.DELIVERED]: 'Delivered',
+};
 
 const ATTENDANCE_ROLE_TYPES = [
   UserType.SALESMAN,
@@ -147,42 +164,57 @@ export class DashboardService {
     const distributorId = this.normalizeOptionalId(query.distributorId);
 
     const [current, previous] = await Promise.all([
-      this.getOrderFulfillmentCounts(tenantDb, dayRange, distributorId),
-      this.getOrderFulfillmentCounts(tenantDb, previousWeekRange, distributorId),
+      this.getOrderStatusCounts(tenantDb, dayRange, distributorId),
+      this.getOrderStatusCounts(tenantDb, previousWeekRange, distributorId),
     ]);
 
-    const total = current.executed + current.pending + current.unassigned;
-    const executedPercent = this.percentOf(current.executed, total);
-    const pendingPercent = this.percentOf(current.pending, total);
-    const unassignedPercent = this.percentOf(current.unassigned, total);
-
-    const growthPercent = this.growthPercent(
-      current.executed,
-      previous.executed,
+    const total = ALL_ORDER_STATUSES.reduce(
+      (sum, status) => sum + (current[status] ?? 0),
+      0,
     );
+    const previousTotal = ALL_ORDER_STATUSES.reduce(
+      (sum, status) => sum + (previous[status] ?? 0),
+      0,
+    );
+
+    const segments = ALL_ORDER_STATUSES.map((status) => {
+      const count = current[status] ?? 0;
+      return {
+        key: status,
+        label: ORDER_STATUS_LABELS[status],
+        count,
+        percent: this.percentOf(count, total),
+      };
+    });
+
+    const summaryCounts = Object.fromEntries(
+      ALL_ORDER_STATUSES.map((status) => [
+        status.toLowerCase(),
+        current[status] ?? 0,
+      ]),
+    ) as Record<string, number>;
+    const summaryPercents = Object.fromEntries(
+      ALL_ORDER_STATUSES.map((status) => [
+        `${status.toLowerCase()}Percent`,
+        this.percentOf(current[status] ?? 0, total),
+      ]),
+    ) as Record<string, number>;
 
     return {
       filters: {
         date: this.toDateString(anchor),
         distributorId,
         granularity: 'DAY_WISE',
+        orderStatuses: [...ALL_ORDER_STATUSES],
       },
       summary: {
         total,
-        executed: current.executed,
-        pending: current.pending,
-        unassigned: current.unassigned,
-        executedPercent,
-        pendingPercent,
-        unassignedPercent,
-        growthPercent,
+        ...summaryCounts,
+        ...summaryPercents,
+        growthPercent: this.growthPercent(total, previousTotal),
         comparisonLabel: 'vs last week',
       },
-      segments: [
-        { key: 'EXECUTED', label: 'Executed', count: current.executed, percent: executedPercent },
-        { key: 'UNASSIGNED', label: 'Unassigned', count: current.unassigned, percent: unassignedPercent },
-        { key: 'PENDING', label: 'Pending', count: current.pending, percent: pendingPercent },
-      ],
+      segments,
     };
   }
 
@@ -1298,70 +1330,39 @@ export class DashboardService {
   // Orders helpers
   // ---------------------------------------------------------------------------
 
-  private async getOrderFulfillmentCounts(
+  private async getOrderStatusCounts(
     tenantDb: DataSource,
     range: { start: Date; end: Date },
     distributorId: string | null,
-  ): Promise<{ executed: number; pending: number; unassigned: number }> {
-    // Exclusive buckets that always sum to total:
-    // - Executed: DELIVERED, or APPROVED/PROCESSING already on a load sheet
-    // - Pending: PENDING
-    // - Unassigned: APPROVED/PROCESSING with no active load sheet
-    const baseQb = () => {
-      const qb = tenantDb
-        .getRepository(SaleOrder)
-        .createQueryBuilder('saleOrder')
-        .where('saleOrder.orderDate >= :start', { start: range.start })
-        .andWhere('saleOrder.orderDate < :end', { end: range.end });
+  ): Promise<Record<OrderStatus, number>> {
+    const qb = tenantDb
+      .getRepository(SaleOrder)
+      .createQueryBuilder('saleOrder')
+      .select('saleOrder.orderStatus', 'status')
+      .addSelect('COUNT(*)', 'count')
+      .where('saleOrder.orderDate >= :start', { start: range.start })
+      .andWhere('saleOrder.orderDate < :end', { end: range.end })
+      .groupBy('saleOrder.orderStatus');
 
-      if (distributorId) {
-        qb.andWhere('saleOrder.distributorId = :distributorId', {
-          distributorId,
-        });
+    if (distributorId) {
+      qb.andWhere('saleOrder.distributorId = :distributorId', {
+        distributorId,
+      });
+    }
+
+    const rows = await qb.getRawMany<{ status: OrderStatus; count: string }>();
+
+    const counts = Object.fromEntries(
+      ALL_ORDER_STATUSES.map((status) => [status, 0]),
+    ) as Record<OrderStatus, number>;
+
+    for (const row of rows) {
+      if (row.status in counts) {
+        counts[row.status] = this.toNumber(row.count);
       }
-      return qb;
-    };
+    }
 
-    const assignedOrderIdsSql = `
-      SELECT lso."saleOrderId"
-      FROM load_sheet_orders lso
-      INNER JOIN load_sheets ls ON ls.id = lso."loadSheetId"
-      WHERE ls.status != :cancelledLoadSheet
-    `;
-
-    const [delivered, pending, assignedInProgress, unassigned] =
-      await Promise.all([
-        baseQb()
-          .andWhere('saleOrder.orderStatus = :status', {
-            status: OrderStatus.DELIVERED,
-          })
-          .getCount(),
-        baseQb()
-          .andWhere('saleOrder.orderStatus = :status', {
-            status: OrderStatus.PENDING,
-          })
-          .getCount(),
-        baseQb()
-          .andWhere('saleOrder.orderStatus IN (:...statuses)', {
-            statuses: [OrderStatus.APPROVED, OrderStatus.PROCESSING],
-          })
-          .andWhere(`saleOrder.id IN (${assignedOrderIdsSql})`)
-          .setParameter('cancelledLoadSheet', LoadSheetStatus.CANCELLED)
-          .getCount(),
-        baseQb()
-          .andWhere('saleOrder.orderStatus IN (:...statuses)', {
-            statuses: [OrderStatus.APPROVED, OrderStatus.PROCESSING],
-          })
-          .andWhere(`saleOrder.id NOT IN (${assignedOrderIdsSql})`)
-          .setParameter('cancelledLoadSheet', LoadSheetStatus.CANCELLED)
-          .getCount(),
-      ]);
-
-    return {
-      executed: delivered + assignedInProgress,
-      pending,
-      unassigned,
-    };
+    return counts;
   }
 
   // ---------------------------------------------------------------------------
