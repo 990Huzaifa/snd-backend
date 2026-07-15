@@ -56,6 +56,7 @@ import { MerchandiserSyncUpController } from './controller/merchandiser/sync-up.
 import { AttendanceController } from './controller/attendance.controller';
 import { ProfileController } from './controller/profile.controller';
 import { InventoryReportController } from './controller/report/inventory-report.controller';
+import { InventoryForecastReportController } from './controller/report/inventory-forecast-report.controller';
 import { RetailerVisitReportController } from './controller/report/retailer-visit-report.controller';
 import { RetailerCheckInReportController } from './controller/report/retailer-checkin-report.controller';
 import { RetailerMerchandisingReportController } from './controller/report/retailer-merchandising-report.controller';
@@ -120,6 +121,7 @@ import { TenantDatabaseBackupService } from './service/tenant-database-backup.se
 import { PgDumpService } from './service/pg-dump.service';
 import { ProfileService } from './service/profile.service';
 import { InventoryReportService } from './service/report/inventory-report.service';
+import { InventoryForecastReportService } from './service/report/inventory-forecast-report.service';
 import { RetailerVisitReportService } from './service/report/retailer-visit-report.service';
 import { RetailerCheckInReportService } from './service/report/retailer-checkin-report.service';
 import { RetailerMerchandisingReportService } from './service/report/retailer-merchandising-report.service';
@@ -194,6 +196,7 @@ import { DashboardService } from './service/dashboard.service';
     ProfileController,
     DatabaseBackupController,
     InventoryReportController,
+    InventoryForecastReportController,
     RetailerVisitReportController,
     RetailerCheckInReportController,
     RetailerMerchandisingReportController,
@@ -256,6 +259,7 @@ import { DashboardService } from './service/dashboard.service';
     PgDumpService,
     ProfileService,
     InventoryReportService,
+    InventoryForecastReportService,
     RetailerVisitReportService,
     RetailerCheckInReportService,
     RetailerMerchandisingReportService,

@@ -70,6 +70,10 @@ export const TENANT_PERMISSIONS = [
   { code: 'LIST_TRANSFER_STOCK', name: 'List Transfer Stock' },
   { code: 'LIST_ATTENDANCE', name: 'List Attendance' },
   { code: 'VIEW_INVENTORY_REPORT', name: 'View Inventory Report' },
+  {
+    code: 'VIEW_INVENTORY_FORECAST_REPORT',
+    name: 'View Inventory Forecast Report',
+  },
   { code: 'VIEW_RETAILER_VISIT_REPORT', name: 'View Retailer Visit Report' },
   { code: 'VIEW_RETAILER_CHECKIN_REPORT', name: 'View Retailer Check-In Report' },
   { code: 'VIEW_RETAILER_MERCHANDISING_REPORT', name: 'View Retailer Merchandising Report' },
