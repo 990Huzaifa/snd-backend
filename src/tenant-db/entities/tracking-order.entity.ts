@@ -61,7 +61,7 @@ export class TrackingOrder {
 }
 
 @Entity('tracking_order_items')
-class TrackingOrderItem {
+export class TrackingOrderItem {
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
