@@ -13,6 +13,10 @@ import {
 } from 'src/common/geo/geo.util';
 import { S3Service } from 'src/common/s3/s3.service';
 import {
+  Attendence,
+  TrackingLog,
+} from 'src/tenant-db/entities/attendence.entity';
+import {
   Retailer,
   RetailerAttendence,
   RetailerVisit,
@@ -58,6 +62,12 @@ type VisitSyncRow = {
 type CheckInSyncRow = {
   row: number;
   checkIn: CheckInRetailerItemDto;
+};
+
+type CheckInTrackingEntry = {
+  latitude: number;
+  longitude: number;
+  logTime: Date;
 };
 
 @Injectable()
@@ -693,6 +703,50 @@ export class RetailerVisitService {
     }));
   }
 
+  private async findActiveTodayAttendance(
+    tenantDb: DataSource,
+    userId: string,
+  ): Promise<Attendence | null> {
+    const today = this.startOfDay(new Date());
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    return tenantDb
+      .getRepository(Attendence)
+      .createQueryBuilder('a')
+      .where('a."userId" = :userId', { userId })
+      .andWhere('a."attendenceDate" >= :today', { today })
+      .andWhere('a."attendenceDate" < :tomorrow', { tomorrow })
+      .andWhere('a."checkInTime" IS NOT NULL')
+      .andWhere('a."checkOutTime" IS NULL')
+      .orderBy('a."checkInTime"', 'DESC')
+      .getOne();
+  }
+
+  private async saveAttendanceTrackingLogs(
+    tenantDb: DataSource,
+    userId: string,
+    attendenceId: string,
+    entries: CheckInTrackingEntry[],
+  ): Promise<void> {
+    if (!entries.length) {
+      return;
+    }
+
+    const repo = tenantDb.getRepository(TrackingLog);
+    await repo.save(
+      entries.map((entry) =>
+        repo.create({
+          userId,
+          attendenceId,
+          latitude: entry.latitude,
+          longitude: entry.longitude,
+          logTime: entry.logTime,
+        }),
+      ),
+    );
+  }
+
   private async notifyCheckInCompletion(
     tenantDb: DataSource,
     job: TenantJob,
@@ -819,23 +873,43 @@ export class RetailerVisitService {
       });
     }
 
+    const activeAttendance = await this.findActiveTodayAttendance(
+      tenantDb,
+      user.userId,
+    );
+    const trackingEntries: CheckInTrackingEntry[] = [];
+
     if (validRows.length) {
+      const recordSuccessfulCheckIn = (
+        source: (typeof validRows)[number],
+        attendance: RetailerAttendence,
+      ) => {
+        this.tenantJobService.appendLog(jobId, {
+          row: source.row.row,
+          name: source.label,
+          status: 'success',
+          metadata: {
+            retailerAttendenceId: attendance.id,
+            retailerId: attendance.retailerId,
+          },
+        });
+
+        if (activeAttendance) {
+          trackingEntries.push({
+            latitude: source.row.checkIn.checkInLatitude,
+            longitude: source.row.checkIn.checkInLongitude,
+            logTime: attendance.createdAt ?? new Date(),
+          });
+        }
+      };
+
       try {
         const saved = await attendanceRepo.save(
           validRows.map((item) => attendanceRepo.create(item.entity)),
         );
 
         saved.forEach((attendance, index) => {
-          const source = validRows[index];
-          this.tenantJobService.appendLog(jobId, {
-            row: source.row.row,
-            name: source.label,
-            status: 'success',
-            metadata: {
-              retailerAttendenceId: attendance.id,
-              retailerId: attendance.retailerId,
-            },
-          });
+          recordSuccessfulCheckIn(validRows[index], attendance);
         });
       } catch {
         for (const item of validRows) {
@@ -843,15 +917,7 @@ export class RetailerVisitService {
             const attendance = await attendanceRepo.save(
               attendanceRepo.create(item.entity),
             );
-            this.tenantJobService.appendLog(jobId, {
-              row: item.row.row,
-              name: item.label,
-              status: 'success',
-              metadata: {
-                retailerAttendenceId: attendance.id,
-                retailerId: attendance.retailerId,
-              },
-            });
+            recordSuccessfulCheckIn(item, attendance);
           } catch (error) {
             this.tenantJobService.appendLog(jobId, {
               row: item.row.row,
@@ -861,6 +927,15 @@ export class RetailerVisitService {
             });
           }
         }
+      }
+
+      if (activeAttendance) {
+        await this.saveAttendanceTrackingLogs(
+          tenantDb,
+          user.userId,
+          activeAttendance.id,
+          trackingEntries,
+        );
       }
     }
 
