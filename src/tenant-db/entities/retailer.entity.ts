@@ -327,28 +327,28 @@ export class RetailerInventory {
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
-    @Column()
+    @Column({ type: 'uuid' })
     retailerId: string;
 
     @ManyToOne(() => Retailer, { onDelete: 'RESTRICT' })
     @JoinColumn({ name: 'retailerId' })
     retailer: Retailer;
 
-    @Column()
+    @Column({ type: 'uuid' })
     productId: string;
 
     @ManyToOne(() => Product, { onDelete: 'CASCADE' })
     @JoinColumn({ name: 'productId' })
     product: Product;
 
-    @Column()
+    @Column({ type: 'uuid' })
     productFlavourId: string;
 
     @ManyToOne(() => ProductFlavour, { onDelete: 'RESTRICT' })
     @JoinColumn({ name: 'productFlavourId' })
     productFlavour: ProductFlavour;
 
-    @Column()
+    @Column({ type: 'uuid' })
     uomId: string;
 
     @ManyToOne(() => Uom, { onDelete: 'RESTRICT' })

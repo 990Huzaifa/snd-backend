@@ -41,7 +41,7 @@ export type ActiveProductForInventorySync = {
   category: { id: string; name: string } | null;
   brand: { id: string; name: string } | null;
   flavours: Array<{
-    id: number;
+    id: string;
     flavour: { id: string; name: string };
   }>;
   uoms: Array<{ id: string; name: string }>;
@@ -111,7 +111,7 @@ export class RetailerInventoryService {
           ? { id: product.brand.id, name: product.brand.name }
           : null,
         flavours: (product.flavours ?? []).map((pf) => ({
-          id: Number(pf.id),
+          id: pf.id,
           flavour: {
             id: pf.flavour.id,
             name: pf.flavour.name,
@@ -287,7 +287,7 @@ export class RetailerInventoryService {
     }
 
     const productFlavour = await tenantDb.getRepository(ProductFlavour).findOne({
-      where: { id: refs.productFlavourId as unknown as string },
+      where: { id: refs.productFlavourId },
       select: ['id', 'productId'],
     });
     if (!productFlavour) {
