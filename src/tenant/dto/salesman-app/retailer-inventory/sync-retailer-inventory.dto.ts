@@ -3,6 +3,7 @@ import {
   ArrayMinSize,
   IsArray,
   IsBoolean,
+  IsEnum,
   IsInt,
   IsOptional,
   IsUUID,
@@ -10,10 +11,14 @@ import {
   ValidateIf,
   ValidateNested,
 } from 'class-validator';
+import { RetailerInventoryType } from 'src/tenant-db/entities/retailer.entity';
 
 export const SALESMAN_RETAILER_INVENTORY_SYNC_MAX = 50;
 
 export class SyncRetailerInventoryItemDto {
+  @IsEnum(RetailerInventoryType)
+  type: RetailerInventoryType;
+
   @IsUUID()
   retailerId: string;
 

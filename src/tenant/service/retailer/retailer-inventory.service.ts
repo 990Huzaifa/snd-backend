@@ -12,6 +12,7 @@ import {
 import {
   Retailer,
   RetailerInventory,
+  RetailerInventoryType,
 } from 'src/tenant-db/entities/retailer.entity';
 import { SyncRetailerInventoryItemDto } from '../../dto/salesman-app/retailer-inventory/sync-retailer-inventory.dto';
 
@@ -208,6 +209,7 @@ export class RetailerInventoryService {
     action: 'created' | 'updated' | 'removed' | 'noop';
     inventoryId?: string;
   }> {
+    const type = item.type;
     const retailerId = item.retailerId.trim();
     const productId = item.productId.trim();
     const uomId = item.uomId.trim();
@@ -223,6 +225,7 @@ export class RetailerInventoryService {
     const repo = tenantDb.getRepository(RetailerInventory);
     const existing = await repo.findOne({
       where: {
+        type,
         retailerId,
         productId,
         productFlavourId,
@@ -250,6 +253,7 @@ export class RetailerInventoryService {
 
     const created = await repo.save(
       repo.create({
+        type,
         retailerId,
         productId,
         productFlavourId,

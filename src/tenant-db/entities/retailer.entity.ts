@@ -322,10 +322,18 @@ export class RetailerAttendence {
     updatedAt: Date;
 }  
 
+export enum RetailerInventoryType {
+    WAREHOUSE = 'WAREHOUSE',
+    SHELF = 'SHELF',
+}
+
 @Entity('retailer_inventories')
 export class RetailerInventory {
     @PrimaryGeneratedColumn('uuid')
     id: string;
+
+    @Column({ type: 'enum', enum: RetailerInventoryType })
+    type: RetailerInventoryType;
 
     @Column({ type: 'uuid' })
     retailerId: string;
