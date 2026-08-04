@@ -155,6 +155,7 @@ export class RetailerInventoryService {
         'flavour.name',
         'uom.id',
         'uom.name',
+        'ri.retailerInventoryType',
       ])
       .orderBy('retailer.shopName', 'ASC')
       .addOrderBy('product.name', 'ASC')
@@ -171,6 +172,7 @@ export class RetailerInventoryService {
 
     const result: RetailerInventoryListItem[] = rows.map((row) => ({
       id: row.id,
+      retailerInventoryType: row.retailerInventoryType,
       retailerId: row.retailerId,
       productId: row.productId,
       productFlavourId: row.productFlavourId,
