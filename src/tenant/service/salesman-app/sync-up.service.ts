@@ -1323,7 +1323,7 @@ export class SalesmanSyncUpService {
                     metadata: {
                         action: result.action,
                         inventoryId: result.inventoryId,
-                        type: row.item.type,
+                        retailerInventoryType: row.item.type,
                         retailerId: row.item.retailerId,
                         productId: row.item.productId,
                         productFlavourId: row.item.productFlavourId,

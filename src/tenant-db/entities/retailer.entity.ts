@@ -333,7 +333,7 @@ export class RetailerInventory {
     id: string;
 
     @Column({ type: 'enum', enum: RetailerInventoryType })
-    type: RetailerInventoryType;
+    retailerInventoryType: RetailerInventoryType;
 
     @Column({ type: 'uuid' })
     retailerId: string;
