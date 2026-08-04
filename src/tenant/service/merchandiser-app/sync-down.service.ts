@@ -4,6 +4,7 @@ import { PJP, PJPRoute, PJPStatus } from 'src/tenant-db/entities/pjp.entity';
 import { Retailer, RetailerCategory, RetailerChannel } from 'src/tenant-db/entities/retailer.entity';
 import { Route } from 'src/tenant-db/entities/route.entity';
 import { SalesmanDistributor } from 'src/tenant-db/entities/user.entity';
+import { RetailerInventoryService } from '../retailer/retailer-inventory.service';
 
 const RETAILER_RELATIONS = [
   'createdByUser',
@@ -22,6 +23,10 @@ const ROUTE_RELATIONS = ['area', 'area.region', 'distributor'] as const;
 
 @Injectable()
 export class MerchandiserSyncDownService {
+
+  constructor(
+    private readonly retailerInventoryService: RetailerInventoryService,
+  ) {}
 
   private normalizeDistributorId(distributorId?: string): string {
     const normalized = (distributorId ?? '').trim();
@@ -117,5 +122,13 @@ export class MerchandiserSyncDownService {
       order: { name: 'ASC' },
     });
     return { result: channels };
+  }
+
+  async listRetailerInventories(tenantDb: DataSource, retailerId?: string) {
+    return this.retailerInventoryService.list(tenantDb, retailerId);
+  }
+
+  async listActiveProducts(tenantDb: DataSource) {
+    return this.retailerInventoryService.listActiveProducts(tenantDb);
   }
 }

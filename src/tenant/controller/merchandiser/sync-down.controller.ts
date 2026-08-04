@@ -8,6 +8,7 @@ import { TenantConnectionGuard } from 'src/common/guards/tenant-connection.guard
 import { TenantJwtGuard } from 'src/common/guards/tenant-jwt.guard';
 import { TenantConnection } from 'src/common/tenant/tenant-connection.decorator';
 import { SalesmanDistributorQueryDto } from '../../dto/salesman-app/sync-down/sync-down.dto';
+import { RetailerInventoryQueryDto } from '../../dto/salesman-app/retailer-inventory/retailer-inventory-query.dto';
 import { MerchandiserSyncDownService } from '../../service/merchandiser-app/sync-down.service';
 
 @Controller('tenant/merchandiser')
@@ -69,5 +70,23 @@ export class MerchandiserSyncDownController {
   @RequirePermissions('MERCHANDISER_SYNC_DOWN')
   listRetailerChannels(@TenantConnection() tenantDb: DataSource) {
     return this.syncDownService.listRetailerChannels(tenantDb);
+  }
+
+  @Get('retailer-inventories')
+  @RequirePermissions('MERCHANDISER_SYNC_DOWN')
+  listRetailerInventories(
+    @TenantConnection() tenantDb: DataSource,
+    @Query() query: RetailerInventoryQueryDto,
+  ) {
+    return this.syncDownService.listRetailerInventories(
+      tenantDb,
+      query.retailerId,
+    );
+  }
+
+  @Get('active-products')
+  @RequirePermissions('MERCHANDISER_SYNC_DOWN')
+  listActiveProducts(@TenantConnection() tenantDb: DataSource) {
+    return this.syncDownService.listActiveProducts(tenantDb);
   }
 }

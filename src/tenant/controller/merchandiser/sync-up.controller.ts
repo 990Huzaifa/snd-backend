@@ -21,6 +21,7 @@ import {
 } from 'src/common/tenant/tenant-connection.decorator';
 import { merchandiserMerchandisingImageMulterOptions } from '../../config/merchandiser-merchandising-image.multer';
 import { BulkCreateRetailerMerchandisingDto } from '../../dto/merchandiser-app/retailer-merchandising/bulk-create-retailer-merchandising.dto';
+import { BulkSyncRetailerInventoryDto } from '../../dto/salesman-app/retailer-inventory/sync-retailer-inventory.dto';
 import { MerchandiserSyncUpService } from '../../service/merchandiser-app/sync-up.service';
 
 @Controller('tenant/merchandiser')
@@ -47,6 +48,22 @@ export class MerchandiserSyncUpController {
       tenantDb,
       dto,
       files,
+      req.user as { userId: string },
+      tenantCode,
+    );
+  }
+
+  @Post('retailer-inventories')
+  @RequirePermissions('MERCHANDISER_SYNC_UP')
+  syncRetailerInventories(
+    @TenantConnection() tenantDb: DataSource,
+    @TenantCode() tenantCode: string,
+    @Body() dto: BulkSyncRetailerInventoryDto,
+    @Req() req: Request,
+  ) {
+    return this.syncUpService.syncRetailerInventories(
+      tenantDb,
+      dto,
       req.user as { userId: string },
       tenantCode,
     );
