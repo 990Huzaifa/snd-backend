@@ -225,7 +225,7 @@ export class RetailerInventoryService {
     const repo = tenantDb.getRepository(RetailerInventory);
     const existing = await repo.findOne({
       where: {
-        type,
+        retailerInventoryType: type,
         retailerId,
         productId,
         productFlavourId,
@@ -253,7 +253,7 @@ export class RetailerInventoryService {
 
     const created = await repo.save(
       repo.create({
-        type,
+        retailerInventoryType: type,
         retailerId,
         productId,
         productFlavourId,
