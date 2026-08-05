@@ -1,7 +1,12 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { DataSource, In } from 'typeorm';
 import { PJP, PJPRoute, PJPStatus } from 'src/tenant-db/entities/pjp.entity';
-import { Retailer, RetailerCategory, RetailerChannel } from 'src/tenant-db/entities/retailer.entity';
+import {
+  Retailer,
+  RetailerCategory,
+  RetailerChannel,
+  RetailerMerchandising,
+} from 'src/tenant-db/entities/retailer.entity';
 import { Route } from 'src/tenant-db/entities/route.entity';
 import { SalesmanDistributor } from 'src/tenant-db/entities/user.entity';
 import { RetailerInventoryService } from '../retailer/retailer-inventory.service';
@@ -130,5 +135,53 @@ export class MerchandiserSyncDownService {
 
   async listActiveProducts(tenantDb: DataSource) {
     return this.retailerInventoryService.listActiveProducts(tenantDb);
+  }
+
+  async listMerchandisingHistory(
+    tenantDb: DataSource,
+    user: { userId: string },
+    retailerId?: string,
+  ) {
+    const qb = tenantDb
+      .getRepository(RetailerMerchandising)
+      .createQueryBuilder('rm')
+      .leftJoinAndSelect('rm.retailer', 'retailer')
+      .leftJoinAndSelect('retailer.route', 'route')
+      .where('rm."userId" = :userId', { userId: user.userId });
+
+    const normalizedRetailerId = (retailerId ?? '').trim();
+    if (normalizedRetailerId) {
+      qb.andWhere('rm."retailerId" = :retailerId', {
+        retailerId: normalizedRetailerId,
+      });
+    }
+
+    const rows = await qb.orderBy('rm.createdAt', 'DESC').getMany();
+
+    const result = rows.map((entry) => ({
+      id: entry.id,
+      notes: entry.notes,
+      shelfImages: entry.shelfImages,
+      imageCount: entry.shelfImages?.length ?? 0,
+      merchandisingDate: entry.createdAt,
+      createdAt: entry.createdAt,
+      updatedAt: entry.updatedAt,
+      retailer: entry.retailer
+        ? {
+            id: entry.retailer.id,
+            shopName: entry.retailer.shopName,
+            address: entry.retailer.address,
+            phone: entry.retailer.phone,
+            route: entry.retailer.route
+              ? {
+                  id: entry.retailer.route.id,
+                  name: entry.retailer.route.name,
+                }
+              : null,
+          }
+        : null,
+    }));
+
+    return { result };
   }
 }

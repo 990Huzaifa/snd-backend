@@ -89,4 +89,18 @@ export class MerchandiserSyncDownController {
   listActiveProducts(@TenantConnection() tenantDb: DataSource) {
     return this.syncDownService.listActiveProducts(tenantDb);
   }
+
+  @Get('merchandising-history')
+  @RequirePermissions('MERCHANDISER_SYNC_DOWN')
+  listMerchandisingHistory(
+    @TenantConnection() tenantDb: DataSource,
+    @Req() req: Request,
+    @Query() query: RetailerInventoryQueryDto,
+  ) {
+    return this.syncDownService.listMerchandisingHistory(
+      tenantDb,
+      req.user as { userId: string },
+      query.retailerId,
+    );
+  }
 }
