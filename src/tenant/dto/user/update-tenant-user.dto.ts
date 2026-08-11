@@ -80,6 +80,11 @@ export class UpdateTenantUserDto {
   maxRadius?: string | null;
 
   @IsOptional()
+  @IsString()
+  @MinLength(8)
+  password?: string;
+
+  @IsOptional()
   @IsEnum(UserType)
   type?: UserType;
 

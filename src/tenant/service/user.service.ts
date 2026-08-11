@@ -429,6 +429,10 @@ export class UserService {
     if (dto.longitude !== undefined) user.longitude = dto.longitude?.trim() ?? null;
     if (dto.maxRadius !== undefined) user.maxRadius = dto.maxRadius?.trim() ?? null;
 
+    if (dto.password !== undefined && dto.password.trim()) {
+      user.password = await bcrypt.hash(dto.password.trim(), 10);
+    }
+
     const updatedUser = await userRepo.save(user);
 
     await this.activityLogService.recordActivityLog(tenantDb, {
