@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  HttpException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -33,6 +34,11 @@ type ResolvedReturnItem = {
   returnedQuantity: number;
   total: number;
   returnReason: string;
+};
+
+type BulkStatusResult = {
+  succeeded: string[];
+  failed: { id: string; message: string }[];
 };
 
 @Injectable()
@@ -727,24 +733,36 @@ export class SaleReturnService {
     return this.view(tenantDb, id, user, { recordActivityLog: false });
   }
 
-  async updateStatus(
-    tenantDb: DataSource,
-    id: string,
-    dto: UpdateSaleReturnStatusDto,
-    user: { userId: string },
-  ) {
+  private assertApproveOrRejectStatus(returnStatus: ReturnStatus) {
     if (
-      dto.returnStatus !== ReturnStatus.APPROVED &&
-      dto.returnStatus !== ReturnStatus.REJECTED
+      returnStatus !== ReturnStatus.APPROVED &&
+      returnStatus !== ReturnStatus.REJECTED
     ) {
       throw new BadRequestException(
         'Only APPROVED and REJECTED statuses are allowed',
       );
     }
+  }
 
-    await this.ensureUser(tenantDb, user.userId);
+  private bulkErrorMessage(error: unknown): string {
+    if (error instanceof HttpException) {
+      return error.message;
+    }
+    if (error instanceof Error) {
+      return error.message;
+    }
+    return 'Unknown error';
+  }
 
-    const outcome = await tenantDb.transaction(
+  private async applyStatusChange(
+    tenantDb: DataSource,
+    id: string,
+    returnStatus: ReturnStatus,
+    user: { userId: string },
+  ): Promise<'noop' | 'updated'> {
+    this.assertApproveOrRejectStatus(returnStatus);
+
+    return tenantDb.transaction(
       async (manager): Promise<'noop' | 'updated'> => {
         const returnRepo = manager.getRepository(SaleReturn);
         const saleReturn = await returnRepo.findOne({
@@ -758,7 +776,7 @@ export class SaleReturnService {
 
         if (
           this.isExecuted(saleReturn) &&
-          dto.returnStatus !== ReturnStatus.APPROVED
+          returnStatus !== ReturnStatus.APPROVED
         ) {
           throw new BadRequestException(
             'Cannot change status once the return has been approved and posted',
@@ -770,16 +788,16 @@ export class SaleReturnService {
         }
 
         const needsApprovalPost =
-          dto.returnStatus === ReturnStatus.APPROVED &&
+          returnStatus === ReturnStatus.APPROVED &&
           !this.isExecuted(saleReturn);
         const isNoop =
-          dto.returnStatus === saleReturn.returnStatus && !needsApprovalPost;
+          returnStatus === saleReturn.returnStatus && !needsApprovalPost;
 
         if (isNoop) {
           return 'noop';
         }
 
-        if (dto.returnStatus === ReturnStatus.APPROVED) {
+        if (returnStatus === ReturnStatus.APPROVED) {
           if (saleReturn.returnStatus !== ReturnStatus.PENDING) {
             throw new BadRequestException(
               'Only pending sale returns can be approved',
@@ -820,6 +838,22 @@ export class SaleReturnService {
         return 'updated';
       },
     );
+  }
+
+  async updateStatus(
+    tenantDb: DataSource,
+    id: string,
+    dto: UpdateSaleReturnStatusDto,
+    user: { userId: string },
+  ) {
+    await this.ensureUser(tenantDb, user.userId);
+
+    const outcome = await this.applyStatusChange(
+      tenantDb,
+      id,
+      dto.returnStatus,
+      user,
+    );
 
     if (outcome === 'updated') {
       await this.activityLogService.recordActivityLog(tenantDb, {
@@ -831,6 +865,57 @@ export class SaleReturnService {
     }
 
     return this.view(tenantDb, id, user, { recordActivityLog: false });
+  }
+
+  async bulkApprove(
+    tenantDb: DataSource,
+    ids: string[],
+    user: { userId: string },
+  ) {
+    return this.bulkUpdateStatus(tenantDb, ids, ReturnStatus.APPROVED, user);
+  }
+
+  async bulkReject(
+    tenantDb: DataSource,
+    ids: string[],
+    user: { userId: string },
+  ) {
+    return this.bulkUpdateStatus(tenantDb, ids, ReturnStatus.REJECTED, user);
+  }
+
+  private async bulkUpdateStatus(
+    tenantDb: DataSource,
+    ids: string[],
+    returnStatus: ReturnStatus,
+    user: { userId: string },
+  ): Promise<BulkStatusResult> {
+    this.assertApproveOrRejectStatus(returnStatus);
+    await this.ensureUser(tenantDb, user.userId);
+
+    const succeeded: string[] = [];
+    const failed: { id: string; message: string }[] = [];
+
+    for (const id of ids) {
+      try {
+        await this.applyStatusChange(tenantDb, id, returnStatus, user);
+        succeeded.push(id);
+      } catch (error) {
+        failed.push({ id, message: this.bulkErrorMessage(error) });
+      }
+    }
+
+    await this.activityLogService.recordActivityLog(tenantDb, {
+      actorId: user.userId,
+      action: 'SALE_RETURN_BULK_STATUS_UPDATED',
+      description: `Sale returns bulk ${returnStatus.toLowerCase()}`,
+      metadata: {
+        returnStatus,
+        succeeded,
+        failed,
+      },
+    });
+
+    return { succeeded, failed };
   }
 
   async list(

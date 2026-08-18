@@ -1,0 +1,137 @@
+import { Injectable } from '@nestjs/common';
+import { DataSource, In } from 'typeorm';
+import { PJP, PJPRoute, PJPStatus } from 'src/tenant-db/entities/pjp.entity';
+import {
+  Retailer,
+  RetailerMerchandising,
+} from 'src/tenant-db/entities/retailer.entity';
+import { Route } from 'src/tenant-db/entities/route.entity';
+import { RetailerInventoryService } from '../retailer/retailer-inventory.service';
+
+const RETAILER_RELATIONS = [
+  'createdByUser',
+  'approvedByUser',
+  'retailerCategory',
+  'retailerChannel',
+  'route',
+  'route.area',
+  'route.area.region',
+  'route.distributor',
+  'route.distributor.area',
+  'route.distributor.area.region',
+] as const;
+
+const ROUTE_RELATIONS = ['area', 'area.region', 'distributor'] as const;
+
+@Injectable()
+export class SpgSyncDownService {
+  constructor(
+    private readonly retailerInventoryService: RetailerInventoryService,
+  ) {}
+
+  async listRoutes(tenantDb: DataSource) {
+    const routes = await tenantDb.getRepository(Route).find({
+      relations: [...ROUTE_RELATIONS],
+      order: { name: 'ASC' },
+    });
+
+    return { result: routes };
+  }
+
+  async listRetailers(tenantDb: DataSource) {
+    const retailers = await tenantDb.getRepository(Retailer).find({
+      relations: [...RETAILER_RELATIONS],
+      order: { shopName: 'ASC' },
+    });
+
+    return { result: retailers };
+  }
+
+  async listPjps(tenantDb: DataSource, user: { userId: string }) {
+    const pjps = await tenantDb.getRepository(PJP).find({
+      where: { salesmanId: user.userId, status: PJPStatus.ACTIVE },
+      relations: ['salesman'],
+      order: { weekStartDate: 'DESC' },
+    });
+
+    if (!pjps.length) {
+      return { result: [] };
+    }
+
+    const pjpRoutes = await tenantDb.getRepository(PJPRoute).find({
+      where: { pjpId: In(pjps.map((pjp) => pjp.id)) },
+      relations: ['route', 'route.area', 'route.distributor', 'route.distributor.area'],
+      order: { visitDate: 'ASC' },
+    });
+
+    const routesByPjpId = new Map<string, PJPRoute[]>();
+    for (const pjpRoute of pjpRoutes) {
+      const existing = routesByPjpId.get(pjpRoute.pjpId) ?? [];
+      existing.push(pjpRoute);
+      routesByPjpId.set(pjpRoute.pjpId, existing);
+    }
+
+    const result = pjps.map((pjp) => ({
+      ...pjp,
+      routes: routesByPjpId.get(pjp.id) ?? [],
+    }));
+
+    return { result };
+  }
+
+  async listRetailerInventories(tenantDb: DataSource, retailerId?: string) {
+    return this.retailerInventoryService.list(tenantDb, retailerId);
+  }
+
+  async listActiveProducts(tenantDb: DataSource) {
+    return this.retailerInventoryService.listActiveProducts(tenantDb);
+  }
+
+  async listMerchandisingHistory(
+    tenantDb: DataSource,
+    user: { userId: string },
+    retailerId?: string,
+  ) {
+    const qb = tenantDb
+      .getRepository(RetailerMerchandising)
+      .createQueryBuilder('rm')
+      .leftJoinAndSelect('rm.retailer', 'retailer')
+      .leftJoinAndSelect('retailer.route', 'route')
+      .where('rm."userId" = :userId', { userId: user.userId });
+
+    const normalizedRetailerId = (retailerId ?? '').trim();
+    if (normalizedRetailerId) {
+      qb.andWhere('rm."retailerId" = :retailerId', {
+        retailerId: normalizedRetailerId,
+      });
+    }
+
+    const rows = await qb.orderBy('rm.createdAt', 'DESC').getMany();
+
+    const result = rows.map((entry) => ({
+      id: entry.id,
+      notes: entry.notes,
+      shelfImages: entry.shelfImages,
+      imageCount: entry.shelfImages?.length ?? 0,
+      merchandisingDate: entry.createdAt,
+      createdAt: entry.createdAt,
+      updatedAt: entry.updatedAt,
+      retailer: entry.retailer
+        ? {
+            id: entry.retailer.id,
+            shopName: entry.retailer.shopName,
+            address: entry.retailer.address,
+            phone: entry.retailer.phone,
+            route: entry.retailer.route
+              ? {
+                  id: entry.retailer.route.id,
+                  name: entry.retailer.route.name,
+                }
+              : null,
+          }
+        : null,
+    }));
+
+    return { result };
+  }
+}

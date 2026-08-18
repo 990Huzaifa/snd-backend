@@ -28,6 +28,7 @@ import { SaleVoucherService } from '../service/sale-voucher.service';
 import { CreateSaleVoucherDto } from '../dto/sale-voucher/create-sale-voucher.dto';
 import { UpdateSaleVoucherDto } from '../dto/sale-voucher/update-sale-voucher.dto';
 import { UpdateSaleVoucherStatusDto } from '../dto/sale-voucher/update-sale-voucher-status.dto';
+import { BulkSaleVoucherIdsDto } from '../dto/sale-voucher/bulk-sale-voucher-ids.dto';
 
 @Controller('tenant/sale-vouchers')
 @UseGuards(
@@ -117,6 +118,34 @@ export class SaleVoucherController {
       tenantDb,
       id,
       dto,
+      req.user as { userId: string },
+    );
+  }
+
+  @Put('bulk/approve')
+  @RequirePermissions('UPDATE_SALE_VOUCHER')
+  bulkApprove(
+    @TenantConnection() tenantDb: DataSource,
+    @Body() dto: BulkSaleVoucherIdsDto,
+    @Req() req: Request,
+  ) {
+    return this.saleVoucherService.bulkApprove(
+      tenantDb,
+      dto.ids,
+      req.user as { userId: string },
+    );
+  }
+
+  @Put('bulk/reject')
+  @RequirePermissions('UPDATE_SALE_VOUCHER')
+  bulkReject(
+    @TenantConnection() tenantDb: DataSource,
+    @Body() dto: BulkSaleVoucherIdsDto,
+    @Req() req: Request,
+  ) {
+    return this.saleVoucherService.bulkReject(
+      tenantDb,
+      dto.ids,
       req.user as { userId: string },
     );
   }

@@ -53,6 +53,7 @@ import { SalesmanSyncDownController } from './controller/salesman-app/sync-down.
 import { SalesmanSyncUpController } from './controller/salesman-app/sync-up.controller';
 import { MerchandiserSyncDownController } from './controller/merchandiser/sync-down.controller';
 import { MerchandiserSyncUpController } from './controller/merchandiser/sync-up.controller';
+import { SpgSyncDownController } from './controller/spg-app/sync-down.controller';
 import { AttendanceController } from './controller/attendance.controller';
 import { ProfileController } from './controller/profile.controller';
 import { InventoryReportController } from './controller/report/inventory-report.controller';
@@ -109,6 +110,7 @@ import { RiderSaleOrderDeliveryService } from './service/rider-app/sale-order-de
 import { RetailerVisitService } from './service/salesman-app/retailer-visit.service';
 import { MerchandiserSyncDownService } from './service/merchandiser-app/sync-down.service';
 import { MerchandiserSyncUpService } from './service/merchandiser-app/sync-up.service';
+import { SpgSyncDownService } from './service/spg-app/sync-down.service';
 import { SalesmanAttendanceService } from './service/salesman-app/attendance.service';
 import { SalesmanSyncDownService } from './service/salesman-app/sync-down.service';
 import { SalesmanSyncUpService } from './service/salesman-app/sync-up.service';
@@ -192,6 +194,7 @@ import { DashboardService } from './service/dashboard.service';
     SalesmanSyncUpController,
     MerchandiserSyncDownController,
     MerchandiserSyncUpController,
+    SpgSyncDownController,
     AttendanceController,
     ProfileController,
     DatabaseBackupController,
@@ -250,6 +253,7 @@ import { DashboardService } from './service/dashboard.service';
     RetailerVisitService,
     MerchandiserSyncDownService,
     MerchandiserSyncUpService,
+    SpgSyncDownService,
     SalesmanAttendanceService,
     SalesmanSyncDownService,
     SalesmanSyncUpService,

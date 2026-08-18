@@ -21,6 +21,7 @@ import { TenantConnection } from 'src/common/tenant/tenant-connection.decorator'
 import { SaleReturnService } from '../service/sale-return.service';
 import { CreateSaleReturnDto } from '../dto/sale-return/create-sale-return.dto';
 import { UpdateSaleReturnDto } from '../dto/sale-return/update-sale-return.dto';
+import { BulkSaleReturnIdsDto } from '../dto/sale-return/bulk-sale-return-ids.dto';
 import { ReturnStatus } from 'src/tenant-db/entities/sale-return.entity';
 
 @Controller('tenant/sale-returns')
@@ -108,6 +109,34 @@ export class SaleReturnController {
       tenantDb,
       id,
       { returnStatus },
+      req.user as { userId: string },
+    );
+  }
+
+  @Put('bulk/approve')
+  @RequirePermissions('UPDATE_SALE_RETURN')
+  bulkApprove(
+    @TenantConnection() tenantDb: DataSource,
+    @Body() dto: BulkSaleReturnIdsDto,
+    @Req() req: Request,
+  ) {
+    return this.saleReturnService.bulkApprove(
+      tenantDb,
+      dto.ids,
+      req.user as { userId: string },
+    );
+  }
+
+  @Put('bulk/reject')
+  @RequirePermissions('UPDATE_SALE_RETURN')
+  bulkReject(
+    @TenantConnection() tenantDb: DataSource,
+    @Body() dto: BulkSaleReturnIdsDto,
+    @Req() req: Request,
+  ) {
+    return this.saleReturnService.bulkReject(
+      tenantDb,
+      dto.ids,
       req.user as { userId: string },
     );
   }

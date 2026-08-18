@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  HttpException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -22,6 +23,11 @@ import {
   PAYMENT_PROOF_ALLOWED_MIME_TYPES,
   PAYMENT_PROOF_MAX_BYTES,
 } from '../config/sale-voucher-payment-proof.multer';
+
+type BulkStatusResult = {
+  succeeded: string[];
+  failed: { id: string; message: string }[];
+};
 
 @Injectable()
 export class SaleVoucherService {
@@ -457,15 +463,23 @@ export class SaleVoucherService {
     return this.view(tenantDb, id, user, { recordActivityLog: false });
   }
 
-  async updateStatus(
+  private bulkErrorMessage(error: unknown): string {
+    if (error instanceof HttpException) {
+      return error.message;
+    }
+    if (error instanceof Error) {
+      return error.message;
+    }
+    return 'Unknown error';
+  }
+
+  private async applyStatusChange(
     tenantDb: DataSource,
     id: string,
-    dto: UpdateSaleVoucherStatusDto,
+    status: SaleVoucherStatus,
     user: { userId: string },
-  ) {
-    await this.ensureUser(tenantDb, user.userId);
-
-    const outcome = await tenantDb.transaction(
+  ): Promise<'noop' | 'updated'> {
+    return tenantDb.transaction(
       async (manager): Promise<'noop' | 'updated'> => {
         const repo = manager.getRepository(SaleVoucher);
         const voucher = await repo.findOne({
@@ -479,7 +493,7 @@ export class SaleVoucherService {
 
         if (
           this.isPaymentPosted(voucher) &&
-          dto.status !== SaleVoucherStatus.PAID
+          status !== SaleVoucherStatus.PAID
         ) {
           throw new BadRequestException(
             'Cannot change status once the voucher payment has been posted to the retailer ledger',
@@ -488,7 +502,7 @@ export class SaleVoucherService {
 
         if (
           voucher.status === SaleVoucherStatus.PAID &&
-          dto.status !== SaleVoucherStatus.PAID
+          status !== SaleVoucherStatus.PAID
         ) {
           throw new BadRequestException(
             'Cannot change status once the voucher is marked paid',
@@ -496,25 +510,41 @@ export class SaleVoucherService {
         }
 
         const needsLedgerPost =
-          dto.status === SaleVoucherStatus.PAID &&
+          status === SaleVoucherStatus.PAID &&
           !this.isPaymentPosted(voucher);
         const isNoop =
-          dto.status === voucher.status && !needsLedgerPost;
+          status === voucher.status && !needsLedgerPost;
 
         if (isNoop) {
           return 'noop';
         }
 
-        if (dto.status === SaleVoucherStatus.PAID) {
+        if (status === SaleVoucherStatus.PAID) {
           voucher.status = SaleVoucherStatus.PAID;
           await this.recordVoucherPaymentInLedger(manager, voucher, user.userId);
         } else {
-          voucher.status = dto.status;
+          voucher.status = status;
         }
 
         await repo.save(voucher);
         return 'updated';
       },
+    );
+  }
+
+  async updateStatus(
+    tenantDb: DataSource,
+    id: string,
+    dto: UpdateSaleVoucherStatusDto,
+    user: { userId: string },
+  ) {
+    await this.ensureUser(tenantDb, user.userId);
+
+    const outcome = await this.applyStatusChange(
+      tenantDb,
+      id,
+      dto.status,
+      user,
     );
 
     if (outcome === 'updated') {
@@ -527,6 +557,57 @@ export class SaleVoucherService {
     }
 
     return this.view(tenantDb, id, user, { recordActivityLog: false });
+  }
+
+  async bulkApprove(
+    tenantDb: DataSource,
+    ids: string[],
+    user: { userId: string },
+  ) {
+    return this.bulkUpdateStatus(tenantDb, ids, SaleVoucherStatus.PAID, user);
+  }
+
+  async bulkReject(
+    tenantDb: DataSource,
+    ids: string[],
+    user: { userId: string },
+  ) {
+    return this.bulkUpdateStatus(
+      tenantDb,
+      ids,
+      SaleVoucherStatus.CANCELLED,
+      user,
+    );
+  }
+
+  private async bulkUpdateStatus(
+    tenantDb: DataSource,
+    ids: string[],
+    status: SaleVoucherStatus,
+    user: { userId: string },
+  ): Promise<BulkStatusResult> {
+    await this.ensureUser(tenantDb, user.userId);
+
+    const succeeded: string[] = [];
+    const failed: { id: string; message: string }[] = [];
+
+    for (const id of ids) {
+      try {
+        await this.applyStatusChange(tenantDb, id, status, user);
+        succeeded.push(id);
+      } catch (error) {
+        failed.push({ id, message: this.bulkErrorMessage(error) });
+      }
+    }
+
+    await this.activityLogService.recordActivityLog(tenantDb, {
+      actorId: user.userId,
+      action: 'SALE_VOUCHER_BULK_STATUS_UPDATED',
+      description: `Sale vouchers bulk ${status.toLowerCase()}`,
+      metadata: { status, succeeded, failed },
+    });
+
+    return { succeeded, failed };
   }
 
   async list(

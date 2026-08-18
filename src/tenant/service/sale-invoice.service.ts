@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  HttpException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -19,6 +20,11 @@ import { User } from 'src/tenant-db/entities/user.entity';
 import { ActivityLogService } from './activity-log.service';
 import { CreateSaleInvoiceDto } from '../dto/sale-invoice/create-sale-invoice.dto';
 import { UpdateSaleInvoiceStatusDto } from '../dto/sale-invoice/update-sale-invoice-status.dto';
+
+type BulkStatusResult = {
+  succeeded: string[];
+  failed: { id: string; message: string }[];
+};
 
 @Injectable()
 export class SaleInvoiceService {
@@ -392,13 +398,23 @@ export class SaleInvoiceService {
     return this.view(tenantDb, saleInvoiceId, user);
   }
 
-  async updateStatus(
+  private bulkErrorMessage(error: unknown): string {
+    if (error instanceof HttpException) {
+      return error.message;
+    }
+    if (error instanceof Error) {
+      return error.message;
+    }
+    return 'Unknown error';
+  }
+
+  private async applyStatusChange(
     tenantDb: DataSource,
     id: string,
-    dto: UpdateSaleInvoiceStatusDto,
+    invoiceStatus: InvoiceStatus,
     user: { userId: string },
-  ) {
-    const outcome = await tenantDb.transaction(
+  ): Promise<'noop' | 'updated'> {
+    return tenantDb.transaction(
       async (manager): Promise<'noop' | 'updated'> => {
         const repo = manager.getRepository(SaleInvoice);
         const invoice = await repo.findOne({
@@ -410,13 +426,13 @@ export class SaleInvoiceService {
           throw new NotFoundException('Sale invoice not found');
         }
 
-        if (invoice.invoiceStatus === dto.invoiceStatus) {
+        if (invoice.invoiceStatus === invoiceStatus) {
           return 'noop';
         }
 
-        invoice.invoiceStatus = dto.invoiceStatus;
+        invoice.invoiceStatus = invoiceStatus;
 
-        if (dto.invoiceStatus === InvoiceStatus.PAID) {
+        if (invoiceStatus === InvoiceStatus.PAID) {
           invoice.executedBy = user.userId;
           invoice.executedDate = new Date();
         } else {
@@ -427,6 +443,20 @@ export class SaleInvoiceService {
         await repo.save(invoice);
         return 'updated';
       },
+    );
+  }
+
+  async updateStatus(
+    tenantDb: DataSource,
+    id: string,
+    dto: UpdateSaleInvoiceStatusDto,
+    user: { userId: string },
+  ) {
+    const outcome = await this.applyStatusChange(
+      tenantDb,
+      id,
+      dto.invoiceStatus,
+      user,
     );
 
     if (outcome === 'updated') {
@@ -439,6 +469,50 @@ export class SaleInvoiceService {
     }
 
     return this.view(tenantDb, id, user);
+  }
+
+  async bulkApprove(
+    tenantDb: DataSource,
+    ids: string[],
+    user: { userId: string },
+  ) {
+    return this.bulkUpdateStatus(tenantDb, ids, InvoiceStatus.PAID, user);
+  }
+
+  async bulkReject(
+    tenantDb: DataSource,
+    ids: string[],
+    user: { userId: string },
+  ) {
+    return this.bulkUpdateStatus(tenantDb, ids, InvoiceStatus.UNPAID, user);
+  }
+
+  private async bulkUpdateStatus(
+    tenantDb: DataSource,
+    ids: string[],
+    invoiceStatus: InvoiceStatus,
+    user: { userId: string },
+  ): Promise<BulkStatusResult> {
+    const succeeded: string[] = [];
+    const failed: { id: string; message: string }[] = [];
+
+    for (const id of ids) {
+      try {
+        await this.applyStatusChange(tenantDb, id, invoiceStatus, user);
+        succeeded.push(id);
+      } catch (error) {
+        failed.push({ id, message: this.bulkErrorMessage(error) });
+      }
+    }
+
+    await this.activityLogService.recordActivityLog(tenantDb, {
+      actorId: user.userId,
+      action: 'SALE_INVOICE_BULK_STATUS_UPDATED',
+      description: `Sale invoices bulk ${invoiceStatus.toLowerCase()}`,
+      metadata: { invoiceStatus, succeeded, failed },
+    });
+
+    return { succeeded, failed };
   }
 
   async createFromSaleOrder(

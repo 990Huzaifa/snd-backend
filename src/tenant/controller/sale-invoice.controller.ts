@@ -20,6 +20,7 @@ import { TenantConnection } from 'src/common/tenant/tenant-connection.decorator'
 import { SaleInvoiceService } from '../service/sale-invoice.service';
 import { CreateSaleInvoiceDto } from '../dto/sale-invoice/create-sale-invoice.dto';
 import { UpdateSaleInvoiceStatusDto } from '../dto/sale-invoice/update-sale-invoice-status.dto';
+import { BulkSaleInvoiceIdsDto } from '../dto/sale-invoice/bulk-sale-invoice-ids.dto';
 
 @Controller('tenant/sale-invoices')
 @UseGuards(
@@ -79,6 +80,34 @@ export class SaleInvoiceController {
       tenantDb,
       id,
       dto,
+      req.user as { userId: string },
+    );
+  }
+
+  @Put('bulk/approve')
+  @RequirePermissions('UPDATE_SALE_INVOICE')
+  bulkApprove(
+    @TenantConnection() tenantDb: DataSource,
+    @Body() dto: BulkSaleInvoiceIdsDto,
+    @Req() req: Request,
+  ) {
+    return this.saleInvoiceService.bulkApprove(
+      tenantDb,
+      dto.ids,
+      req.user as { userId: string },
+    );
+  }
+
+  @Put('bulk/reject')
+  @RequirePermissions('UPDATE_SALE_INVOICE')
+  bulkReject(
+    @TenantConnection() tenantDb: DataSource,
+    @Body() dto: BulkSaleInvoiceIdsDto,
+    @Req() req: Request,
+  ) {
+    return this.saleInvoiceService.bulkReject(
+      tenantDb,
+      dto.ids,
       req.user as { userId: string },
     );
   }
