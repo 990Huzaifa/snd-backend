@@ -77,8 +77,12 @@ export class Uom {
     @Column()
     name: string;
 
-    @Column({nullable: true})
-    childUomId: string;
+    @Column({ nullable: true })
+    childUomId: string | null;
+
+    @ManyToOne(() => Uom, { nullable: true, onDelete: 'SET NULL' })
+    @JoinColumn({ name: 'childUomId' })
+    childUom: Uom | null;
 
     @Column({ name: 'is_base', default: false })
     isBase: boolean;

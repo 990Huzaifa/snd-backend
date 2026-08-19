@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { DataSource, Like } from 'typeorm';
+import { DataSource, Like, Repository } from 'typeorm';
 import { Uom } from 'src/tenant-db/entities/product.entity';
 import { ActivityLogService } from '../activity-log.service';
 import { CreateUomDto } from '../../dto/uom/create-uom.dto';
@@ -160,6 +160,27 @@ export class UomService {
     await this.notifyImportCompletion(tenantDb, completedJob, user, tenantCode, 'completed');
   }
 
+  private async resolveChildUom(
+    uomRepo: Repository<Uom>,
+    childUomId?: string,
+    currentUomId?: string,
+  ) {
+    if (!childUomId) {
+      return null;
+    }
+
+    if (currentUomId && childUomId === currentUomId) {
+      throw new BadRequestException('UOM cannot be a child of itself');
+    }
+
+    const childUom = await uomRepo.findOne({ where: { id: childUomId } });
+    if (!childUom) {
+      throw new NotFoundException('Child UOM not found');
+    }
+
+    return childUom;
+  }
+
   async create(tenantDb: DataSource, dto: CreateUomDto, user: any) {
     const name = dto.name.trim();
     const uomRepo = tenantDb.getRepository(Uom);
@@ -172,12 +193,13 @@ export class UomService {
       throw new ConflictException('UOM with this name already exists');
     }
 
-
+    const childUom = await this.resolveChildUom(uomRepo, dto.childUomId);
 
     const createdUom = await uomRepo.save(
       uomRepo.create({
         name,
         isBase: false,
+        childUomId: childUom?.id ?? null,
       }),
     );
 
@@ -185,9 +207,14 @@ export class UomService {
       actorId: user.userId,
       action: 'UOM_CREATED',
       description: `UOM ${createdUom.name} created`,
-      metadata: { uomId: createdUom.id, isBase: createdUom.isBase },
+      metadata: {
+        uomId: createdUom.id,
+        isBase: createdUom.isBase,
+        childUomId: createdUom.childUomId,
+      },
     });
 
+    createdUom.childUom = childUom;
     return createdUom;
   }
 
@@ -199,7 +226,18 @@ export class UomService {
     user: any,
   ) {
     const [uoms, total] = await tenantDb.getRepository(Uom).findAndCount({
-      where: { name: Like(`%${search}%`), isBase: false },
+      where: { name: Like(`%${search}%`) },
+      relations: ['childUom'],
+      select: {
+        id: true,
+        name: true,
+        isBase: true,
+        childUomId: true,
+        childUom: {
+          id: true,
+          name: true,
+        },
+      },
       order: { name: 'ASC' },
       skip: (page - 1) * limit,
       take: limit,
@@ -212,12 +250,25 @@ export class UomService {
       metadata: { total, page, limit },
     });
 
-    return { result: uoms, meta: { total, page, limit } };
+    return {
+      result: uoms.map((uom) => ({
+        id: uom.id,
+        name: uom.name,
+        isBase: uom.isBase,
+        childUomId: uom.childUomId,
+        childUomName: uom.childUom?.name ?? null,
+        childUom: uom.childUom
+          ? { id: uom.childUom.id, name: uom.childUom.name }
+          : null,
+      })),
+      meta: { total, page, limit },
+    };
   }
 
   async view(tenantDb: DataSource, id: string, user: any) {
     const uom = await tenantDb.getRepository(Uom).findOne({
       where: { id },
+      relations: ['childUom'],
     });
 
     if (!uom) {
@@ -253,16 +304,24 @@ export class UomService {
       }
     }
 
+    if (dto.childUomId !== undefined) {
+      const childUom = await this.resolveChildUom(uomRepo, dto.childUomId, uom.id);
+      uom.childUomId = childUom?.id ?? null;
+    }
+
     await uomRepo.save(uom);
 
     await this.activityLogService.recordActivityLog(tenantDb, {
       actorId: user.userId,
       action: 'UOM_UPDATED',
       description: `UOM ${uom.name} updated`,
-      metadata: { uomId: uom.id, isBase: uom.isBase },
+      metadata: { uomId: uom.id, isBase: uom.isBase, childUomId: uom.childUomId },
     });
 
-    return uom;
+    return uomRepo.findOne({
+      where: { id: uom.id },
+      relations: ['childUom'],
+    });
   }
 
   async importUoms(tenantDb: DataSource, file: Express.Multer.File, user: any, tenantCode: string) {

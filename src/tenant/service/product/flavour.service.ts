@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { DataSource, Like } from 'typeorm';
+import { DataSource, Like, Repository } from 'typeorm';
 import { Flavour, Product, ProductFlavour } from 'src/tenant-db/entities/product.entity';
 import { ActivityLogService } from '../activity-log.service';
 import { CreateFlavourDto } from '../../dto/flavour/create-flavour.dto';
@@ -20,6 +20,42 @@ export class FlavourService {
     private readonly notificationService: NotificationService,
     private readonly tenantJobService: TenantJobService,
   ) {}
+
+  private flavourSkuPrefix(name: string): string {
+    const compact = name.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+    if (!compact) {
+      return 'FLV';
+    }
+    return compact.slice(0, 3).padEnd(3, 'X');
+  }
+
+  private async generateFlavourSku(
+    flavourRepo: Repository<Flavour>,
+    name: string,
+  ): Promise<string> {
+    const prefix = this.flavourSkuPrefix(name);
+    const existing = await flavourRepo
+      .createQueryBuilder('flavour')
+      .select(['flavour.id', 'flavour.sku'])
+      .where('flavour.sku = :prefix', { prefix })
+      .orWhere('flavour.sku LIKE :pattern', { pattern: `${prefix}%` })
+      .getMany();
+
+    const used = new Set(
+      existing.map((flavour) => flavour.sku).filter((sku): sku is string => Boolean(sku)),
+    );
+
+    if (!used.has(prefix)) {
+      return prefix;
+    }
+
+    let sequence = 2;
+    while (used.has(`${prefix}${sequence}`)) {
+      sequence += 1;
+    }
+
+    return `${prefix}${sequence}`;
+  }
 
   private sanitizeFlavourName(value: unknown): string {
     if (typeof value !== 'string') {
@@ -124,12 +160,13 @@ export class FlavourService {
           continue;
         }
 
-        const created = await flavourRepo.save(flavourRepo.create({ name: row.name }));
+        const sku = await this.generateFlavourSku(flavourRepo, row.name);
+        const created = await flavourRepo.save(flavourRepo.create({ name: row.name, sku }));
         this.tenantJobService.appendLog(jobId, {
           row: row.row,
           name: row.name,
           status: 'success',
-          metadata: { flavourId: created.id },
+          metadata: { flavourId: created.id, sku: created.sku },
         });
       } catch (error) {
         this.tenantJobService.appendLog(jobId, {
@@ -169,13 +206,14 @@ export class FlavourService {
       throw new ConflictException('Flavour with this name already exists');
     }
 
-    const createdFlavour = await flavourRepo.save(flavourRepo.create({ name }));
+    const sku = await this.generateFlavourSku(flavourRepo, name);
+    const createdFlavour = await flavourRepo.save(flavourRepo.create({ name, sku }));
 
     await this.activityLogService.recordActivityLog(tenantDb, {
       actorId: user.userId,
       action: 'FLAVOUR_CREATED',
       description: `Flavour ${createdFlavour.name} created`,
-      metadata: { flavourId: createdFlavour.id },
+      metadata: { flavourId: createdFlavour.id, sku: createdFlavour.sku },
     });
 
     return createdFlavour;

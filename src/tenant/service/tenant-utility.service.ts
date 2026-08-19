@@ -171,12 +171,32 @@ export class TenantUtilityService {
 
   async uoms(tenantDb: DataSource) {
     const uoms = await tenantDb.getRepository(Uom).find({
-      select: ['id', 'name', 'isBase'],
-      where: { isBase: false },
+      relations: ['childUom'],
+      select: {
+        id: true,
+        name: true,
+        isBase: true,
+        childUomId: true,
+        childUom: {
+          id: true,
+          name: true,
+        },
+      },
       order: { name: 'ASC' },
     });
 
-    return { result: uoms };
+    return {
+      result: uoms.map((uom) => ({
+        id: uom.id,
+        name: uom.name,
+        isBase: uom.isBase,
+        childUomId: uom.childUomId,
+        childUomName: uom.childUom?.name ?? null,
+        childUom: uom.childUom
+          ? { id: uom.childUom.id, name: uom.childUom.name }
+          : null,
+      })),
+    };
   }
 
 
