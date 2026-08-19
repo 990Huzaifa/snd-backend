@@ -1,4 +1,4 @@
-import { IsDateString, IsNumber, IsString, IsUUID, MinLength } from 'class-validator';
+import { IsDateString, IsNumber, IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
 
 export class CreateProductPricingJobDto {
   @IsUUID()
@@ -20,4 +20,12 @@ export class CreateProductPricingJobDto {
 
   @IsNumber()
   quantity: number;
+
+  @IsOptional()
+  @IsString()
+  gst?: string;
+
+  @IsOptional()
+  @IsString()
+  offer?: string;
 }

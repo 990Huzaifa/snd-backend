@@ -146,15 +146,43 @@ export class ProductService {
     }
   }
 
-  private async ensureFlavoursExist(tenantDb: DataSource, flavourIds: string[]) {
+  private async loadFlavoursByIds(tenantDb: DataSource, flavourIds: string[]) {
     const uniqueFlavourIds = [...new Set(flavourIds)];
-    const count = await tenantDb.getRepository(Flavour).count({
+    const flavours = await tenantDb.getRepository(Flavour).find({
       where: { id: In(uniqueFlavourIds) },
+      select: ['id', 'name', 'sku'],
     });
 
-    if (count !== uniqueFlavourIds.length) {
+    if (flavours.length !== uniqueFlavourIds.length) {
       throw new NotFoundException('One or more flavours not found');
     }
+
+    return flavours;
+  }
+
+  private flavourSkuPart(flavour: Pick<Flavour, 'sku' | 'name'>): string {
+    const fromSku = flavour.sku?.trim();
+    if (fromSku) {
+      return fromSku;
+    }
+
+    const compact = flavour.name.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+    if (!compact) {
+      return 'FLV';
+    }
+    return compact.slice(0, 3).padEnd(3, 'X');
+  }
+
+  private buildProductFlavourSku(
+    productSku: string,
+    flavour: Pick<Flavour, 'sku' | 'name'>,
+  ): string {
+    return `${productSku}-${this.flavourSkuPart(flavour)}`;
+  }
+
+  private normalizeDecimal(value?: string): string {
+    const trimmed = value?.trim();
+    return trimmed ? trimmed : '0';
   }
 
   private async ensureUomsExist(tenantDb: DataSource, uomIds: string[]) {
@@ -182,7 +210,7 @@ export class ProductService {
       await this.ensureBrandExists(tenantDb, brandId);
     }
     await this.ensureSkuUnique(tenantDb, skuCode);
-    await this.ensureFlavoursExist(tenantDb, flavourIds);
+    const flavours = await this.loadFlavoursByIds(tenantDb, flavourIds);
     await this.ensureUomsExist(
       tenantDb,
       dto.pricing.map((item) => item.uomId.trim()),
@@ -239,12 +267,17 @@ export class ProductService {
         }
       }
 
-      const flavourRows = [...new Set(flavourIds)].map((flavourId) =>
-        productFlavourRepo.create({
+      const flavourById = new Map(flavours.map((flavour) => [flavour.id, flavour]));
+      const flavourRows = [...new Set(flavourIds)].map((flavourId) => {
+        const flavour = flavourById.get(flavourId);
+        return productFlavourRepo.create({
           productId: savedProduct.id,
           flavourId,
-        }),
-      );
+          productFlavourSku: flavour
+            ? this.buildProductFlavourSku(skuCode, flavour)
+            : `${skuCode}-FLV`,
+        });
+      });
       await productFlavourRepo.save(flavourRows);
 
       const pricingRows = dto.pricing.map((price) =>
@@ -253,8 +286,9 @@ export class ProductService {
           uomId: price.uomId.trim(),
           tradePrice: price.tradePrice,
           retailPrice: price.retailPrice,
-          // convert it to number
           quantity: Number(price.quantity),
+          gst: this.normalizeDecimal(price.gst),
+          offer: this.normalizeDecimal(price.offer),
         }),
       );
       await productPricingRepo.save(pricingRows);
@@ -377,6 +411,7 @@ export class ProductService {
         'flavours.flavour',
         'pricing',
         'pricing.uom',
+        'pricing.uom.childUom',
       ],
     });
 
@@ -490,10 +525,15 @@ export class ProductService {
 
       if (dto.flavourIds !== undefined) {
         const flavourIds = dto.flavourIds.map((item) => item.trim()).filter(Boolean);
-        if (flavourIds.length) {
-          await this.ensureFlavoursExist(tenantDb, flavourIds);
-        }
         const requestedFlavourIds = [...new Set(flavourIds)];
+        const flavourById = requestedFlavourIds.length
+          ? new Map(
+              (await this.loadFlavoursByIds(tenantDb, requestedFlavourIds)).map((flavour) => [
+                flavour.id,
+                flavour,
+              ]),
+            )
+          : new Map<string, Flavour>();
         const productFlavourRepo = manager.getRepository(ProductFlavour);
         const existingFlavours = await productFlavourRepo.find({
           where: { productId: product.id },
@@ -502,12 +542,16 @@ export class ProductService {
 
         const newFlavourRows = requestedFlavourIds
           .filter((flavourId) => !existingFlavourIdSet.has(flavourId))
-          .map((flavourId) =>
-            productFlavourRepo.create({
+          .map((flavourId) => {
+            const flavour = flavourById.get(flavourId);
+            return productFlavourRepo.create({
               productId: product.id,
               flavourId,
-            }),
-          );
+              productFlavourSku: flavour
+                ? this.buildProductFlavourSku(product.skuCode, flavour)
+                : `${product.skuCode}-FLV`,
+            });
+          });
 
         if (newFlavourRows.length) {
           await productFlavourRepo.save(newFlavourRows);
@@ -533,6 +577,20 @@ export class ProductService {
         }
       }
 
+      if (dto.skuCode !== undefined) {
+        const productFlavourRepo = manager.getRepository(ProductFlavour);
+        const flavourRows = await productFlavourRepo.find({
+          where: { productId: product.id },
+          relations: ['flavour'],
+        });
+        for (const row of flavourRows) {
+          row.productFlavourSku = this.buildProductFlavourSku(product.skuCode, row.flavour);
+        }
+        if (flavourRows.length) {
+          await productFlavourRepo.save(flavourRows);
+        }
+      }
+
       if (dto.pricing !== undefined) {
         if (dto.pricing.length) {
           await this.ensureUomsExist(
@@ -547,6 +605,8 @@ export class ProductService {
               tradePrice: item.tradePrice,
               retailPrice: item.retailPrice,
               quantity: Number(item.quantity),
+              gst: this.normalizeDecimal(item.gst),
+              offer: this.normalizeDecimal(item.offer),
             },
           ]),
         );
@@ -566,6 +626,8 @@ export class ProductService {
             currentPricing.tradePrice = requestedPricing.tradePrice;
             currentPricing.retailPrice = requestedPricing.retailPrice;
             currentPricing.quantity = requestedPricing.quantity;
+            currentPricing.gst = requestedPricing.gst;
+            currentPricing.offer = requestedPricing.offer;
             await productPricingRepo.save(currentPricing);
             continue;
           }
@@ -577,6 +639,8 @@ export class ProductService {
               tradePrice: requestedPricing.tradePrice,
               retailPrice: requestedPricing.retailPrice,
               quantity: requestedPricing.quantity,
+              gst: requestedPricing.gst,
+              offer: requestedPricing.offer,
             }),
           );
         }

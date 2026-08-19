@@ -24,6 +24,14 @@ class CreateProductPricingDto {
   @IsNumber()
   @Min(1)
   quantity: number;
+
+  @IsOptional()
+  @IsString()
+  gst?: string;
+
+  @IsOptional()
+  @IsString()
+  offer?: string;
 }
 
 export class CreateProductDto {

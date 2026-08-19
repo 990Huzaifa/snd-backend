@@ -21,6 +21,14 @@ class UpdateProductPricingDto {
 
   @IsInt()
   quantity: number;
+
+  @IsOptional()
+  @IsString()
+  gst?: string;
+
+  @IsOptional()
+  @IsString()
+  offer?: string;
 }
 
 export class UpdateProductDto {

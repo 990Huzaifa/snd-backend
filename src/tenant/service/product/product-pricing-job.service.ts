@@ -54,6 +54,8 @@ export class ProductPricingJobService {
         tradePrice: dto.tradePrice.trim(),
         retailPrice: dto.retailPrice.trim(),
         quantity: Number(dto.quantity),
+        gst: dto.gst?.trim() || '0',
+        offer: dto.offer?.trim() || '0',
         errorMessage: '',
       }),
     );
@@ -161,6 +163,9 @@ export class ProductPricingJobService {
 
           pricing.tradePrice = freshJob.tradePrice;
           pricing.retailPrice = freshJob.retailPrice;
+          pricing.quantity = freshJob.quantity;
+          pricing.gst = freshJob.gst;
+          pricing.offer = freshJob.offer;
           await txPricingRepo.save(pricing);
 
           freshJob.status = 'COMPLETED';
