@@ -55,6 +55,9 @@ export class Flavour {
     @Column()
     name: string;
 
+    @Column({nullable: true})
+    sku: string;
+
     @OneToMany(() => ProductFlavour, (productFlavour) => productFlavour.flavour)
     products: ProductFlavour[];
 
@@ -73,6 +76,9 @@ export class Uom {
 
     @Column()
     name: string;
+
+    @Column({nullable: true})
+    childUomId: string;
 
     @Column({ name: 'is_base', default: false })
     isBase: boolean;
@@ -206,6 +212,9 @@ export class ProductFlavour {
     @Column()
     flavourId: string;
 
+    @Column({ nullable: true })
+    productFlavourSku: string;
+
     @CreateDateColumn()
     createdAt: Date;
 
@@ -249,6 +258,12 @@ export class ProductPricing {
 
     @Column()
     quantity: number;
+
+    @Column({ default: 0, type: 'decimal', precision: 10, scale: 2 })
+    gst: string;
+
+    @Column({ default: 0, type: 'decimal', precision: 10, scale: 2 })
+    offer: string;
 
     @CreateDateColumn()
     createdAt: Date;
@@ -302,6 +317,12 @@ export class ProductPricingJob {
 
     @Column()
     quantity: number;
+
+    @Column({ default: 0, type: 'decimal', precision: 10, scale: 2 })
+    gst: string;
+
+    @Column({ default: 0, type: 'decimal', precision: 10, scale: 2 })
+    offer: string;
 
     @Column()
     errorMessage: string;
