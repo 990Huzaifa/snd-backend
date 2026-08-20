@@ -5,6 +5,7 @@
 /dist
 /src/master-db/seed-data
 # Logs
+/docs
 logs
 *.log
 *.csv

@@ -7,7 +7,7 @@ export class UpdateDB1787127184401 implements MigrationInterface {
         await queryRunner.query(`CREATE TABLE "spg_orders" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "orderNumber" character varying NOT NULL, "spgId" uuid NOT NULL, "retailerId" uuid NOT NULL, "notes" character varying, "orderDate" TIMESTAMP NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "UQ_6d564550ba120d3a5f1f0fa3ad6" UNIQUE ("orderNumber"), CONSTRAINT "PK_3d863a592946add2cf003076ee0" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE TABLE "spg_order_items" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "spgOrderId" uuid NOT NULL, "productId" uuid NOT NULL, "productFlavourId" uuid NOT NULL, "productPricingId" uuid NOT NULL, "quantity" integer NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_25412bee418932fdcef4be9799a" PRIMARY KEY ("id"))`);
         await queryRunner.query(`ALTER TABLE "flavours" ADD "sku" character varying`);
-        await queryRunner.query(`ALTER TABLE "uoms" ADD "childUomId" character varying`);
+        await queryRunner.query(`ALTER TABLE "uoms" ADD "childUomId" uuid`);
         await queryRunner.query(`ALTER TABLE "product_flavours" ADD "productFlavourSku" character varying`);
         await queryRunner.query(`ALTER TABLE "product_pricings" ADD "gst" numeric(10,2) NOT NULL DEFAULT '0'`);
         await queryRunner.query(`ALTER TABLE "product_pricings" ADD "offer" numeric(10,2) NOT NULL DEFAULT '0'`);

@@ -170,20 +170,12 @@ export class TenantUtilityService {
   }
 
   async uoms(tenantDb: DataSource) {
-    const uoms = await tenantDb.getRepository(Uom).find({
-      relations: ['childUom'],
-      select: {
-        id: true,
-        name: true,
-        isBase: true,
-        childUomId: true,
-        childUom: {
-          id: true,
-          name: true,
-        },
-      },
-      order: { name: 'ASC' },
-    });
+    const uoms = await tenantDb
+      .getRepository(Uom)
+      .createQueryBuilder('uom')
+      .leftJoinAndSelect('uom.childUom', 'childUom')
+      .orderBy('uom.name', 'ASC')
+      .getMany();
 
     return {
       result: uoms.map((uom) => ({

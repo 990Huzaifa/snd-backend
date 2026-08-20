@@ -77,7 +77,7 @@ export class Uom {
     @Column()
     name: string;
 
-    @Column({ nullable: true })
+    @Column({ type: 'uuid', nullable: true })
     childUomId: string | null;
 
     @ManyToOne(() => Uom, { nullable: true, onDelete: 'SET NULL' })

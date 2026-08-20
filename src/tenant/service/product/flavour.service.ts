@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { DataSource, Like, Repository } from 'typeorm';
+import { DataSource, Like, Repository, Brackets } from 'typeorm';
 import { Flavour, Product, ProductFlavour } from 'src/tenant-db/entities/product.entity';
 import { ActivityLogService } from '../activity-log.service';
 import { CreateFlavourDto } from '../../dto/flavour/create-flavour.dto';
@@ -32,14 +32,25 @@ export class FlavourService {
   private async generateFlavourSku(
     flavourRepo: Repository<Flavour>,
     name: string,
+    excludeFlavourId?: string,
   ): Promise<string> {
     const prefix = this.flavourSkuPrefix(name);
-    const existing = await flavourRepo
+    const qb = flavourRepo
       .createQueryBuilder('flavour')
       .select(['flavour.id', 'flavour.sku'])
-      .where('flavour.sku = :prefix', { prefix })
-      .orWhere('flavour.sku LIKE :pattern', { pattern: `${prefix}%` })
-      .getMany();
+      .where(
+        new Brackets((sub) => {
+          sub
+            .where('flavour.sku = :prefix', { prefix })
+            .orWhere('flavour.sku LIKE :pattern', { pattern: `${prefix}%` });
+        }),
+      );
+
+    if (excludeFlavourId) {
+      qb.andWhere('flavour.id != :excludeFlavourId', { excludeFlavourId });
+    }
+
+    const existing = await qb.getMany();
 
     const used = new Set(
       existing.map((flavour) => flavour.sku).filter((sku): sku is string => Boolean(sku)),
@@ -281,13 +292,17 @@ export class FlavourService {
       }
     }
 
+    if (!flavour.sku?.trim()) {
+      flavour.sku = await this.generateFlavourSku(flavourRepo, flavour.name, flavour.id);
+    }
+
     await flavourRepo.save(flavour);
 
     await this.activityLogService.recordActivityLog(tenantDb, {
       actorId: user.userId,
       action: 'FLAVOUR_UPDATED',
       description: `Flavour ${flavour.name} updated`,
-      metadata: { flavourId: flavour.id },
+      metadata: { flavourId: flavour.id, sku: flavour.sku },
     });
 
     return flavour;

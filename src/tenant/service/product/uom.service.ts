@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { DataSource, Like, Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { Uom } from 'src/tenant-db/entities/product.entity';
 import { ActivityLogService } from '../activity-log.service';
 import { CreateUomDto } from '../../dto/uom/create-uom.dto';
@@ -225,23 +225,20 @@ export class UomService {
     search: string,
     user: any,
   ) {
-    const [uoms, total] = await tenantDb.getRepository(Uom).findAndCount({
-      where: { name: Like(`%${search}%`) },
-      relations: ['childUom'],
-      select: {
-        id: true,
-        name: true,
-        isBase: true,
-        childUomId: true,
-        childUom: {
-          id: true,
-          name: true,
-        },
-      },
-      order: { name: 'ASC' },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
+    const qb = tenantDb
+      .getRepository(Uom)
+      .createQueryBuilder('uom')
+      .leftJoinAndSelect('uom.childUom', 'childUom')
+      .orderBy('uom.name', 'ASC')
+      .skip((page - 1) * limit)
+      .take(limit);
+
+    const normalizedSearch = (search ?? '').trim();
+    if (normalizedSearch) {
+      qb.where('uom.name ILIKE :search', { search: `%${normalizedSearch}%` });
+    }
+
+    const [uoms, total] = await qb.getManyAndCount();
 
     await this.activityLogService.recordActivityLog(tenantDb, {
       actorId: user.userId,
@@ -266,10 +263,12 @@ export class UomService {
   }
 
   async view(tenantDb: DataSource, id: string, user: any) {
-    const uom = await tenantDb.getRepository(Uom).findOne({
-      where: { id },
-      relations: ['childUom'],
-    });
+    const uom = await tenantDb
+      .getRepository(Uom)
+      .createQueryBuilder('uom')
+      .leftJoinAndSelect('uom.childUom', 'childUom')
+      .where('uom.id = :id', { id })
+      .getOne();
 
     if (!uom) {
       throw new NotFoundException('UOM not found');
@@ -282,7 +281,16 @@ export class UomService {
       metadata: { uomId: uom.id },
     });
 
-    return uom;
+    return {
+      id: uom.id,
+      name: uom.name,
+      isBase: uom.isBase,
+      childUomId: uom.childUomId,
+      childUomName: uom.childUom?.name ?? null,
+      childUom: uom.childUom
+        ? { id: uom.childUom.id, name: uom.childUom.name }
+        : null,
+    };
   }
 
   async edit(tenantDb: DataSource, id: string, dto: UpdateUomDto, user: any) {

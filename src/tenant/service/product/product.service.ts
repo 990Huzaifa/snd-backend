@@ -402,18 +402,19 @@ export class ProductService {
   }
 
   async view(tenantDb: DataSource, id: string, user: any) {
-    const product = await tenantDb.getRepository(Product).findOne({
-      where: { id, isDelete: false },
-      relations: [
-        'category',
-        'brand',
-        'flavours',
-        'flavours.flavour',
-        'pricing',
-        'pricing.uom',
-        'pricing.uom.childUom',
-      ],
-    });
+    const product = await tenantDb
+      .getRepository(Product)
+      .createQueryBuilder('product')
+      .leftJoinAndSelect('product.category', 'category')
+      .leftJoinAndSelect('product.brand', 'brand')
+      .leftJoinAndSelect('product.flavours', 'flavours')
+      .leftJoinAndSelect('flavours.flavour', 'flavour')
+      .leftJoinAndSelect('product.pricing', 'pricing')
+      .leftJoinAndSelect('pricing.uom', 'uom')
+      .leftJoinAndSelect('uom.childUom', 'childUom')
+      .where('product.id = :id', { id })
+      .andWhere('product.isDelete = :isDelete', { isDelete: false })
+      .getOne();
 
     if (!product) {
       throw new NotFoundException('Product not found');
