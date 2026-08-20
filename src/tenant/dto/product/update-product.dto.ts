@@ -5,6 +5,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  MinLength,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -29,6 +30,16 @@ class UpdateProductPricingDto {
   @IsOptional()
   @IsString()
   offer?: string;
+}
+
+class UpdateProductFlavourDto {
+  @IsUUID()
+  flavourId: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  productFlavourSku?: string;
 }
 
 export class UpdateProductDto {
@@ -71,8 +82,9 @@ export class UpdateProductDto {
 
   @IsOptional()
   @IsArray()
-  @IsUUID('4', { each: true })
-  flavourIds?: string[];
+  @ValidateNested({ each: true })
+  @Type(() => UpdateProductFlavourDto)
+  flavours?: UpdateProductFlavourDto[];
 
   @IsOptional()
   @IsArray()

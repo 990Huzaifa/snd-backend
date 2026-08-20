@@ -185,6 +185,47 @@ export class ProductService {
     return trimmed ? trimmed : '0';
   }
 
+  private normalizeProductFlavours(
+    items: Array<{ flavourId: string; productFlavourSku?: string }>,
+  ): Array<{ flavourId: string; productFlavourSku?: string }> {
+    const normalized = items.map((item) => {
+      const sku = item.productFlavourSku?.trim();
+      return {
+        flavourId: item.flavourId.trim(),
+        ...(sku ? { productFlavourSku: sku } : {}),
+      };
+    });
+
+    const flavourIds = normalized.map((item) => item.flavourId);
+    if (new Set(flavourIds).size !== flavourIds.length) {
+      throw new BadRequestException('Duplicate flavourId in flavours list');
+    }
+
+    const providedSkus = normalized
+      .map((item) => item.productFlavourSku?.toLowerCase())
+      .filter((sku): sku is string => Boolean(sku));
+    if (new Set(providedSkus).size !== providedSkus.length) {
+      throw new BadRequestException('Duplicate productFlavourSku in flavours list');
+    }
+
+    return normalized;
+  }
+
+  private resolveProductFlavourSku(
+    productSku: string,
+    flavour: Flavour,
+    providedSku?: string,
+    existingSku?: string | null,
+  ): string {
+    if (providedSku?.trim()) {
+      return providedSku.trim();
+    }
+    if (existingSku?.trim()) {
+      return existingSku.trim();
+    }
+    return this.buildProductFlavourSku(productSku, flavour);
+  }
+
   private async ensureUomsExist(tenantDb: DataSource, uomIds: string[]) {
     const uniqueUomIds = [...new Set(uomIds)];
     const count = await tenantDb.getRepository(Uom).count({
@@ -203,14 +244,18 @@ export class ProductService {
     const name = dto.name.trim();
     const description = dto.description?.trim() || null;
     const hsCode = dto.hsCode?.trim() || null;
-    const flavourIds = dto.flavourIds.map((id) => id.trim()).filter(Boolean);
+    const productFlavours = this.normalizeProductFlavours(dto.flavours);
 
     await this.ensureCategoryExists(tenantDb, categoryId);
     if (brandId) {
       await this.ensureBrandExists(tenantDb, brandId);
     }
     await this.ensureSkuUnique(tenantDb, skuCode);
-    const flavours = await this.loadFlavoursByIds(tenantDb, flavourIds);
+    const flavours = await this.loadFlavoursByIds(
+      tenantDb,
+      productFlavours.map((item) => item.flavourId),
+    );
+    const flavourById = new Map(flavours.map((flavour) => [flavour.id, flavour]));
     await this.ensureUomsExist(
       tenantDb,
       dto.pricing.map((item) => item.uomId.trim()),
@@ -267,15 +312,16 @@ export class ProductService {
         }
       }
 
-      const flavourById = new Map(flavours.map((flavour) => [flavour.id, flavour]));
-      const flavourRows = [...new Set(flavourIds)].map((flavourId) => {
-        const flavour = flavourById.get(flavourId);
+      const flavourRows = productFlavours.map((item) => {
+        const flavour = flavourById.get(item.flavourId)!;
         return productFlavourRepo.create({
           productId: savedProduct.id,
-          flavourId,
-          productFlavourSku: flavour
-            ? this.buildProductFlavourSku(skuCode, flavour)
-            : `${skuCode}-FLV`,
+          flavourId: item.flavourId,
+          productFlavourSku: this.resolveProductFlavourSku(
+            skuCode,
+            flavour,
+            item.productFlavourSku,
+          ),
         });
       });
       await productFlavourRepo.save(flavourRows);
@@ -524,9 +570,9 @@ export class ProductService {
         product.isActive = dto.isActive;
       }
 
-      if (dto.flavourIds !== undefined) {
-        const flavourIds = dto.flavourIds.map((item) => item.trim()).filter(Boolean);
-        const requestedFlavourIds = [...new Set(flavourIds)];
+      if (dto.flavours !== undefined) {
+        const productFlavours = this.normalizeProductFlavours(dto.flavours);
+        const requestedFlavourIds = productFlavours.map((item) => item.flavourId);
         const flavourById = requestedFlavourIds.length
           ? new Map(
               (await this.loadFlavoursByIds(tenantDb, requestedFlavourIds)).map((flavour) => [
@@ -535,31 +581,53 @@ export class ProductService {
               ]),
             )
           : new Map<string, Flavour>();
+
+        const skuByFlavourId = new Map(
+          productFlavours.map((item) => [item.flavourId, item.productFlavourSku]),
+        );
         const productFlavourRepo = manager.getRepository(ProductFlavour);
         const existingFlavours = await productFlavourRepo.find({
           where: { productId: product.id },
         });
-        const existingFlavourIdSet = new Set(existingFlavours.map((item) => item.flavourId));
+        const existingByFlavourId = new Map(
+          existingFlavours.map((item) => [item.flavourId, item]),
+        );
 
-        const newFlavourRows = requestedFlavourIds
-          .filter((flavourId) => !existingFlavourIdSet.has(flavourId))
-          .map((flavourId) => {
-            const flavour = flavourById.get(flavourId);
-            return productFlavourRepo.create({
+        const rowsToSave: ProductFlavour[] = [];
+
+        for (const item of productFlavours) {
+          const flavour = flavourById.get(item.flavourId)!;
+          const existing = existingByFlavourId.get(item.flavourId);
+          if (existing) {
+            existing.productFlavourSku = this.resolveProductFlavourSku(
+              product.skuCode,
+              flavour,
+              item.productFlavourSku,
+              existing.productFlavourSku,
+            );
+            rowsToSave.push(existing);
+            continue;
+          }
+
+          rowsToSave.push(
+            productFlavourRepo.create({
               productId: product.id,
-              flavourId,
-              productFlavourSku: flavour
-                ? this.buildProductFlavourSku(product.skuCode, flavour)
-                : `${product.skuCode}-FLV`,
-            });
-          });
+              flavourId: item.flavourId,
+              productFlavourSku: this.resolveProductFlavourSku(
+                product.skuCode,
+                flavour,
+                item.productFlavourSku,
+              ),
+            }),
+          );
+        }
 
-        if (newFlavourRows.length) {
-          await productFlavourRepo.save(newFlavourRows);
+        if (rowsToSave.length) {
+          await productFlavourRepo.save(rowsToSave);
         }
 
         const flavourRowsToRemove = existingFlavours.filter(
-          (item) => !requestedFlavourIds.includes(item.flavourId),
+          (item) => !skuByFlavourId.has(item.flavourId),
         );
         for (const row of flavourRowsToRemove) {
           try {
@@ -575,20 +643,6 @@ export class ProductService {
             }
             throw error;
           }
-        }
-      }
-
-      if (dto.skuCode !== undefined) {
-        const productFlavourRepo = manager.getRepository(ProductFlavour);
-        const flavourRows = await productFlavourRepo.find({
-          where: { productId: product.id },
-          relations: ['flavour'],
-        });
-        for (const row of flavourRows) {
-          row.productFlavourSku = this.buildProductFlavourSku(product.skuCode, row.flavour);
-        }
-        if (flavourRows.length) {
-          await productFlavourRepo.save(flavourRows);
         }
       }
 
