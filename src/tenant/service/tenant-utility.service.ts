@@ -312,6 +312,7 @@ export class TenantUtilityService {
       .innerJoinAndSelect('sb.productFlavour', 'productFlavour')
       .innerJoinAndSelect('productFlavour.flavour', 'flavour')
       .innerJoinAndSelect('sb.uom', 'uom')
+      .leftJoinAndSelect('uom.childUom', 'childUom')
       .where('sb.distributorId = :distributorId', { distributorId: normalizedDistributorId })
       .andWhere('product.isDelete = :isDelete', { isDelete: false })
       .andWhere('product.isActive = :isActive', { isActive: true });
@@ -354,6 +355,14 @@ export class TenantUtilityService {
           ? {
               id: balance.uom.id,
               name: balance.uom.name,
+              childUomId: balance.uom.childUomId ?? null,
+              childUomName: balance.uom.childUom?.name ?? null,
+              childUom: balance.uom.childUom
+                ? {
+                    id: balance.uom.childUom.id,
+                    name: balance.uom.childUom.name,
+                  }
+                : null,
             }
           : null,
         productFlavourId: balance.productFlavourId,

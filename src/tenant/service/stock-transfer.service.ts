@@ -311,15 +311,34 @@ export class StockTransferService {
     tenantDb: DataSource,
     distributorId: string,
   ) {
-    const stock = await tenantDb.getRepository(StockBalance).find({
-      where: { distributorId },
-      relations: {
-        product: true,
-        productFlavour: { flavour: true },
-        uom: true,
-      },
-    });
+    const stock = await tenantDb
+      .getRepository(StockBalance)
+      .createQueryBuilder('sb')
+      .leftJoinAndSelect('sb.product', 'product')
+      .leftJoinAndSelect('sb.productFlavour', 'productFlavour')
+      .leftJoinAndSelect('productFlavour.flavour', 'flavour')
+      .leftJoinAndSelect('sb.uom', 'uom')
+      .leftJoinAndSelect('uom.childUom', 'childUom')
+      .where('sb.distributorId = :distributorId', { distributorId })
+      .getMany();
 
-    return stock;
+    return stock.map((row) => ({
+      ...row,
+      uom: row.uom
+        ? {
+            id: row.uom.id,
+            name: row.uom.name,
+            isBase: row.uom.isBase,
+            childUomId: row.uom.childUomId ?? null,
+            childUomName: row.uom.childUom?.name ?? null,
+            childUom: row.uom.childUom
+              ? {
+                  id: row.uom.childUom.id,
+                  name: row.uom.childUom.name,
+                }
+              : null,
+          }
+        : null,
+    }));
   }
 }
