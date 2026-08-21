@@ -321,6 +321,9 @@ export class SalesmanSyncUpService {
             phone: this.normalizeOptional(shop.phone),
             CNIC: this.normalizeOptional(shop.CNIC),
             address: this.normalize(shop.address),
+            locationTitle:
+                this.normalizeOptional(shop.locationTitle) ??
+                this.normalize(shop.shopName),
             latitude: this.normalize(shop.latitude),
             longitude: this.normalize(shop.longitude),
             maxRadius: DEFAULT_MAX_RADIUS,
