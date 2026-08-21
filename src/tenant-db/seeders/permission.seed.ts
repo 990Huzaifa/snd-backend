@@ -170,6 +170,7 @@ export const TENANT_PERMISSIONS = [
 
 
   { code: 'TRANSFER_ROUTE', name: 'Transfer Route' },
+  { code: 'TRANSFER_RETAILER_ROUTE', name: 'Transfer Retailer Route' },
   { code: 'SHARE_ROUTE', name: 'Share Route' },
 
 

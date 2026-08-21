@@ -150,18 +150,6 @@ export class User {
     fcmToken: string;
 
     @Column({ nullable: true })
-    locationTitle: string;
-
-    @Column({ nullable: true })
-    latitude: string;
-
-    @Column({ nullable: true })
-    longitude: string;
-
-    @Column({ nullable: true })
-    maxRadius: string;
-
-    @Column({ nullable: true })
     passwordResetOtpHash: string | null;
 
     @Column({ nullable: true })
@@ -190,8 +178,41 @@ export class User {
 
     @OneToMany(() => SaleOrder, (saleOrder) => saleOrder.executedByUser)
     executedSaleOrders: SaleOrder[];
+
+    @OneToMany(() => UserLocation, (userLocation) => userLocation.user)
+    userLocations: UserLocation[];
 }
 
+@Entity('user_locations')
+export class UserLocation {
+    @PrimaryGeneratedColumn()
+    id: number;
+
+    @ManyToOne(() => User, (user) => user.userLocations)
+    @JoinColumn({ name: 'userId' })
+    user: User;
+
+    @Column({ nullable: true })
+    userId: string;
+
+    @Column({ nullable: true })
+    locationTitle: string;
+
+    @Column({ nullable: true, type: 'decimal', precision: 10, scale: 8 })
+    latitude: string;
+
+    @Column({ nullable: true, type: 'decimal', precision: 10, scale: 8 })
+    longitude: string;
+
+    @Column({ nullable: true })
+    maxRadius: string;
+
+    @CreateDateColumn()
+    createdAt: Date;
+
+    @UpdateDateColumn()
+    updatedAt: Date;
+}
 @Entity('salesman_distributors')
 export class SalesmanDistributor {
     @PrimaryGeneratedColumn()

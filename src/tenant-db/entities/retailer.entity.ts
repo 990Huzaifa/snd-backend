@@ -315,6 +315,12 @@ export class RetailerAttendence {
     @Column({nullable: true, type: 'decimal', precision: 10, scale: 8 })
     checkinLongitude: number;
 
+    @Column({nullable: true, type: 'decimal', precision: 10, scale: 8 })
+    checkoutLatitude: number;
+
+    @Column({nullable: true, type: 'decimal', precision: 10, scale: 8 })
+    checkoutLongitude: number;
+
     @CreateDateColumn()
     createdAt: Date;
     

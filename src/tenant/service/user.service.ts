@@ -9,11 +9,11 @@ import { JwtService } from '@nestjs/jwt';
 import { DataSource, In, Like, Not, Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { MailService } from 'src/common/mail/mail.service';
-import { DeviceApprovedStatus, SalesmanDistributor, User, UserType } from 'src/tenant-db/entities/user.entity';
+import { DeviceApprovedStatus, SalesmanDistributor, User, UserLocation, UserType } from 'src/tenant-db/entities/user.entity';
 import { Role } from 'src/tenant-db/entities/role.entity';
 import { Designation } from 'src/tenant-db/entities/user.entity';
 import { Asset, AssetStatus } from 'src/tenant-db/entities/asset.entity';
-import { CreateTenantUserDto } from '../dto/user/create-tenant-user.dto';
+import { CreateTenantUserDto, UserLocationItemDto } from '../dto/user/create-tenant-user.dto';
 import { InviteTenantUserDto } from '../dto/user/invite-tenant-user.dto';
 import { UpdateTenantUserDto } from '../dto/user/update-tenant-user.dto';
 import { ActivityLogService } from './activity-log.service';
@@ -25,6 +25,10 @@ import {
 } from '../config/asset-rules.config';
 import { Distributor } from 'src/tenant-db/entities/distributor.entity';
 import { S3Service } from 'src/common/s3/s3.service';
+import {
+  parseGeoCoordinate,
+  parseMaxRadiusKm,
+} from 'src/common/geo/geo.util';
 
 @Injectable()
 export class UserService {
@@ -117,6 +121,70 @@ export class UserService {
     return this.s3Service.getObjectUrl(asset.s3Key);
   }
 
+  private normalizeUserLocations(
+    locations: UserLocationItemDto[] | undefined,
+  ): Array<{
+    locationTitle: string | null;
+    latitude: string;
+    longitude: string;
+    maxRadius: string;
+  }> {
+    if (!locations?.length) {
+      return [];
+    }
+
+    return locations.map((item, index) => {
+      try {
+        parseGeoCoordinate(item.latitude, `locations[${index}].latitude`);
+        parseGeoCoordinate(item.longitude, `locations[${index}].longitude`);
+        parseMaxRadiusKm(item.maxRadius);
+      } catch (error) {
+        throw new BadRequestException(
+          error instanceof Error
+            ? error.message
+            : `Invalid location at index ${index}`,
+        );
+      }
+
+      return {
+        locationTitle: item.locationTitle?.trim() || null,
+        latitude: item.latitude.trim(),
+        longitude: item.longitude.trim(),
+        maxRadius: item.maxRadius.trim(),
+      };
+    });
+  }
+
+  private async syncUserLocations(
+    tenantDb: DataSource,
+    userId: string,
+    locations: UserLocationItemDto[] | undefined,
+  ) {
+    if (locations === undefined) {
+      return;
+    }
+
+    const locationRepo = tenantDb.getRepository(UserLocation);
+    await locationRepo.delete({ userId });
+
+    const normalized = this.normalizeUserLocations(locations);
+    if (!normalized.length) {
+      return;
+    }
+
+    await locationRepo.save(
+      normalized.map((item) =>
+        locationRepo.create({
+          userId,
+          locationTitle: item.locationTitle,
+          latitude: item.latitude,
+          longitude: item.longitude,
+          maxRadius: item.maxRadius,
+        }),
+      ),
+    );
+  }
+
   async updateUserAvatar(
     tenantDb: DataSource,
     tenantCode: string,
@@ -182,7 +250,7 @@ export class UserService {
       },
     });
     const [users, total] = await userRepo.findAndCount({
-      relations: ['role', 'designation', 'assignedDistributors'],
+      relations: ['role', 'designation', 'assignedDistributors', 'userLocations'],
       where: {
         name: Like(`%${search}%`),
         id: Not(user.userId),
@@ -225,7 +293,7 @@ export class UserService {
     const userRepo = tenantDb.getRepository(User);
     const user = await userRepo.findOne({
       where: { id },
-      relations: ['role', 'designation'],
+      relations: ['role', 'designation', 'assignedDistributors', 'userLocations'],
     });
     if (!user) {
       throw new NotFoundException('User not found');
@@ -309,15 +377,12 @@ export class UserService {
       cityId: dto.cityId ?? null,
       deviceId: dto.deviceId ?? null,
       fcmToken: dto.fcmToken ?? null,
-      locationTitle: dto.locationTitle?.trim() ?? null,
-      latitude: dto.latitude ?? dto.lat ?? null,
-      longitude: dto.longitude ?? dto.lng ?? null,
-      maxRadius: dto.maxRadius ?? dto.radius ?? null,
       isActive: dto.isActive ?? false,
       isDeleted: false,
     });
 
     const createdUser = await userRepo.save(user);
+    await this.syncUserLocations(tenantDb, createdUser.id, dto.locations);
 
     if (dto.avatarAssetId) {
       const assetRepo = tenantDb.getRepository(Asset);
@@ -340,7 +405,11 @@ export class UserService {
 
     delete createdUser.password;
 
-    return createdUser;
+    const withRelations = await userRepo.findOne({
+      where: { id: createdUser.id },
+      relations: ['role', 'designation', 'assignedDistributors', 'userLocations'],
+    });
+    return this.attachGeoNames(withRelations ?? createdUser);
   }
 
   async updateUserStatus(tenantDb: DataSource, id: string, status: boolean, Authuser: any) {
@@ -424,16 +493,13 @@ export class UserService {
     if (dto.countryId !== undefined) user.countryId = dto.countryId?.trim() || null;
     if (dto.stateId !== undefined) user.stateId = dto.stateId?.trim() || null;
     if (dto.cityId !== undefined) user.cityId = dto.cityId?.trim() || null;
-    if (dto.locationTitle !== undefined) user.locationTitle = dto.locationTitle?.trim() ?? null;
-    if (dto.latitude !== undefined) user.latitude = dto.latitude?.trim() ?? null;
-    if (dto.longitude !== undefined) user.longitude = dto.longitude?.trim() ?? null;
-    if (dto.maxRadius !== undefined) user.maxRadius = dto.maxRadius?.trim() ?? null;
 
     if (dto.password !== undefined && dto.password.trim()) {
       user.password = await bcrypt.hash(dto.password.trim(), 10);
     }
 
     const updatedUser = await userRepo.save(user);
+    await this.syncUserLocations(tenantDb, updatedUser.id, dto.locations);
 
     await this.activityLogService.recordActivityLog(tenantDb, {
       actorId: authUser.userId,
@@ -442,7 +508,11 @@ export class UserService {
       metadata: { userId: updatedUser.id },
     });
 
-    const userWithGeoNames = await this.attachGeoNames(updatedUser);
+    const refreshed = await userRepo.findOne({
+      where: { id: updatedUser.id },
+      relations: ['role', 'designation', 'assignedDistributors', 'userLocations'],
+    });
+    const userWithGeoNames = await this.attachGeoNames(refreshed ?? updatedUser);
     delete userWithGeoNames.password;
     return userWithGeoNames;
   }

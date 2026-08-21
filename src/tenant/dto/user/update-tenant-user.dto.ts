@@ -1,4 +1,5 @@
 import {
+  IsArray,
   IsEmail,
   IsEnum,
   IsInt,
@@ -7,8 +8,11 @@ import {
   IsUUID,
   MinLength,
   ValidateIf,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import { UserType } from 'src/tenant-db/entities/user.entity';
+import { UserLocationItemDto } from './create-tenant-user.dto';
 
 export class UpdateTenantUserDto {
   @IsOptional()
@@ -60,24 +64,10 @@ export class UpdateTenantUserDto {
   cityId?: string | null;
 
   @IsOptional()
-  @ValidateIf((_, value) => value !== null)
-  @IsString()
-  locationTitle?: string | null;
-
-  @IsOptional()
-  @ValidateIf((_, value) => value !== null)
-  @IsString()
-  latitude?: string | null;
-
-  @IsOptional()
-  @ValidateIf((_, value) => value !== null)
-  @IsString()
-  longitude?: string | null;
-
-  @IsOptional()
-  @ValidateIf((_, value) => value !== null)
-  @IsString()
-  maxRadius?: string | null;
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => UserLocationItemDto)
+  locations?: UserLocationItemDto[];
 
   @IsOptional()
   @IsString()

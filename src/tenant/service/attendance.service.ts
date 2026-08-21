@@ -38,7 +38,9 @@ type AttendanceGeofence = {
   centerLat: number;
   centerLng: number;
   radiusKm: number;
-  source: 'user' | 'distributor';
+  source: 'user_location' | 'distributor';
+  sourceId?: string | number | null;
+  sourceLabel?: string | null;
 };
 
 @Injectable()
@@ -275,19 +277,61 @@ export class AttendanceService {
     return 'Poor attendance. Please be more regular.';
   }
 
-  private resolveUserGeofence(
-    user: Pick<User, 'latitude' | 'longitude' | 'maxRadius'>,
-  ): AttendanceGeofence {
+  private tryBuildGeofence(
+    latitude: string | null | undefined,
+    longitude: string | null | undefined,
+    maxRadius: string | null | undefined,
+    source: AttendanceGeofence['source'],
+    sourceId?: string | number | null,
+    sourceLabel?: string | null,
+  ): AttendanceGeofence | null {
+    const lat = latitude?.trim();
+    const lng = longitude?.trim();
+    const radius = maxRadius?.trim();
+    if (!lat || !lng || !radius) {
+      return null;
+    }
+
     try {
       return {
-        centerLat: parseGeoCoordinate(user.latitude, 'latitude'),
-        centerLng: parseGeoCoordinate(user.longitude, 'longitude'),
-        radiusKm: parseMaxRadiusKm(user.maxRadius),
-        source: 'user',
+        centerLat: parseGeoCoordinate(lat, 'latitude'),
+        centerLng: parseGeoCoordinate(lng, 'longitude'),
+        radiusKm: parseMaxRadiusKm(radius),
+        source,
+        sourceId: sourceId ?? null,
+        sourceLabel: sourceLabel ?? null,
       };
     } catch {
-      throw new BadRequestException('Invalid user location configuration');
+      return null;
     }
+  }
+
+  private assertWithinAnyAttendanceArea(
+    checkLat: number,
+    checkLng: number,
+    geofences: AttendanceGeofence[],
+  ): AttendanceGeofence {
+    if (!geofences.length) {
+      throw new BadRequestException(
+        'No check-in geofence configured. Assign a distributor with location or add user locations.',
+      );
+    }
+
+    for (const geofence of geofences) {
+      if (
+        isWithinRadiusKm(
+          checkLat,
+          checkLng,
+          geofence.centerLat,
+          geofence.centerLng,
+          geofence.radiusKm,
+        )
+      ) {
+        return geofence;
+      }
+    }
+
+    throw new BadRequestException('You are outside the allowed check-in area');
   }
 
   private async findTodayAttendance(
@@ -337,65 +381,15 @@ export class AttendanceService {
   private async assertDistributor(
     tenantDb: DataSource,
     distributorId: string,
-  ): Promise<Pick<Distributor, 'id' | 'latitude' | 'longitude' | 'maxRadius'>> {
+  ): Promise<Pick<Distributor, 'id' | 'name' | 'latitude' | 'longitude' | 'maxRadius'>> {
     const distributor = await tenantDb.getRepository(Distributor).findOne({
       where: { id: distributorId, isDeleted: false },
-      select: ['id', 'latitude', 'longitude', 'maxRadius'],
+      select: ['id', 'name', 'latitude', 'longitude', 'maxRadius'],
     });
     if (!distributor) {
       throw new NotFoundException('Distributor not found');
     }
     return distributor;
-  }
-
-  private hasCompleteUserGeofence(
-    user: Pick<User, 'latitude' | 'longitude' | 'maxRadius'>,
-  ): boolean {
-    const lat = user.latitude?.trim();
-    const lng = user.longitude?.trim();
-    const radius = user.maxRadius?.trim();
-    return Boolean(lat && lng && radius);
-  }
-
-  private resolveAttendanceGeofence(
-    user: Pick<User, 'latitude' | 'longitude' | 'maxRadius'>,
-    distributor: Pick<Distributor, 'latitude' | 'longitude' | 'maxRadius'>,
-  ): AttendanceGeofence {
-    const useUserGeofence = this.hasCompleteUserGeofence(user);
-    const source = useUserGeofence ? user : distributor;
-
-    try {
-      return {
-        centerLat: parseGeoCoordinate(source.latitude, 'latitude'),
-        centerLng: parseGeoCoordinate(source.longitude, 'longitude'),
-        radiusKm: parseMaxRadiusKm(source.maxRadius),
-        source: useUserGeofence ? 'user' : 'distributor',
-      };
-    } catch {
-      throw new BadRequestException(
-        useUserGeofence
-          ? 'Invalid user location configuration'
-          : 'Invalid distributor location configuration',
-      );
-    }
-  }
-
-  private assertWithinAttendanceArea(
-    checkLat: number,
-    checkLng: number,
-    geofence: AttendanceGeofence,
-  ): void {
-    if (
-      !isWithinRadiusKm(
-        checkLat,
-        checkLng,
-        geofence.centerLat,
-        geofence.centerLng,
-        geofence.radiusKm,
-      )
-    ) {
-      throw new BadRequestException('You are outside the allowed check-in area');
-    }
   }
 
   private async resolveOwnedAttendance(
@@ -419,24 +413,28 @@ export class AttendanceService {
   ) {
     const attendanceUser = await tenantDb.getRepository(User).findOne({
       where: { id: user.userId, isDeleted: false },
-      select: ['id', 'latitude', 'longitude', 'maxRadius'],
+      relations: [
+        'userLocations',
+        'assignedDistributors',
+        'assignedDistributors.distributor',
+      ],
     });
     if (!attendanceUser) {
       throw new NotFoundException('User not found');
     }
 
     const normalizedDistributorId = dto.distributorId?.trim() || null;
-    const hasUserGeofence = this.hasCompleteUserGeofence(attendanceUser);
+    const assignedDistributorIds = new Set(
+      (attendanceUser.assignedDistributors ?? [])
+        .map((row) => row.distributorId)
+        .filter((id): id is string => Boolean(id)),
+    );
 
-    if (!hasUserGeofence && !normalizedDistributorId) {
-      throw new BadRequestException(
-        'Distributor is required when user location is not configured',
+    if (normalizedDistributorId && !assignedDistributorIds.has(normalizedDistributorId)) {
+      throw new ForbiddenException(
+        'Distributor is not assigned to this user',
       );
     }
-
-    const distributor = normalizedDistributorId
-      ? await this.assertDistributor(tenantDb, normalizedDistributorId)
-      : null;
 
     const checkInTime = this.parseRequiredDateTime(
       dto.checkInTime,
@@ -466,14 +464,62 @@ export class AttendanceService {
       );
     }
 
-    const geofence =
-      hasUserGeofence && !distributor
-        ? this.resolveUserGeofence(attendanceUser)
-        : this.resolveAttendanceGeofence(attendanceUser, distributor!);
-    this.assertWithinAttendanceArea(
+    const geofences: AttendanceGeofence[] = [];
+
+    if (normalizedDistributorId) {
+      const distributor = await this.assertDistributor(
+        tenantDb,
+        normalizedDistributorId,
+      );
+      const fence = this.tryBuildGeofence(
+        distributor.latitude,
+        distributor.longitude,
+        distributor.maxRadius,
+        'distributor',
+        distributor.id,
+        distributor.name,
+      );
+      if (fence) {
+        geofences.push(fence);
+      }
+    } else {
+      for (const assignment of attendanceUser.assignedDistributors ?? []) {
+        const distributor = assignment.distributor;
+        if (!distributor || distributor.isDeleted) {
+          continue;
+        }
+        const fence = this.tryBuildGeofence(
+          distributor.latitude,
+          distributor.longitude,
+          distributor.maxRadius,
+          'distributor',
+          distributor.id,
+          distributor.name,
+        );
+        if (fence) {
+          geofences.push(fence);
+        }
+      }
+    }
+
+    for (const location of attendanceUser.userLocations ?? []) {
+      const fence = this.tryBuildGeofence(
+        location.latitude,
+        location.longitude,
+        location.maxRadius,
+        'user_location',
+        location.id,
+        location.locationTitle,
+      );
+      if (fence) {
+        geofences.push(fence);
+      }
+    }
+
+    const matchedGeofence = this.assertWithinAnyAttendanceArea(
       dto.checkInLatitude,
       dto.checkInLongitude,
-      geofence,
+      geofences,
     );
 
     const repo = tenantDb.getRepository(Attendence);
@@ -507,12 +553,13 @@ export class AttendanceService {
       metadata: {
         attendanceId: attendance.id,
         distributorId: normalizedDistributorId,
+        geofenceSource: matchedGeofence.source,
+        geofenceSourceId: matchedGeofence.sourceId,
+        geofenceSourceLabel: matchedGeofence.sourceLabel,
       },
     });
 
-    return this.viewAttendance(tenantDb, attendance.id, user, {
-      recordActivityLog: false,
-    });
+    return attendance;
   }
 
   async checkOut(
@@ -902,14 +949,16 @@ export class AttendanceService {
     }
 
     const users = await userQb
+      .leftJoinAndSelect('u.userLocations', 'userLocations')
       .select([
         'u.id',
         'u.name',
-        'u.locationTitle',
         'u.type',
         'designation.id',
         'designation.name',
         'designation.slug',
+        'userLocations.id',
+        'userLocations.locationTitle',
       ])
       .orderBy('u.name', 'ASC')
       .getMany();
@@ -983,7 +1032,7 @@ export class AttendanceService {
       return {
         id: employee.id,
         name: employee.name,
-        zone: employee.locationTitle,
+        zone: employee.userLocations?.[0]?.locationTitle ?? null,
         userType: employee.type,
         designation: employee.designation
           ? {

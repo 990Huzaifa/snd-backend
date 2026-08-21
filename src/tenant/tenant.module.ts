@@ -38,6 +38,7 @@ import { StockTransferController } from './controller/stock-transfer.controller'
 import { RetailerCategoryController } from './controller/retailer-category.controller';
 import { RetailerChannelController } from './controller/retailer-channel.controller';
 import { RetailerController } from './controller/retailer.controller';
+import { RetailerRouteTransferController } from './controller/retailer-route-transfer.controller';
 import { SchemeController } from './controller/scheme.controller';
 import { TargetPlanController } from './controller/target-plan.controller';
 import { StockController } from './controller/stock.controller';
@@ -92,6 +93,7 @@ import { StockTransferService } from './service/stock-transfer.service';
 import { RetailerCategoryService } from './service/retailer/retailer-category.service';
 import { RetailerChannelService } from './service/retailer/retailer-channel.service';
 import { RetailerService } from './service/retailer/retailer.service';
+import { RetailerRouteTransferService } from './service/retailer/retailer-route-transfer.service';
 import { RetailerInventoryService } from './service/retailer/retailer-inventory.service';
 import { AssetController } from './controller/asset.controller';
 import { AssetService } from './service/asset.service';
@@ -178,6 +180,7 @@ import { DashboardService } from './service/dashboard.service';
     RetailerCategoryController,
     RetailerChannelController,
     RetailerController,
+    RetailerRouteTransferController,
     AssetController,
     SchemeController,
     TargetPlanController,
@@ -236,6 +239,7 @@ import { DashboardService } from './service/dashboard.service';
     RetailerCategoryService,
     RetailerChannelService,
     RetailerService,
+    RetailerRouteTransferService,
     RetailerInventoryService,
     AssetService,
     SchemeService,

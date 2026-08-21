@@ -1,17 +1,36 @@
 import {
+  IsArray,
   IsBoolean,
-  IsDate,
   IsEmail,
   IsEnum,
   IsInt,
   IsOptional,
   IsString,
   MinLength,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import { UserType } from 'src/tenant-db/entities/user.entity';
 
-export class CreateTenantUserDto {
+export class UserLocationItemDto {
+  @IsOptional()
+  @IsString()
+  locationTitle?: string;
 
+  @IsString()
+  @MinLength(1)
+  latitude: string;
+
+  @IsString()
+  @MinLength(1)
+  longitude: string;
+
+  @IsString()
+  @MinLength(1)
+  maxRadius: string;
+}
+
+export class CreateTenantUserDto {
   @IsString()
   @MinLength(1)
   name: string;
@@ -83,32 +102,10 @@ export class CreateTenantUserDto {
   fcmToken?: string;
 
   @IsOptional()
-  @IsString()
-  locationTitle?: string;
-
-  @IsOptional()
-  @IsString()
-  latitude?: string;
-
-  @IsOptional()
-  @IsString()
-  longitude?: string;
-
-  @IsOptional()
-  @IsString()
-  maxRadius?: string;
-
-  @IsOptional()
-  @IsString()
-  lat?: string;
-
-  @IsOptional()
-  @IsString()
-  lng?: string;
-
-  @IsOptional()
-  @IsString()
-  radius?: string;
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => UserLocationItemDto)
+  locations?: UserLocationItemDto[];
 
   @IsOptional()
   @IsBoolean()
