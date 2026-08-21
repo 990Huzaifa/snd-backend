@@ -106,8 +106,7 @@ export class User {
     @Column({nullable: true})
     leavingDate: Date;
 
-    // geo cols
-
+    /** Master geo (country / state / city ids) — coordinates live on user_locations */
     @Column({nullable: true})
     countryId: string;
 
