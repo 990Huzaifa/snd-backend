@@ -52,6 +52,10 @@ export class UpdateRetailerDto {
 
   @IsOptional()
   @IsString()
+  locationTitle?: string | null;
+
+  @IsOptional()
+  @IsString()
   latitude?: string;
 
   @IsOptional()

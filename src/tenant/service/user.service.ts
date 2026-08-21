@@ -84,25 +84,6 @@ export class UserService {
     };
   }
 
-  private toUserResponse<T extends User>(user: T) {
-    const {
-      password: _password,
-      userLocations,
-      ...rest
-    } = user as T & { password?: string | null };
-
-    return {
-      ...rest,
-      locations: (userLocations ?? []).map((loc) => ({
-        id: loc.id,
-        locationTitle: loc.locationTitle,
-        latitude: loc.latitude,
-        longitude: loc.longitude,
-        maxRadius: loc.maxRadius,
-      })),
-    };
-  }
-
   private async resolveAvatarAsset(
     tenantDb: DataSource,
     tenantCode: string,
@@ -281,8 +262,8 @@ export class UserService {
       skip: (page - 1) * limit,
       take: limit,
     });
-    users.forEach((row) => {
-      delete row.password;
+    users.forEach(user => {
+      delete user.password;
     });
 
     // remove admin role user from the list
@@ -296,12 +277,12 @@ export class UserService {
     });
 
     return {
-      result: users.map((row) => this.toUserResponse(row)),
+      result: users,
       totalUsers,
       totalActiveUsers,
       totalInactiveUsers,
       meta: {
-        total,
+        total: total,
         page,
         limit,
       },
@@ -317,7 +298,7 @@ export class UserService {
     if (!user) {
       throw new NotFoundException('User not found');
     }
-    const userWithGeoNames = await this.attachGeoNames(this.toUserResponse(user) as any);
+    const userWithGeoNames = await this.attachGeoNames(user);
     await this.activityLogService.recordActivityLog(tenantDb, {
       actorId: Authuser.userId,
       action: 'USER_VIEWED',
@@ -428,9 +409,7 @@ export class UserService {
       where: { id: createdUser.id },
       relations: ['role', 'designation', 'assignedDistributors', 'userLocations'],
     });
-    return this.attachGeoNames(
-      this.toUserResponse(withRelations ?? createdUser) as any,
-    );
+    return this.attachGeoNames(withRelations ?? createdUser);
   }
 
   async updateUserStatus(tenantDb: DataSource, id: string, status: boolean, Authuser: any) {
@@ -533,9 +512,9 @@ export class UserService {
       where: { id: updatedUser.id },
       relations: ['role', 'designation', 'assignedDistributors', 'userLocations'],
     });
-    return this.attachGeoNames(
-      this.toUserResponse(refreshed ?? updatedUser) as any,
-    );
+    const userWithGeoNames = await this.attachGeoNames(refreshed ?? updatedUser);
+    delete userWithGeoNames.password;
+    return userWithGeoNames;
   }
   
   async inviteUser(

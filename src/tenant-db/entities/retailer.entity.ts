@@ -97,6 +97,9 @@ export class Retailer {
     @Column()
     address: string;
 
+    @Column({ nullable: true })
+    locationTitle: string | null;
+
     @Column()
     latitude: string;
 

@@ -32,6 +32,10 @@ export class CreateRetailerShopDto {
     @IsString()
     address: string;
 
+    @IsOptional()
+    @IsString()
+    locationTitle?: string;
+
     @IsString()
     latitude: string;
 

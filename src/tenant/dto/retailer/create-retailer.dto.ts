@@ -50,6 +50,9 @@ export class CreateRetailerDto {
   address: string;
 
   @IsString()
+  locationTitle: string;
+
+  @IsString()
   latitude: string;
 
   @IsString()

@@ -178,6 +178,7 @@ export class RetailerService {
         STRN: this.normalizeOptional(dto.STRN) ?? null,
         NTN: this.normalizeOptional(dto.NTN) ?? null,
         address: this.normalize(dto.address),
+        locationTitle: this.normalize(dto.locationTitle),
         latitude: this.normalize(dto.latitude),
         longitude: this.normalize(dto.longitude),
         maxRadius: this.normalize(dto.maxRadius),
@@ -448,6 +449,12 @@ export class RetailerService {
       if (dto.STRN !== undefined) retailer.STRN = this.normalizeOptional(dto.STRN) ?? null;
       if (dto.NTN !== undefined) retailer.NTN = this.normalizeOptional(dto.NTN) ?? null;
       if (dto.address !== undefined) retailer.address = this.normalize(dto.address);
+      if (dto.locationTitle !== undefined) {
+        retailer.locationTitle =
+          dto.locationTitle === null || dto.locationTitle === ''
+            ? null
+            : this.normalize(dto.locationTitle);
+      }
       if (dto.latitude !== undefined) retailer.latitude = this.normalize(dto.latitude);
       if (dto.longitude !== undefined) retailer.longitude = this.normalize(dto.longitude);
       if (dto.maxRadius !== undefined) retailer.maxRadius = this.normalize(dto.maxRadius);
