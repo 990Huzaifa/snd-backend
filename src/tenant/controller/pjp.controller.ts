@@ -97,6 +97,16 @@ export class PjpController {
     return this.pjpService.assign(tenantDb, id, dto, req.user);
   }
 
+  @Put('unassign/:id')
+  @RequirePermissions('UPDATE_PJP')
+  unassign(
+    @TenantConnection() tenantDb: DataSource,
+    @Param('id') id: string,
+    @Req() req: Request,
+  ) {
+    return this.pjpService.unassign(tenantDb, id, req.user);
+  }
+
   @Delete(':id')
   @RequirePermissions('DELETE_PJP')
   delete(

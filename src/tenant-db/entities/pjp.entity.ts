@@ -20,7 +20,7 @@ export class PJP {
     weekEndDate: Date;
 
     @Column({nullable: true})
-    salesmanId: string;
+    salesmanId: string | null;
 
     @ManyToOne(() => User, { onDelete: 'RESTRICT' })
     @JoinColumn({ name: 'salesmanId' })

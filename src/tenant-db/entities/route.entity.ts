@@ -61,7 +61,7 @@ export class RouteTransferLog {
     @Column()
     pjpId: string;
 
-    @ManyToOne(() => PJP, { onDelete: 'RESTRICT' })
+    @ManyToOne(() => PJP, { onDelete: 'CASCADE' })
     @JoinColumn({ name: 'pjpId' })
     pjp: PJP;
 
