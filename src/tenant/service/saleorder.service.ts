@@ -346,6 +346,23 @@ export class SaleOrderService {
       .take(limit)
       .getMany();
 
+    const quantityByOrderId = new Map<string, number>();
+    const orderIds = orders.map((order) => order.id);
+    if (orderIds.length) {
+      const quantityRows = await tenantDb
+        .getRepository(SaleOrderItem)
+        .createQueryBuilder('item')
+        .select('item.saleOrderId', 'saleOrderId')
+        .addSelect('COALESCE(SUM(item.quantity), 0)', 'totalQuantity')
+        .where('item.saleOrderId IN (:...orderIds)', { orderIds })
+        .groupBy('item.saleOrderId')
+        .getRawMany<{ saleOrderId: string; totalQuantity: string }>();
+
+      for (const row of quantityRows) {
+        quantityByOrderId.set(row.saleOrderId, Number(row.totalQuantity) || 0);
+      }
+    }
+
     await this.activityLogService.recordActivityLog(tenantDb, {
       actorId: user.userId,
       action: 'SALE_ORDER_LISTED',
@@ -354,7 +371,10 @@ export class SaleOrderService {
     });
 
     return {
-      result: orders,
+      result: orders.map((order) => ({
+        ...order,
+        totalQuantity: quantityByOrderId.get(order.id) ?? 0,
+      })),
       meta: { total, page, limit },
     };
   }
