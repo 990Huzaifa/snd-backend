@@ -46,10 +46,10 @@ export class CreateTenantUserDto {
   @MinLength(1)
   roleId: string;
 
-  @IsOptional()
   @IsEnum(UserType)
-  type?: UserType;
+  type: UserType;
 
+  @IsOptional()
   @IsInt()
   designationId?: number;
 
