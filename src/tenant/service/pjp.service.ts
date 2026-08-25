@@ -372,7 +372,7 @@ export class PjpService {
     return { message: 'PJP deleted successfully' };
   }
 
-  @Cron(CronExpression.EVERY_5_SECONDS)
+  @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
   async rolloverExpiredPjpsCron() {
     const tenants = await this.tenantRepo.find({
       where: { isActive: true },
