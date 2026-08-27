@@ -6,27 +6,51 @@ import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import FormData from 'form-data';
 
+export type MailAttachment = {
+    filename: string;
+    content: Buffer | string;
+    contentType?: string;
+};
+
 @Injectable()
 export class MailService {
-    constructor(private readonly httpService: HttpService) { }
+    constructor(private readonly httpService: HttpService) {}
 
     async sendEmail(
-        toEmail: string,
+        toEmail: string | string[],
         subject: string,
         bodyHtml: string,
         fromEmail: string,
+        attachments?: MailAttachment[],
     ) {
         const url = process.env.MAIL_SERVICE_URL;
         const masterUser = process.env.MAIL_SERVICE_MASTER_USER;
 
         const formData = new FormData();
 
-        formData.append('master_user', masterUser);
+        if (masterUser) {
+            formData.append('master_user', masterUser);
+        }
+
         formData.append('from_email', fromEmail);
-        formData.append('to_email', toEmail);
+
+        // API expects repeated `to_email` keys (one email per field), not a comma-separated string
+        const recipients = Array.isArray(toEmail) ? toEmail : [toEmail];
+        for (const email of recipients) {
+            formData.append('to_email', email);
+        }
+
         formData.append('subject', subject);
         formData.append('body_html', bodyHtml);
 
+        if (attachments?.length) {
+            for (const file of attachments) {
+                formData.append('attachments', file.content, {
+                    filename: file.filename,
+                    contentType: file.contentType,
+                });
+            }
+        }
 
         const response = await firstValueFrom(
             this.httpService.post(url!, formData, {
@@ -36,8 +60,8 @@ export class MailService {
                 },
             }),
         );
-        // console.log('Email-send response:', response.data);
-        // return response.data;
+
+        return response.data;
     }
 
     private renderTemplate(templateName: string, data: Record<string, any>) {
