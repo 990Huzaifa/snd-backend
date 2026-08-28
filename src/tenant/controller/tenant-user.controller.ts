@@ -93,6 +93,7 @@ export class TenantUserController {
   
 
   @Post('invite')
+  @RequirePermissions('CREATE_USER')
   invite(
     @TenantConnection() tenantDb: DataSource,
     @Body() dto: InviteTenantUserDto,

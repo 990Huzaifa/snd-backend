@@ -556,7 +556,9 @@ export class UserService {
         name: email.split('@')[0],
         email,
         password: null,
+        roleId: role.id,
         role,
+        designationId: designation?.id ?? null,
         designation: designation ?? undefined,
         isActive: true,
         isDeleted: false,
@@ -565,7 +567,9 @@ export class UserService {
       if (user.password) {
         throw new ConflictException('User already has an active account');
       }
+      user.roleId = role.id;
       user.role = role;
+      user.designationId = designation?.id ?? null;
       user.designation = designation ?? undefined;
       user.isActive = true;
       user.isDeleted = false;

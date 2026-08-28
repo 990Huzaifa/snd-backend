@@ -1,10 +1,15 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as Handlebars from 'handlebars';
-import { Injectable } from '@nestjs/common';
+import {
+    BadGatewayException,
+    Injectable,
+    InternalServerErrorException,
+} from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import FormData from 'form-data';
+import { isAxiosError } from 'axios';
 
 export type MailAttachment = {
     filename: string;
@@ -23,8 +28,16 @@ export class MailService {
         fromEmail: string,
         attachments?: MailAttachment[],
     ) {
-        const url = process.env.MAIL_SERVICE_URL;
-        const masterUser = process.env.MAIL_SERVICE_MASTER_USER;
+        const url = process.env.MAIL_SERVICE_URL?.trim();
+        const masterUser = process.env.MAIL_SERVICE_MASTER_USER?.trim();
+        const apiKey = process.env.MAIL_API_KEY?.trim().replace(/^["']|["']$/g, '');
+
+        if (!url) {
+            throw new InternalServerErrorException('MAIL_SERVICE_URL is not configured');
+        }
+        if (!apiKey) {
+            throw new InternalServerErrorException('MAIL_API_KEY is not configured');
+        }
 
         const formData = new FormData();
 
@@ -52,20 +65,49 @@ export class MailService {
             }
         }
 
-        const response = await firstValueFrom(
-            this.httpService.post(url!, formData, {
-                headers: {
-                    ...formData.getHeaders(),
-                    'x-api-key': process.env.MAIL_API_KEY!,
-                },
-            }),
-        );
+        try {
+            const response = await firstValueFrom(
+                this.httpService.post(url, formData, {
+                    headers: {
+                        ...formData.getHeaders(),
+                        'x-api-key': apiKey,
+                    },
+                }),
+            );
 
-        return response.data;
+            return response.data;
+        } catch (error) {
+            if (isAxiosError(error)) {
+                const detail =
+                    (error.response?.data as { message?: string; detail?: string } | undefined)
+                        ?.message ??
+                    (error.response?.data as { detail?: string } | undefined)?.detail ??
+                    error.message;
+                throw new BadGatewayException(`Failed to send email: ${detail}`);
+            }
+            throw error;
+        }
+    }
+
+    private resolveTemplatePath(templateName: string): string {
+        const fileName = `${templateName}.hbs`;
+        const candidates = [
+            path.join(__dirname, 'templates', fileName),
+            path.join(process.cwd(), 'dist/common/mail/templates', fileName),
+            path.join(process.cwd(), 'src/common/mail/templates', fileName),
+        ];
+
+        for (const filePath of candidates) {
+            if (fs.existsSync(filePath)) {
+                return filePath;
+            }
+        }
+
+        throw new InternalServerErrorException(`Email template not found: ${fileName}`);
     }
 
     private renderTemplate(templateName: string, data: Record<string, any>) {
-        const filePath = path.join(process.cwd(), 'src/common/mail/templates', `${templateName}.hbs`);
+        const filePath = this.resolveTemplatePath(templateName);
         const source = fs.readFileSync(filePath, 'utf8');
         const template = Handlebars.compile(source);
         return template(data);
