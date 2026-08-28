@@ -20,6 +20,7 @@ export class TenantJwtGuard implements CanActivate {
           tenantId?: string;
           tenantStatus?: TenantStatus;
           tenantCode?: string;
+          tenantSubdomain?: string;
         }
       | undefined;
     const tenantId = user?.tenantId;
@@ -40,6 +41,7 @@ export class TenantJwtGuard implements CanActivate {
     req.tenant = {
       isPlatform: false,
       tenantId,
+      name: user.tenantSubdomain,
       code: user.tenantCode,
       status,
     };

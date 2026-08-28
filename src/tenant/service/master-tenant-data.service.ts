@@ -67,12 +67,26 @@ export class MasterTenantDataService {
     }
     const tenant = await this.tenantRepo.findOne({
       where: { id: tenantId.trim() },
+      select: ['code'],
     });
     if (!tenant) {
       return null;
     }
     return tenant.code;
+  }
 
+  async getTenantSubdomainByTenantId(tenantId?: string | null): Promise<string | null> {
+    if (!tenantId?.trim()) {
+      return null;
+    }
+    const tenant = await this.tenantRepo.findOne({
+      where: { id: tenantId.trim() },
+      select: ['name'],
+    });
+    if (!tenant) {
+      return null;
+    }
+    return tenant.name;
   }
 
   async getTenantModulesByTenantId(tenantId?: string | null){

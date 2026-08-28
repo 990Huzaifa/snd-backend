@@ -10,6 +10,7 @@ export type TenantJwtPayload = {
   role: string;
   tenantStatus?: TenantStatus;
   tenantCode?: string;
+  tenantSubdomain?: string;
   tenantName?: string;
   type?: string;
 };
@@ -38,6 +39,7 @@ export class TenantJwtStrategy extends PassportStrategy(Strategy, 'tenant-jwt') 
       role: payload.role,
       tenantStatus: payload.tenantStatus,
       tenantCode: payload.tenantCode,
+      tenantSubdomain: payload.tenantSubdomain,
       tenantName: payload.tenantName,
     };
   }

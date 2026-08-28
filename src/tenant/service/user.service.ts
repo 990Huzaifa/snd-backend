@@ -55,10 +55,15 @@ export class UserService {
     token: string,
     tenantCode?: string,
     requestBaseUrl?: string,
+    tenantSubdomain?: string,
   ) {
-    const baseUrl =
+    let baseUrl =
       (requestBaseUrl || process.env.TENANT_SETUP_BASE_URL || '')
         .replace(/\/+$/, '');
+
+    if (!baseUrl && tenantSubdomain && process.env.DOMAIN) {
+      baseUrl = `https://${tenantSubdomain}.${process.env.DOMAIN}`;
+    }
     const query = new URLSearchParams();
     query.set('token', token);
     if (tenantCode) {
@@ -524,6 +529,7 @@ export class UserService {
     tenantName?: string,
     requestBaseUrl?: string,
     Authuser?: any,
+    tenantSubdomain?: string,
   ) {
     const userRepo = tenantDb.getRepository(User);
     const roleRepo = tenantDb.getRepository(Role);
@@ -591,6 +597,7 @@ export class UserService {
       token,
       tenantCode,
       requestBaseUrl,
+      tenantSubdomain,
     );
     const emailHtml = this.mailService.renderTenantUserInviteTemplate({
       logoUrl: process.env.APP_LOGO_URL || 'https://snd.com/logo.png',

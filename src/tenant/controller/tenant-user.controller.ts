@@ -11,13 +11,17 @@ import { CreateTenantUserDto } from '../dto/user/create-tenant-user.dto';
 import { InviteTenantUserDto } from '../dto/user/invite-tenant-user.dto';
 import { UpdateTenantUserDto } from '../dto/user/update-tenant-user.dto';
 import { UserService } from '../service/user.service';
+import { MasterTenantDataService } from '../service/master-tenant-data.service';
 
 @Controller('tenant/users')
 @UseGuards(TenantJwtAuthGuard, TenantJwtGuard, TenantConnectionGuard, TenantPermissionGuard)
 export class TenantUserController {
-  constructor(private readonly userService: UserService) { }
+  constructor(
+    private readonly userService: UserService,
+    private readonly masterTenantDataService: MasterTenantDataService,
+  ) {}
 
-  private buildSetupBaseUrl(req: Request, tenantCode?: string): string {
+  private buildSetupBaseUrl(req: Request, tenantSubdomain?: string): string {
     const forwardedProto = req.headers['x-forwarded-proto'];
     const protocol = Array.isArray(forwardedProto)
       ? forwardedProto[0]
@@ -39,7 +43,7 @@ export class TenantUserController {
     const rootDomain = parts.slice(1).join('.');
     const subdomain =
       !first || first === 'api' || first === 'www'
-        ? tenantCode
+        ? tenantSubdomain
         : parts[0];
 
     const finalHost = subdomain
@@ -94,23 +98,31 @@ export class TenantUserController {
 
   @Post('invite')
   @RequirePermissions('CREATE_USER')
-  invite(
+  async invite(
     @TenantConnection() tenantDb: DataSource,
     @Body() dto: InviteTenantUserDto,
     @Req() req: Request,
   ) {
     const authUser = req.user as {
+      tenantId?: string;
       tenantCode?: string;
+      tenantSubdomain?: string;
       tenantName?: string;
     };
+
+    const tenantSubdomain =
+      req.tenant?.name ??
+      authUser?.tenantSubdomain ??
+      (await this.masterTenantDataService.getTenantSubdomainByTenantId(authUser?.tenantId));
 
     return this.userService.inviteUser(
       tenantDb,
       dto,
       authUser?.tenantCode,
       authUser?.tenantName,
-      this.buildSetupBaseUrl(req, authUser?.tenantCode),
+      this.buildSetupBaseUrl(req, tenantSubdomain ?? undefined),
       req.user,
+      tenantSubdomain ?? undefined,
     );
   }
 

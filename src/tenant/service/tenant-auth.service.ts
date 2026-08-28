@@ -402,6 +402,7 @@ export class TenantAuthService {
       role: user.role.name,
       tenantStatus: tenant.status,
       tenantCode: tenant.code,
+      tenantSubdomain: tenant.name,
       tenantName: tenant.profile.displayName,
     };
 
