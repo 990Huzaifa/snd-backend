@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { DataSource, In } from 'typeorm';
 import { S3Service } from 'src/common/s3/s3.service';
@@ -24,8 +24,15 @@ import {
     BulkCreateSaleOrderDto,
     SALESMAN_SALE_ORDER_SYNC_MAX,
 } from '../../dto/salesman-app/saleorder/bulk-create-saleorder.dto';
+import {
+    BulkEditSaleOrderDto,
+    EditSaleOrderSyncDto,
+    SALESMAN_SALE_ORDER_EDIT_SYNC_MAX,
+} from '../../dto/salesman-app/saleorder/bulk-edit-saleorder.dto';
 import { CreateSaleOrderDto } from '../../dto/saleorder/create-saleorder.dto';
+import { UpdateSaleOrderDto } from '../../dto/saleorder/update-saleorder.dto';
 import { SaleOrderService } from '../saleorder.service';
+import { OrderStatus, SaleOrder } from 'src/tenant-db/entities/saleorder.entity';
 import {
     BulkCreateSaleVoucherDto,
 } from '../../dto/salesman-app/sale-voucher/bulk-create-sale-voucher.dto';
@@ -42,8 +49,15 @@ import {
     BulkCreateSaleReturnDto,
     SALESMAN_SALE_RETURN_SYNC_MAX,
 } from '../../dto/salesman-app/sale-return/bulk-create-sale-return.dto';
+import {
+    BulkEditSaleReturnDto,
+    EditSaleReturnSyncDto,
+    SALESMAN_SALE_RETURN_EDIT_SYNC_MAX,
+} from '../../dto/salesman-app/sale-return/bulk-edit-sale-return.dto';
 import { CreateSaleReturnDto } from '../../dto/sale-return/create-sale-return.dto';
+import { UpdateSaleReturnDto } from '../../dto/sale-return/update-sale-return.dto';
 import { SaleReturnService } from '../sale-return.service';
+import { ReturnStatus, SaleReturn } from 'src/tenant-db/entities/sale-return.entity';
 import {
     BulkSyncRetailerInventoryDto,
     SALESMAN_RETAILER_INVENTORY_SYNC_MAX,
@@ -71,6 +85,11 @@ type SaleOrderSyncRow = {
     order: CreateSaleOrderDto;
 };
 
+type SaleOrderEditSyncRow = {
+    row: number;
+    order: EditSaleOrderSyncDto;
+};
+
 type PaymentProofPayload = {
     buffer: Buffer;
     mimetype: string;
@@ -85,6 +104,11 @@ type SaleVoucherSyncRow = {
 type SaleReturnSyncRow = {
     row: number;
     saleReturn: CreateSaleReturnDto;
+};
+
+type SaleReturnEditSyncRow = {
+    row: number;
+    saleReturn: EditSaleReturnSyncDto;
 };
 
 type RetailerInventorySyncRow = {
@@ -752,6 +776,238 @@ export class SalesmanSyncUpService {
         };
     }
 
+    private buildSaleOrderEditSyncRows(dto: BulkEditSaleOrderDto): SaleOrderEditSyncRow[] {
+        return dto.orders.map((order, index) => ({
+            row: index + 1,
+            order,
+        }));
+    }
+
+    private saleOrderEditRowLabel(order: EditSaleOrderSyncDto, row: number): string {
+        return order.id ? `Order ${order.id}` : `Row ${row}`;
+    }
+
+    private splitSaleOrderEditPayload(order: EditSaleOrderSyncDto): {
+        id: string;
+        payload: UpdateSaleOrderDto;
+    } {
+        const { id, ...payload } = order;
+        return { id, payload };
+    }
+
+    private async assertEditableSaleOrderForSalesman(
+        tenantDb: DataSource,
+        orderId: string,
+        userId: string,
+    ): Promise<SaleOrder> {
+        const order = await tenantDb.getRepository(SaleOrder).findOne({
+            where: { id: orderId },
+            select: ['id', 'orderNumber', 'orderStatus', 'salesmanId'],
+        });
+        if (!order) {
+            throw new NotFoundException('Sale order not found');
+        }
+        if (order.salesmanId !== userId) {
+            throw new ForbiddenException('Sale order does not belong to this salesman');
+        }
+        if (order.orderStatus !== OrderStatus.PENDING) {
+            throw new BadRequestException('Only pending sale orders can be edited');
+        }
+        return order;
+    }
+
+    private async notifySaleOrderEditSyncCompletion(
+        tenantDb: DataSource,
+        job: TenantJob,
+        user: { userId: string },
+        tenantCode: string,
+        status: 'completed' | 'failed',
+    ) {
+        const title =
+            status === 'completed'
+                ? 'Sale order edit sync completed'
+                : 'Sale order edit sync failed';
+        const message =
+            status === 'completed'
+                ? `Sync finished. Updated: ${job.inserted}, Failed: ${job.failed}, Total: ${job.totalRows}`
+                : 'Sale order edit sync failed. Please review sync logs.';
+
+        await this.notificationService.createNotification(
+            tenantDb,
+            {
+                userId: user.userId,
+                title,
+                message,
+                type: 'salesman_sale_order_edit_sync',
+            },
+            tenantCode,
+            {
+                job: {
+                    id: job.id,
+                    jobType: job.jobType,
+                    status,
+                    fileName: job.fileName,
+                    totalRows: job.totalRows,
+                    inserted: job.inserted,
+                    failed: job.failed,
+                    completedAt: job.completedAt,
+                    logs: job.logs,
+                },
+            },
+        );
+    }
+
+    private async processEditSaleOrdersJob(
+        tenantDb: DataSource,
+        jobId: string,
+        rows: SaleOrderEditSyncRow[],
+        user: { userId: string },
+        tenantCode: string,
+    ) {
+        this.tenantJobService.startJob(jobId);
+
+        for (const row of rows) {
+            const orderLabel = this.saleOrderEditRowLabel(row.order, row.row);
+
+            try {
+                const { id, payload } = this.splitSaleOrderEditPayload(row.order);
+                await this.assertEditableSaleOrderForSalesman(tenantDb, id, user.userId);
+
+                const updated = await this.saleOrderService.edit(
+                    tenantDb,
+                    id,
+                    {
+                        ...payload,
+                        salesmanId: user.userId,
+                    },
+                    user,
+                );
+
+                this.tenantJobService.appendLog(jobId, {
+                    row: row.row,
+                    name: updated.orderNumber ?? orderLabel,
+                    status: 'success',
+                    metadata: {
+                        saleOrderId: updated.id,
+                        orderNumber: updated.orderNumber,
+                    },
+                });
+            } catch (error) {
+                this.tenantJobService.appendLog(jobId, {
+                    row: row.row,
+                    name: orderLabel,
+                    status: 'error',
+                    error: error instanceof Error ? error.message : 'Unknown error',
+                });
+            }
+        }
+
+        const completedJob = this.tenantJobService.completeJob(jobId);
+
+        await this.activityLogService.recordActivityLog(tenantDb, {
+            actorId: user.userId,
+            action: 'TENANT_JOB_COMPLETED',
+            description: `Salesman sale order edit sync completed for ${completedJob.fileName}`,
+            metadata: {
+                jobId: completedJob.id,
+                jobType: completedJob.jobType,
+                fileName: completedJob.fileName,
+                totalRows: completedJob.totalRows,
+                inserted: completedJob.inserted,
+                failed: completedJob.failed,
+            },
+        });
+
+        await this.notifySaleOrderEditSyncCompletion(
+            tenantDb,
+            completedJob,
+            user,
+            tenantCode,
+            'completed',
+        );
+    }
+
+    async editSaleOrders(
+        tenantDb: DataSource,
+        dto: BulkEditSaleOrderDto,
+        user: { userId: string },
+        tenantCode: string,
+    ) {
+        if (!dto.orders?.length) {
+            throw new BadRequestException('At least one sale order is required');
+        }
+
+        if (dto.orders.length > SALESMAN_SALE_ORDER_EDIT_SYNC_MAX) {
+            throw new BadRequestException(
+                `At most ${SALESMAN_SALE_ORDER_EDIT_SYNC_MAX} sale orders are allowed per edit sync`,
+            );
+        }
+
+        const rows = this.buildSaleOrderEditSyncRows(dto);
+        const fileName = `salesman-sale-order-edit-sync-${new Date().toISOString()}`;
+
+        const job = this.tenantJobService.createJob({
+            tenantCode,
+            jobType: 'SALESMAN_SALE_ORDER_EDIT_SYNC',
+            fileName,
+            createdBy: user.userId,
+            totalRows: rows.length,
+        });
+
+        await this.activityLogService.recordActivityLog(tenantDb, {
+            actorId: user.userId,
+            action: 'TENANT_JOB_STARTED',
+            description: `Salesman sale order edit sync started (${rows.length} orders)`,
+            metadata: {
+                jobId: job.id,
+                jobType: job.jobType,
+                fileName,
+                totalRows: rows.length,
+            },
+        });
+
+        void this.processEditSaleOrdersJob(tenantDb, job.id, rows, user, tenantCode).catch(
+            async (error) => {
+                this.tenantJobService.failJob(job.id);
+                this.tenantJobService.appendLog(job.id, {
+                    row: 0,
+                    name: '',
+                    status: 'error',
+                    error: error instanceof Error ? error.message : 'Unknown processing failure',
+                });
+
+                const failedJob = this.tenantJobService.getJobById(job.id, tenantCode, user.userId);
+
+                await this.activityLogService.recordActivityLog(tenantDb, {
+                    actorId: user.userId,
+                    action: 'TENANT_JOB_FAILED',
+                    description: 'Salesman sale order edit sync failed',
+                    metadata: {
+                        jobId: job.id,
+                        jobType: job.jobType,
+                        fileName,
+                        error: error instanceof Error ? error.message : String(error),
+                    },
+                });
+
+                await this.notifySaleOrderEditSyncCompletion(
+                    tenantDb,
+                    failedJob,
+                    user,
+                    tenantCode,
+                    'failed',
+                );
+            },
+        );
+
+        return {
+            message: 'Sale order edit sync started',
+            jobId: job.id,
+            status: job.status,
+            totalRows: job.totalRows,
+        };
+    }
+
     private buildSaleReturnSyncRows(dto: BulkCreateSaleReturnDto): SaleReturnSyncRow[] {
         return dto.returns.map((saleReturn, index) => ({
             row: index + 1,
@@ -945,6 +1201,240 @@ export class SalesmanSyncUpService {
 
         return {
             message: 'Sale return sync started',
+            jobId: job.id,
+            status: job.status,
+            totalRows: job.totalRows,
+        };
+    }
+
+    private buildSaleReturnEditSyncRows(dto: BulkEditSaleReturnDto): SaleReturnEditSyncRow[] {
+        return dto.returns.map((saleReturn, index) => ({
+            row: index + 1,
+            saleReturn,
+        }));
+    }
+
+    private saleReturnEditRowLabel(saleReturn: EditSaleReturnSyncDto, row: number): string {
+        return saleReturn.id ? `Return ${saleReturn.id}` : `Row ${row}`;
+    }
+
+    private splitSaleReturnEditPayload(saleReturn: EditSaleReturnSyncDto): {
+        id: string;
+        payload: UpdateSaleReturnDto;
+    } {
+        const { id, ...payload } = saleReturn;
+        return { id, payload };
+    }
+
+    private async assertEditableSaleReturnForSalesman(
+        tenantDb: DataSource,
+        saleReturnId: string,
+        userId: string,
+    ): Promise<SaleReturn> {
+        const saleReturn = await tenantDb.getRepository(SaleReturn).findOne({
+            where: { id: saleReturnId },
+            select: ['id', 'returnStatus', 'salesmanId', 'executedBy'],
+        });
+        if (!saleReturn) {
+            throw new NotFoundException('Sale return not found');
+        }
+        if (saleReturn.salesmanId !== userId) {
+            throw new ForbiddenException('Sale return does not belong to this salesman');
+        }
+        if (saleReturn.returnStatus !== ReturnStatus.PENDING) {
+            throw new BadRequestException('Only pending sale returns can be edited');
+        }
+        if (saleReturn.executedBy) {
+            throw new BadRequestException('Approved sale returns cannot be edited');
+        }
+        return saleReturn;
+    }
+
+    private async notifySaleReturnEditSyncCompletion(
+        tenantDb: DataSource,
+        job: TenantJob,
+        user: { userId: string },
+        tenantCode: string,
+        status: 'completed' | 'failed',
+    ) {
+        const title =
+            status === 'completed'
+                ? 'Sale return edit sync completed'
+                : 'Sale return edit sync failed';
+        const message =
+            status === 'completed'
+                ? `Sync finished. Updated: ${job.inserted}, Failed: ${job.failed}, Total: ${job.totalRows}`
+                : 'Sale return edit sync failed. Please review sync logs.';
+
+        await this.notificationService.createNotification(
+            tenantDb,
+            {
+                userId: user.userId,
+                title,
+                message,
+                type: 'salesman_sale_return_edit_sync',
+            },
+            tenantCode,
+            {
+                job: {
+                    id: job.id,
+                    jobType: job.jobType,
+                    status,
+                    fileName: job.fileName,
+                    totalRows: job.totalRows,
+                    inserted: job.inserted,
+                    failed: job.failed,
+                    completedAt: job.completedAt,
+                    logs: job.logs,
+                },
+            },
+        );
+    }
+
+    private async processEditSaleReturnsJob(
+        tenantDb: DataSource,
+        jobId: string,
+        rows: SaleReturnEditSyncRow[],
+        user: { userId: string },
+        tenantCode: string,
+    ) {
+        this.tenantJobService.startJob(jobId);
+
+        for (const row of rows) {
+            const returnLabel = this.saleReturnEditRowLabel(row.saleReturn, row.row);
+
+            try {
+                const { id, payload } = this.splitSaleReturnEditPayload(row.saleReturn);
+                await this.assertEditableSaleReturnForSalesman(tenantDb, id, user.userId);
+
+                const updated = await this.saleReturnService.edit(
+                    tenantDb,
+                    id,
+                    {
+                        ...payload,
+                        salesmanId: user.userId,
+                    },
+                    user,
+                );
+
+                this.tenantJobService.appendLog(jobId, {
+                    row: row.row,
+                    name: returnLabel,
+                    status: 'success',
+                    metadata: {
+                        saleReturnId: updated.id,
+                    },
+                });
+            } catch (error) {
+                this.tenantJobService.appendLog(jobId, {
+                    row: row.row,
+                    name: returnLabel,
+                    status: 'error',
+                    error: error instanceof Error ? error.message : 'Unknown error',
+                });
+            }
+        }
+
+        const completedJob = this.tenantJobService.completeJob(jobId);
+
+        await this.activityLogService.recordActivityLog(tenantDb, {
+            actorId: user.userId,
+            action: 'TENANT_JOB_COMPLETED',
+            description: `Salesman sale return edit sync completed for ${completedJob.fileName}`,
+            metadata: {
+                jobId: completedJob.id,
+                jobType: completedJob.jobType,
+                fileName: completedJob.fileName,
+                totalRows: completedJob.totalRows,
+                inserted: completedJob.inserted,
+                failed: completedJob.failed,
+            },
+        });
+
+        await this.notifySaleReturnEditSyncCompletion(
+            tenantDb,
+            completedJob,
+            user,
+            tenantCode,
+            'completed',
+        );
+    }
+
+    async editSaleReturns(
+        tenantDb: DataSource,
+        dto: BulkEditSaleReturnDto,
+        user: { userId: string },
+        tenantCode: string,
+    ) {
+        if (!dto.returns?.length) {
+            throw new BadRequestException('At least one sale return is required');
+        }
+
+        if (dto.returns.length > SALESMAN_SALE_RETURN_EDIT_SYNC_MAX) {
+            throw new BadRequestException(
+                `At most ${SALESMAN_SALE_RETURN_EDIT_SYNC_MAX} sale returns are allowed per edit sync`,
+            );
+        }
+
+        const rows = this.buildSaleReturnEditSyncRows(dto);
+        const fileName = `salesman-sale-return-edit-sync-${new Date().toISOString()}`;
+
+        const job = this.tenantJobService.createJob({
+            tenantCode,
+            jobType: 'SALESMAN_SALE_RETURN_EDIT_SYNC',
+            fileName,
+            createdBy: user.userId,
+            totalRows: rows.length,
+        });
+
+        await this.activityLogService.recordActivityLog(tenantDb, {
+            actorId: user.userId,
+            action: 'TENANT_JOB_STARTED',
+            description: `Salesman sale return edit sync started (${rows.length} returns)`,
+            metadata: {
+                jobId: job.id,
+                jobType: job.jobType,
+                fileName,
+                totalRows: rows.length,
+            },
+        });
+
+        void this.processEditSaleReturnsJob(tenantDb, job.id, rows, user, tenantCode).catch(
+            async (error) => {
+                this.tenantJobService.failJob(job.id);
+                this.tenantJobService.appendLog(job.id, {
+                    row: 0,
+                    name: '',
+                    status: 'error',
+                    error: error instanceof Error ? error.message : 'Unknown processing failure',
+                });
+
+                const failedJob = this.tenantJobService.getJobById(job.id, tenantCode, user.userId);
+
+                await this.activityLogService.recordActivityLog(tenantDb, {
+                    actorId: user.userId,
+                    action: 'TENANT_JOB_FAILED',
+                    description: 'Salesman sale return edit sync failed',
+                    metadata: {
+                        jobId: job.id,
+                        jobType: job.jobType,
+                        fileName,
+                        error: error instanceof Error ? error.message : String(error),
+                    },
+                });
+
+                await this.notifySaleReturnEditSyncCompletion(
+                    tenantDb,
+                    failedJob,
+                    user,
+                    tenantCode,
+                    'failed',
+                );
+            },
+        );
+
+        return {
+            message: 'Sale return edit sync started',
             jobId: job.id,
             status: job.status,
             totalRows: job.totalRows,

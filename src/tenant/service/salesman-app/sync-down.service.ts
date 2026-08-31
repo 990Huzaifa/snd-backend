@@ -13,6 +13,14 @@ import { Route } from 'src/tenant-db/entities/route.entity';
 import { Scheme } from 'src/tenant-db/entities/scheme.entity';
 import { SaleInvoice } from 'src/tenant-db/entities/sale-invoice.entity';
 import {
+  OrderStatus,
+  SaleOrder,
+} from 'src/tenant-db/entities/saleorder.entity';
+import {
+  ReturnStatus,
+  SaleReturn,
+} from 'src/tenant-db/entities/sale-return.entity';
+import {
   SaleVoucher,
   SaleVoucherStatus,
 } from 'src/tenant-db/entities/sale-voucher.entity';
@@ -82,6 +90,8 @@ const SALE_INVOICE_RELATIONS = [
   'items.scheme',
   'items.slab',
 ] as const;
+
+const ORDER_HISTORY_DAYS = 7;
 
 @Injectable()
 export class SalesmanSyncDownService {
@@ -263,6 +273,104 @@ export class SalesmanSyncDownService {
     });
 
     return { result: invoices };
+  }
+
+  async listOrderHistory(
+    tenantDb: DataSource,
+    user: { userId: string },
+  ) {
+    const toDate = new Date();
+    const fromDate = new Date(toDate);
+    fromDate.setDate(fromDate.getDate() - ORDER_HISTORY_DAYS);
+    fromDate.setHours(0, 0, 0, 0);
+
+    const orders = await tenantDb
+      .getRepository(SaleOrder)
+      .createQueryBuilder('order')
+      .leftJoinAndSelect('order.distributor', 'distributor')
+      .leftJoinAndSelect('order.salesman', 'salesman')
+      .leftJoinAndSelect('order.retailer', 'retailer')
+      .leftJoinAndSelect('retailer.route', 'retailerRoute')
+      .leftJoinAndSelect('retailer.retailerCategory', 'retailerCategory')
+      .leftJoinAndSelect('retailer.retailerChannel', 'retailerChannel')
+      .leftJoinAndSelect('order.route', 'route')
+      .leftJoinAndSelect('route.area', 'routeArea')
+      .leftJoinAndSelect('order.scheme', 'scheme')
+      .leftJoinAndSelect('order.schemeSlab', 'schemeSlab')
+      .leftJoinAndSelect('order.executedByUser', 'executedByUser')
+      .leftJoinAndSelect('order.items', 'items')
+      .leftJoinAndSelect('items.product', 'product')
+      .leftJoinAndSelect('items.productFlavour', 'productFlavour')
+      .leftJoinAndSelect('productFlavour.flavour', 'flavour')
+      .leftJoinAndSelect('items.productPricing', 'productPricing')
+      .leftJoinAndSelect('productPricing.uom', 'pricingUom')
+      .leftJoinAndSelect('items.scheme', 'itemScheme')
+      .leftJoinAndSelect('items.slab', 'itemSlab')
+      .where('order.salesmanId = :salesmanId', { salesmanId: user.userId })
+      .andWhere('order.orderStatus IN (:...statuses)', {
+        statuses: [OrderStatus.PENDING, OrderStatus.APPROVED],
+      })
+      .andWhere('order.orderDate >= :fromDate', { fromDate })
+      .andWhere('order.orderDate <= :toDate', { toDate })
+      .orderBy('order.orderDate', 'DESC')
+      .addOrderBy('order.createdAt', 'DESC')
+      .getMany();
+
+    return {
+      result: orders,
+      meta: {
+        fromDate: fromDate.toISOString(),
+        toDate: toDate.toISOString(),
+        days: ORDER_HISTORY_DAYS,
+      },
+    };
+  }
+
+  async listSaleReturnHistory(
+    tenantDb: DataSource,
+    user: { userId: string },
+  ) {
+    const toDate = new Date();
+    const fromDate = new Date(toDate);
+    fromDate.setDate(fromDate.getDate() - ORDER_HISTORY_DAYS);
+    fromDate.setHours(0, 0, 0, 0);
+
+    const returns = await tenantDb
+      .getRepository(SaleReturn)
+      .createQueryBuilder('saleReturn')
+      .leftJoinAndSelect('saleReturn.retailer', 'retailer')
+      .leftJoinAndSelect('retailer.route', 'retailerRoute')
+      .leftJoinAndSelect('retailer.retailerCategory', 'retailerCategory')
+      .leftJoinAndSelect('retailer.retailerChannel', 'retailerChannel')
+      .leftJoinAndSelect('saleReturn.distributor', 'distributor')
+      .leftJoinAndSelect('saleReturn.salesman', 'salesman')
+      .leftJoinAndSelect('saleReturn.order', 'order')
+      .leftJoinAndSelect('order.distributor', 'orderDistributor')
+      .leftJoinAndSelect('order.salesman', 'orderSalesman')
+      .leftJoinAndSelect('saleReturn.items', 'items')
+      .leftJoinAndSelect('items.product', 'product')
+      .leftJoinAndSelect('items.productFlavour', 'productFlavour')
+      .leftJoinAndSelect('productFlavour.flavour', 'flavour')
+      .leftJoinAndSelect('items.productPricing', 'productPricing')
+      .leftJoinAndSelect('productPricing.uom', 'pricingUom')
+      .where('saleReturn.salesmanId = :salesmanId', { salesmanId: user.userId })
+      .andWhere('saleReturn.returnStatus IN (:...statuses)', {
+        statuses: [ReturnStatus.PENDING, ReturnStatus.APPROVED],
+      })
+      .andWhere('saleReturn.returnDate >= :fromDate', { fromDate })
+      .andWhere('saleReturn.returnDate <= :toDate', { toDate })
+      .orderBy('saleReturn.returnDate', 'DESC')
+      .addOrderBy('saleReturn.createdAt', 'DESC')
+      .getMany();
+
+    return {
+      result: returns,
+      meta: {
+        fromDate: fromDate.toISOString(),
+        toDate: toDate.toISOString(),
+        days: ORDER_HISTORY_DAYS,
+      },
+    };
   }
 
   async listAssignedDistributors(

@@ -99,6 +99,30 @@ export class SalesmanSyncDownController {
     );
   }
 
+  @Get('order-history')
+  @RequirePermissions('SALESMAN_SYNC_DOWN')
+  listOrderHistory(
+    @TenantConnection() tenantDb: DataSource,
+    @Req() req: Request,
+  ) {
+    return this.syncDownService.listOrderHistory(
+      tenantDb,
+      req.user as { userId: string },
+    );
+  }
+
+  @Get('sale-return-history')
+  @RequirePermissions('SALESMAN_SYNC_DOWN')
+  listSaleReturnHistory(
+    @TenantConnection() tenantDb: DataSource,
+    @Req() req: Request,
+  ) {
+    return this.syncDownService.listSaleReturnHistory(
+      tenantDb,
+      req.user as { userId: string },
+    );
+  }
+
   @Get('retailer-categories')
   @RequirePermissions('SALESMAN_SYNC_DOWN')
   listRetailerCategories(@TenantConnection() tenantDb: DataSource) {
