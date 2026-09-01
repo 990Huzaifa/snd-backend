@@ -22,6 +22,13 @@ export class DistributorService {
     return value.trim();
   }
 
+  private normalizeMarginPercentage(value?: number): string {
+    if (value === undefined || value === null || Number.isNaN(value)) {
+      return '0.00';
+    }
+    return Number(value).toFixed(2);
+  }
+
   private async generateUniqueUserCode(distributorRepo: Repository<Distributor>): Promise<string> {
     while (true) {
       const code = Math.floor(100000 + Math.random() * 900000).toString();
@@ -92,6 +99,7 @@ export class DistributorService {
       maxRadius: this.normalize(dto.maxRadius) ?? '0.5',
       isActive: dto.isActive ?? true,
       stockLock: dto.stockLock ?? false,
+      marginPercentage: this.normalizeMarginPercentage(dto.marginPercentage),
     });
 
     const createdDistributor = await distributorRepo.save(distributor);
@@ -224,6 +232,9 @@ export class DistributorService {
     if (dto.longitude !== undefined) distributor.longitude = dto.longitude;
     if (dto.maxRadius !== undefined) distributor.maxRadius = this.normalize(dto.maxRadius);
     if (dto.isActive !== undefined) distributor.isActive = dto.isActive;
+    if (dto.marginPercentage !== undefined) {
+      distributor.marginPercentage = this.normalizeMarginPercentage(dto.marginPercentage);
+    }
 
     await distributorRepo.save(distributor);
 

@@ -1,10 +1,14 @@
 import {
   IsBoolean,
   IsEmail,
+  IsNumber,
   IsOptional,
   IsString,
   IsUUID,
+  Max,
+  Min,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class UpdateDistributorDto {
   @IsOptional()
@@ -66,4 +70,11 @@ export class UpdateDistributorDto {
   @IsOptional()
   @IsBoolean()
   stockLock?: boolean;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  @Max(100)
+  marginPercentage?: number;
 }
