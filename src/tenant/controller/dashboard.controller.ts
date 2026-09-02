@@ -14,6 +14,7 @@ import {
   DashboardSalesQueryDto,
   DashboardTargetAchievementGroupBy,
   DashboardTargetAchievementQueryDto,
+  DashboardTopProductsQueryDto,
 } from '../dto/dashboard/dashboard.dto';
 import { DashboardService } from '../service/dashboard.service';
 
@@ -105,6 +106,20 @@ export class DashboardController {
     @Req() req: Request,
   ) {
     return this.dashboardService.getTargetAchievement(
+      tenantDb,
+      query,
+      req.user as { userId: string },
+    );
+  }
+
+  @Get('top-performing-products')
+  @RequirePermissions('VIEW_DASHBOARD')
+  topPerformingProducts(
+    @TenantConnection() tenantDb: DataSource,
+    @Query() query: DashboardTopProductsQueryDto,
+    @Req() req: Request,
+  ) {
+    return this.dashboardService.getTopPerformingProducts(
       tenantDb,
       query,
       req.user as { userId: string },

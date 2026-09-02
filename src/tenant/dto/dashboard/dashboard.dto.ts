@@ -1,9 +1,13 @@
 import {
   IsDateString,
   IsEnum,
+  IsInt,
   IsOptional,
   IsUUID,
+  Max,
+  Min,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export enum DashboardTargetAchievementGroupBy {
   CITY = 'CITY',
@@ -71,4 +75,26 @@ export class DashboardTargetAchievementQueryDto {
   @IsOptional()
   @IsUUID()
   categoryId?: string;
+}
+
+export class DashboardTopProductsQueryDto {
+  @IsOptional()
+  @IsUUID()
+  distributorId?: string;
+
+  /** Anchor date (YYYY-MM-DD). MTD range is computed from this date. Defaults to today. */
+  @IsOptional()
+  @IsDateString()
+  date?: string;
+
+  @IsOptional()
+  @IsUUID()
+  categoryId?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  limit?: number;
 }

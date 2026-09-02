@@ -23,6 +23,7 @@ import {
   DashboardSalesQueryDto,
   DashboardTargetAchievementGroupBy,
   DashboardTargetAchievementQueryDto,
+  DashboardTopProductsQueryDto,
 } from '../dto/dashboard/dashboard.dto';
 import { MasterGeoHelperService } from './master-geo-helper.service';
 
@@ -384,6 +385,141 @@ export class DashboardService {
       );
       throw error;
     }
+  }
+
+  async getTopPerformingProducts(
+    tenantDb: DataSource,
+    query: DashboardTopProductsQueryDto,
+    _user: { userId: string },
+  ) {
+    try {
+      return await this.buildTopPerformingProducts(tenantDb, query);
+    } catch (error) {
+      this.logger.error(
+        `getTopPerformingProducts failed: ${error instanceof Error ? error.message : error}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw error;
+    }
+  }
+
+  private async buildTopPerformingProducts(
+    tenantDb: DataSource,
+    query: DashboardTopProductsQueryDto,
+  ) {
+    const anchor = this.resolveAnchorDate(query.date);
+    const range = this.getMonthToDateRange(anchor);
+    const distributorId = this.normalizeOptionalId(query.distributorId);
+    const categoryId = this.normalizeOptionalId(query.categoryId);
+    const limit = Math.min(Math.max(Number(query.limit) || 5, 1), 50);
+
+    const statusList = APPROVED_SALE_ORDER_STATUSES.map((s) => `'${s}'`).join(
+      ', ',
+    );
+    const params: unknown[] = [
+      range.start,
+      this.endOfDay(range.end),
+      limit,
+    ];
+    let paramIndex = 4;
+
+    let sql = `
+      SELECT
+        p.id AS "productId",
+        p.name AS "productName",
+        p."skuCode" AS "skuCode",
+        p.image AS image,
+        p."categoryId" AS "categoryId",
+        pc.name AS "categoryName",
+        pb.name AS "brandName",
+        COALESCE(SUM(soi.quantity), 0) AS "totalQuantity",
+        COALESCE(SUM(soi."totalAmount"), 0) AS "totalRevenue"
+      FROM sale_order_items soi
+      INNER JOIN sale_orders so ON so.id = soi."saleOrderId"
+      INNER JOIN products p ON p.id = soi."productId"
+      LEFT JOIN product_categories pc ON pc.id = p."categoryId"
+      LEFT JOIN product_brands pb ON pb.id = p."brandId"
+      WHERE so."orderStatus" IN (${statusList})
+        AND so."orderDate" >= $1
+        AND so."orderDate" <= $2
+        AND p."isDelete" = false
+    `;
+
+    if (distributorId) {
+      sql += ` AND so."distributorId" = $${paramIndex}`;
+      params.push(distributorId);
+      paramIndex += 1;
+    }
+
+    if (categoryId) {
+      sql += ` AND p."categoryId" = $${paramIndex}`;
+      params.push(categoryId);
+      paramIndex += 1;
+    }
+
+    sql += `
+      GROUP BY p.id, p.name, p."skuCode", p.image, p."categoryId", pc.name, pb.name
+      ORDER BY "totalRevenue" DESC, "totalQuantity" DESC, p.name ASC
+      LIMIT $3
+    `;
+
+    const rows = (await tenantDb.query(sql, params)) as Array<{
+      productId: string;
+      productName: string;
+      skuCode: string;
+      image: string | null;
+      categoryId: string;
+      categoryName: string | null;
+      brandName: string | null;
+      totalQuantity: string | number;
+      totalRevenue: string | number;
+    }>;
+
+    const totalRevenue = rows.reduce(
+      (sum, row) => sum + this.toNumber(row.totalRevenue),
+      0,
+    );
+    const totalQuantity = rows.reduce(
+      (sum, row) => sum + this.toNumber(row.totalQuantity),
+      0,
+    );
+
+    const products = rows.map((row, index) => {
+      const revenue = this.toNumber(row.totalRevenue);
+      const quantity = this.toNumber(row.totalQuantity);
+      return {
+        rank: index + 1,
+        productId: row.productId,
+        productName: row.productName,
+        skuCode: row.skuCode,
+        image: row.image,
+        categoryId: row.categoryId,
+        categoryName: row.categoryName,
+        brandName: row.brandName,
+        totalQuantity: quantity,
+        totalRevenue: revenue,
+        sharePercent: this.percentOf(revenue, totalRevenue),
+      };
+    });
+
+    return {
+      filters: {
+        period: 'MTD' as const,
+        date: this.toDateString(anchor),
+        dateFrom: this.toDateString(range.start),
+        dateTo: this.toDateString(range.end),
+        distributorId,
+        categoryId,
+        limit,
+        orderStatuses: [...APPROVED_SALE_ORDER_STATUSES],
+      },
+      summary: {
+        totalQuantity,
+        totalRevenue,
+        productCount: products.length,
+      },
+      products,
+    };
   }
 
   private async buildTargetAchievement(
