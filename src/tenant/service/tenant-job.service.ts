@@ -117,6 +117,25 @@ export class TenantJobService {
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   }
 
+  listJobsByType(
+    tenantCode: string,
+    jobType: string,
+    status?: string,
+  ): TenantJob[] {
+    const normalizedStatus = status?.trim().toLowerCase();
+    return [...this.jobs.values()]
+      .filter((job) => {
+        if (job.tenantCode !== tenantCode || job.jobType !== jobType) {
+          return false;
+        }
+        if (!normalizedStatus) {
+          return true;
+        }
+        return job.status === normalizedStatus;
+      })
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }
+
   @Cron(CronExpression.EVERY_HOUR)
   cleanupExpiredJobs() {
     const now = Date.now();

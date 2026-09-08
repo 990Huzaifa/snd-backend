@@ -164,42 +164,26 @@ export class RetailerRouteTransferService {
   }
 
   async list(
-    tenantDb: DataSource,
+    tenantCode: string,
     pageInput: number,
     limitInput: number,
     status?: string,
   ) {
     const page = Math.max(1, Number(pageInput) || 1);
     const limit = Math.min(100, Math.max(1, Number(limitInput) || 10));
-    const qb = tenantDb
-      .getRepository(RetailerRouteTransferJob)
-      .createQueryBuilder('job')
-      .leftJoinAndSelect('job.destinationRoute', 'destinationRoute')
-      .leftJoinAndSelect('job.createdBy', 'createdBy')
-      .orderBy('job.createdAt', 'DESC')
-      .skip((page - 1) * limit)
-      .take(limit);
-
-    if (status?.trim()) {
-      qb.andWhere('job.status = :status', { status: status.trim().toUpperCase() });
-    }
-
-    const [result, total] = await qb.getManyAndCount();
+    const jobs = this.tenantJobService.listJobsByType(
+      tenantCode,
+      'RETAILER_ROUTE_TRANSFER',
+      status,
+    );
+    const total = jobs.length;
+    const result = jobs.slice((page - 1) * limit, page * limit);
     return { result, meta: { total, page, limit } };
   }
 
-  async view(tenantDb: DataSource, id: string) {
-    const job = await tenantDb.getRepository(RetailerRouteTransferJob).findOne({
-      where: { id },
-      relations: [
-        'destinationRoute',
-        'createdBy',
-        'items',
-        'items.retailer',
-        'items.fromRoute',
-      ],
-    });
-    if (!job) {
+  async view(tenantCode: string, id: string, user: { userId: string }) {
+    const job = this.tenantJobService.getJobById(id, tenantCode, user.userId);
+    if (job.jobType !== 'RETAILER_ROUTE_TRANSFER') {
       throw new NotFoundException('Retailer route transfer job not found');
     }
     return job;

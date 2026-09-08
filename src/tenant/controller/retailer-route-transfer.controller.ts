@@ -39,17 +39,25 @@ export class RetailerRouteTransferController {
   @Get()
   @RequirePermissions('LIST_RETAILER')
   list(
-    @TenantConnection() tenantDb: DataSource,
+    @TenantCode() tenantCode: string,
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 10,
     @Query('status') status?: string,
   ) {
-    return this.retailerRouteTransferService.list(tenantDb, page, limit, status);
+    return this.retailerRouteTransferService.list(tenantCode, page, limit, status);
   }
 
   @Get(':id')
   @RequirePermissions('VIEW_RETAILER')
-  view(@TenantConnection() tenantDb: DataSource, @Param('id') id: string) {
-    return this.retailerRouteTransferService.view(tenantDb, id);
+  view(
+    @TenantCode() tenantCode: string,
+    @Param('id') id: string,
+    @Req() req: Request,
+  ) {
+    return this.retailerRouteTransferService.view(
+      tenantCode,
+      id,
+      req.user as { userId: string },
+    );
   }
 }
