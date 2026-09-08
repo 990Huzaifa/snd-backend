@@ -36,6 +36,7 @@ export class Subscription {
     tenant: Tenant;
 
     @ManyToOne(() => Plan, { onDelete: 'CASCADE' })
+    @JoinColumn({ name: 'planId' })
     plan: Plan;
 
     @OneToMany(() => SubscriptionAddon, (subscriptionAddon) => subscriptionAddon.subscription)

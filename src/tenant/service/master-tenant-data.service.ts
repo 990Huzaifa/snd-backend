@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { LIMIT_KEY } from 'src/master-db/entities/plan.entity';
 import { TenantGeoPolicy } from 'src/master-db/entities/tenant-geo-policy.entity';
@@ -16,6 +16,8 @@ export type TenantPlanLimit = {
 
 @Injectable()
 export class MasterTenantDataService {
+  private readonly logger = new Logger(MasterTenantDataService.name);
+
   constructor(
     @InjectRepository(TenantSettings)
     private readonly tenantSettingsRepo: Repository<TenantSettings>,
@@ -67,7 +69,7 @@ export class MasterTenantDataService {
     }
     const tenant = await this.tenantRepo.findOne({
       where: { id: tenantId.trim() },
-      select: ['code'],
+      select: ['id', 'code'],
     });
     if (!tenant) {
       return null;
@@ -81,7 +83,7 @@ export class MasterTenantDataService {
     }
     const tenant = await this.tenantRepo.findOne({
       where: { id: tenantId.trim() },
-      select: ['name'],
+      select: ['id', 'name'],
     });
     if (!tenant) {
       return null;
@@ -89,18 +91,14 @@ export class MasterTenantDataService {
     return tenant.name;
   }
 
-  async getTenantModulesByTenantId(tenantId?: string | null){
+  async getTenantModulesByTenantId(tenantId?: string | null) {
     if (!tenantId?.trim()) {
-      return null;
-    }
-    const modules = await this.tenantModuleRepo.find({
-      where: { tenant: { id: tenantId.trim() } },
-      relations: ['module'],
-    });
-    if (!modules) {
       return [];
     }
-    return modules;
+    return this.tenantModuleRepo.find({
+      where: { tenant: { id: tenantId.trim() } },
+      relations: { module: true },
+    });
   }
 
   async getTenantLimitsByTenantId(tenantId?: string | null): Promise<TenantPlanLimit[]> {
@@ -108,18 +106,28 @@ export class MasterTenantDataService {
       return [];
     }
 
-    const subscription = await this.subscriptionRepo.findOne({
-      where: { tenant: { id: tenantId.trim() }, status: Status.ACTIVE },
-      relations: ['plan', 'plan.plan_limits'],
-    });
+    // Raw join avoids fragile nested relation hydration (plan → plan_limits)
+    // and matches actual DB column names (subscriptions."planId", plan_limits.plan_id).
+    const rows: Array<{ limitKey: string; limitValue: string | number }> =
+      await this.subscriptionRepo.manager.query(
+        `
+          SELECT pl."limitKey" AS "limitKey", pl."limitValue" AS "limitValue"
+          FROM subscriptions s
+          INNER JOIN plans p ON p.id = s."planId"
+          INNER JOIN plan_limits pl ON pl.plan_id = p.id
+          WHERE s.tenant_id = $1
+            AND s.status = $2
+        `,
+        [tenantId.trim(), Status.ACTIVE],
+      );
 
-    if (!subscription?.plan?.plan_limits?.length) {
+    if (!rows?.length) {
       return [];
     }
 
-    return subscription.plan.plan_limits.map(({ limitKey, limitValue }) => ({
-      limitKey,
-      limitValue,
+    return rows.map((row) => ({
+      limitKey: row.limitKey as LIMIT_KEY,
+      limitValue: Number(row.limitValue),
     }));
   }
 
@@ -150,7 +158,7 @@ export class MasterTenantDataService {
 
     const normalizedTenantId = tenantId.trim();
 
-    const [tenantCode, settings, geoPolicy, theme, modules, limits] = await Promise.all([
+    const settled = await Promise.allSettled([
       this.getTenantCodeByTenantId(normalizedTenantId),
       this.getTenantSettingsByTenantId(normalizedTenantId),
       this.getTenantGeoPolicyByTenantId(normalizedTenantId),
@@ -159,13 +167,34 @@ export class MasterTenantDataService {
       this.getTenantLimitsByTenantId(normalizedTenantId),
     ]);
 
+    const labels = [
+      'tenantCode',
+      'settings',
+      'geoPolicy',
+      'theme',
+      'modules',
+      'limits',
+    ] as const;
+
+    settled.forEach((result, index) => {
+      if (result.status === 'rejected') {
+        this.logger.error(
+          `master-data failed loading ${labels[index]} for tenant ${normalizedTenantId}`,
+          result.reason instanceof Error ? result.reason.stack : result.reason,
+        );
+      }
+    });
+
+    const value = <T>(result: PromiseSettledResult<T>, fallback: T): T =>
+      result.status === 'fulfilled' ? result.value : fallback;
+
     return {
-      tenantCode,
-      settings,
-      geoPolicy,
-      theme,
-      modules,
-      limits,
+      tenantCode: value(settled[0], null),
+      settings: value(settled[1], null),
+      geoPolicy: value(settled[2], null),
+      theme: value(settled[3], null),
+      modules: value(settled[4], []),
+      limits: value(settled[5], []),
     };
   }
 }

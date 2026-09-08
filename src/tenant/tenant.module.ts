@@ -10,6 +10,8 @@ import { TenantGeoPolicy } from 'src/master-db/entities/tenant-geo-policy.entity
 import { TenantModule as TenantModuleEntity } from 'src/master-db/entities/tenant-modules.entity';
 import { TenantTheme } from 'src/master-db/entities/tenant-themes.entity';
 import { Subscription } from 'src/master-db/entities/subscription.entity';
+import { Plan, PlanLimit } from 'src/master-db/entities/plan.entity';
+import { Module as ModuleEntity } from 'src/master-db/entities/module.entity';
 import { TenantDbConfig } from 'src/master-db/entities/tenant-db-config.entity';
 import { AuthModule } from 'src/auth/auth.module';
 import { TenantRuntimeModule } from 'src/tenant-db/tenant-runtime.module';
@@ -149,7 +151,10 @@ import { DashboardService } from './service/dashboard.service';
       TenantGeoPolicy,
       TenantTheme,
       TenantModuleEntity,
+      ModuleEntity,
       Subscription,
+      Plan,
+      PlanLimit,
       TenantDbConfig,
     ]),
   ],

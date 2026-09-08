@@ -25,7 +25,7 @@ export class TenantGeoPolicy {
      * Auto delete policy if tenant deleted
      */
     @OneToOne(() => Tenant, { onDelete: 'CASCADE' })
-    @JoinColumn()
+    @JoinColumn({ name: 'tenantId' })
     tenant: Tenant;
 
     /**

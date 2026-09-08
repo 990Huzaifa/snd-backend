@@ -3,6 +3,7 @@ import {
     PrimaryGeneratedColumn,
     Column,
     ManyToOne,
+    JoinColumn,
     Unique,
     CreateDateColumn,
     UpdateDateColumn,
@@ -17,9 +18,11 @@ export class TenantModule {
     id: string;
 
     @ManyToOne(() => Tenant, { onDelete: 'CASCADE' })
+    @JoinColumn({ name: 'tenantId' })
     tenant: Tenant;
 
     @ManyToOne(() => Module, { onDelete: 'CASCADE' })
+    @JoinColumn({ name: 'moduleId' })
     module: Module;
 
     @Column({ default: true })
