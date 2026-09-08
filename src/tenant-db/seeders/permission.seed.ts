@@ -78,6 +78,10 @@ export const TENANT_PERMISSIONS = [
   { code: 'VIEW_RETAILER_VISIT_REPORT', name: 'View Retailer Visit Report' },
   { code: 'VIEW_RETAILER_CHECKIN_REPORT', name: 'View Retailer Check-In Report' },
   { code: 'VIEW_RETAILER_MERCHANDISING_REPORT', name: 'View Retailer Merchandising Report' },
+  {
+    code: 'VIEW_SALESMAN_TRACKING_REPORT',
+    name: 'View Salesman Tracking Report',
+  },
   { code: 'VIEW_DASHBOARD', name: 'View Dashboard' },
 
   { code: 'UPDATE_USER', name: 'Update Users' },
