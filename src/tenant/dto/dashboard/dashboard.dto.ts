@@ -82,11 +82,6 @@ export class DashboardTopProductsQueryDto {
   @IsUUID()
   distributorId?: string;
 
-  /** Anchor date (YYYY-MM-DD). MTD range is computed from this date. Defaults to today. */
-  @IsOptional()
-  @IsDateString()
-  date?: string;
-
   @IsOptional()
   @IsUUID()
   categoryId?: string;

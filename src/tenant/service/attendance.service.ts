@@ -24,6 +24,10 @@ import { CheckInAttendanceDto } from '../dto/attendance/check-in-attendance.dto'
 import { CheckOutAttendanceDto } from '../dto/attendance/check-out-attendance.dto';
 import { ListAttendanceDto } from '../dto/attendance/list-attendance.dto';
 import { CreateTrackingLogDto } from '../dto/attendance/create-tracking-log.dto';
+import {
+  MarkAttendanceDto,
+  MarkAttendanceStatus,
+} from '../dto/attendance/mark-attendance.dto';
 
 type AttendanceDayCode = 'P' | 'A' | 'HD' | 'L' | 'W' | 'NA';
 
@@ -177,6 +181,58 @@ export class AttendanceService {
       Boolean(record.checkInTime) &&
       !record.checkOutTime
     );
+  }
+
+  private parseAttendanceDay(value: string): Date {
+    const trimmed = value.trim();
+    const dayOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed);
+    if (dayOnly) {
+      const year = Number(dayOnly[1]);
+      const month = Number(dayOnly[2]);
+      const day = Number(dayOnly[3]);
+      return this.startOfDay(new Date(year, month - 1, day));
+    }
+    const d = new Date(trimmed);
+    if (Number.isNaN(d.getTime())) {
+      throw new BadRequestException(`Invalid attendanceDate: ${value}`);
+    }
+    return this.startOfDay(d);
+  }
+
+  private parseTimeOnDate(date: Date, value: string, fieldName: string): Date {
+    const trimmed = value.trim();
+
+    const amPm = /^(\d{1,2}):([0-5]\d)\s*([AaPp][Mm])$/.exec(trimmed);
+    if (amPm) {
+      let hours = Number(amPm[1]);
+      const minutes = Number(amPm[2]);
+      const meridiem = amPm[3].toUpperCase();
+      if (hours < 1 || hours > 12) {
+        throw new BadRequestException(`Invalid ${fieldName}: ${value}`);
+      }
+      if (meridiem === 'AM') {
+        hours = hours === 12 ? 0 : hours;
+      } else {
+        hours = hours === 12 ? 12 : hours + 12;
+      }
+      const result = new Date(date);
+      result.setHours(hours, minutes, 0, 0);
+      return result;
+    }
+
+    const hhmm = /^([01]?\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?$/.exec(trimmed);
+    if (hhmm) {
+      const result = new Date(date);
+      result.setHours(
+        Number(hhmm[1]),
+        Number(hhmm[2]),
+        hhmm[3] ? Number(hhmm[3]) : 0,
+        0,
+      );
+      return result;
+    }
+
+    return this.parseRequiredDateTime(trimmed, fieldName);
   }
 
   private resolveDayCode(
@@ -403,6 +459,111 @@ export class AttendanceService {
     if (!attendance) {
       throw new NotFoundException('Attendance record not found');
     }
+    return attendance;
+  }
+
+  async markAttendance(
+    tenantDb: DataSource,
+    dto: MarkAttendanceDto,
+    actor: { userId: string },
+  ) {
+    const targetUser = await tenantDb.getRepository(User).findOne({
+      where: { id: dto.userId, isDeleted: false },
+      select: ['id'],
+    });
+    if (!targetUser) {
+      throw new NotFoundException('User not found');
+    }
+
+    const attendanceDate = this.parseAttendanceDay(dto.attendanceDate);
+    const normalizedDistributorId = dto.distributorId?.trim() || null;
+
+    if (normalizedDistributorId) {
+      await this.assertDistributor(tenantDb, normalizedDistributorId);
+    }
+
+    let checkInTime: Date | null = null;
+    let checkOutTime: Date | null = null;
+    const status =
+      dto.status === MarkAttendanceStatus.LEAVE
+        ? AttendenceStatus.LEAVE
+        : AttendenceStatus.PRESENT;
+
+    if (dto.status === MarkAttendanceStatus.PRESENT) {
+      if (!dto.checkInTime?.trim() || !dto.checkOutTime?.trim()) {
+        throw new BadRequestException(
+          'checkInTime and checkOutTime are required for PRESENT',
+        );
+      }
+      checkInTime = this.parseTimeOnDate(
+        attendanceDate,
+        dto.checkInTime,
+        'checkInTime',
+      );
+      checkOutTime = this.parseTimeOnDate(
+        attendanceDate,
+        dto.checkOutTime,
+        'checkOutTime',
+      );
+      if (checkOutTime.getTime() < checkInTime.getTime()) {
+        throw new BadRequestException(
+          'Check-out time cannot be before check-in time',
+        );
+      }
+    }
+
+    const repo = tenantDb.getRepository(Attendence);
+    const existing = await this.findTodayAttendance(
+      tenantDb,
+      dto.userId,
+      normalizedDistributorId,
+      attendanceDate,
+    );
+
+    const payload: Partial<Attendence> = {
+      userId: dto.userId,
+      distributorId: normalizedDistributorId,
+      attendenceDate: attendanceDate,
+      status,
+      checkInTime,
+      checkOutTime,
+      checkInLocation:
+        dto.status === MarkAttendanceStatus.LEAVE
+          ? null
+          : dto.checkInLocation?.trim() || null,
+      checkOutLocation:
+        dto.status === MarkAttendanceStatus.LEAVE
+          ? null
+          : dto.checkOutLocation?.trim() || null,
+      checkInLatitude: null,
+      checkInLongitude: null,
+      checkOutLatitude: null,
+      checkOutLongitude: null,
+    };
+
+    const attendance = existing
+      ? await repo.save(
+          Object.assign(existing, {
+            ...payload,
+            id: existing.id,
+          }),
+        )
+      : await repo.save(repo.create(payload));
+
+    await this.activityLogService.recordActivityLog(tenantDb, {
+      actorId: actor.userId,
+      action: 'ATTENDANCE_MARKED',
+      description: 'Attendance marked by admin',
+      metadata: {
+        attendanceId: attendance.id,
+        targetUserId: dto.userId,
+        status,
+        attendanceDate: this.toDateKey(attendanceDate),
+        distributorId: normalizedDistributorId,
+        updated: Boolean(existing),
+      },
+    });
+
     return attendance;
   }
 

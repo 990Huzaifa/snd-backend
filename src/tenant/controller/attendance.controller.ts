@@ -23,6 +23,7 @@ import { AppAttendanceOverviewDto } from '../dto/attendance/app-attendance-overv
 import { AttendanceOverviewDto } from '../dto/attendance/attendance-overview.dto';
 import { ListAttendanceDto } from '../dto/attendance/list-attendance.dto';
 import { CreateTrackingLogDto } from '../dto/attendance/create-tracking-log.dto';
+import { MarkAttendanceDto } from '../dto/attendance/mark-attendance.dto';
 
 @Controller('tenant/attendance')
 @UseGuards(
@@ -33,6 +34,20 @@ import { CreateTrackingLogDto } from '../dto/attendance/create-tracking-log.dto'
 )
 export class AttendanceController {
   constructor(private readonly attendanceService: AttendanceService) {}
+
+  @Post('mark')
+  @RequirePermissions('LIST_ATTENDANCE')
+  mark(
+    @TenantConnection() tenantDb: DataSource,
+    @Body() dto: MarkAttendanceDto,
+    @Req() req: Request,
+  ) {
+    return this.attendanceService.markAttendance(
+      tenantDb,
+      dto,
+      req.user as { userId: string },
+    );
+  }
 
   @Post('check-in')
   // @RequirePermissions('CHECK_IN_ATTENDANCE')

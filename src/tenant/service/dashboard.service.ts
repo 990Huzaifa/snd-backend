@@ -407,8 +407,7 @@ export class DashboardService {
     tenantDb: DataSource,
     query: DashboardTopProductsQueryDto,
   ) {
-    const anchor = this.resolveAnchorDate(query.date);
-    const range = this.getMonthToDateRange(anchor);
+    const tillDate = this.endOfDay(new Date());
     const distributorId = this.normalizeOptionalId(query.distributorId);
     const categoryId = this.normalizeOptionalId(query.categoryId);
     const limit = Math.min(Math.max(Number(query.limit) || 5, 1), 50);
@@ -416,12 +415,8 @@ export class DashboardService {
     const statusList = APPROVED_SALE_ORDER_STATUSES.map((s) => `'${s}'`).join(
       ', ',
     );
-    const params: unknown[] = [
-      range.start,
-      this.endOfDay(range.end),
-      limit,
-    ];
-    let paramIndex = 4;
+    const params: unknown[] = [tillDate, limit];
+    let paramIndex = 3;
 
     let sql = `
       SELECT
@@ -440,8 +435,7 @@ export class DashboardService {
       LEFT JOIN product_categories pc ON pc.id = p."categoryId"
       LEFT JOIN product_brands pb ON pb.id = p."brandId"
       WHERE so."orderStatus" IN (${statusList})
-        AND so."orderDate" >= $1
-        AND so."orderDate" <= $2
+        AND so."orderDate" <= $1
         AND p."isDelete" = false
     `;
 
@@ -460,7 +454,7 @@ export class DashboardService {
     sql += `
       GROUP BY p.id, p.name, p."skuCode", p.image, p."categoryId", pc.name, pb.name
       ORDER BY "totalRevenue" DESC, "totalQuantity" DESC, p.name ASC
-      LIMIT $3
+      LIMIT $2
     `;
 
     const rows = (await tenantDb.query(sql, params)) as Array<{
@@ -504,10 +498,7 @@ export class DashboardService {
 
     return {
       filters: {
-        period: 'MTD' as const,
-        date: this.toDateString(anchor),
-        dateFrom: this.toDateString(range.start),
-        dateTo: this.toDateString(range.end),
+        tillDate: this.toDateString(tillDate),
         distributorId,
         categoryId,
         limit,
