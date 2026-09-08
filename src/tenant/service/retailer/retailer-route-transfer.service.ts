@@ -9,7 +9,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
 import { Tenant } from 'src/master-db/entities/tenant.entity';
 import { Retailer } from 'src/tenant-db/entities/retailer.entity';
-import { Route } from 'src/tenant-db/entities/route.entity';
+import { Route, RouteTransferLog } from 'src/tenant-db/entities/route.entity';
 import {
   RetailerRouteTransferJob,
   RetailerRouteTransferJobItem,
@@ -163,30 +163,64 @@ export class RetailerRouteTransferService {
     };
   }
 
-  async list(
-    tenantCode: string,
-    pageInput: number,
-    limitInput: number,
-    status?: string,
-  ) {
+  async list(tenantDb: DataSource, pageInput: number, limitInput: number) {
     const page = Math.max(1, Number(pageInput) || 1);
     const limit = Math.min(100, Math.max(1, Number(limitInput) || 10));
-    const jobs = this.tenantJobService.listJobsByType(
-      tenantCode,
-      'RETAILER_ROUTE_TRANSFER',
-      status,
-    );
-    const total = jobs.length;
-    const result = jobs.slice((page - 1) * limit, page * limit);
+
+    const qb = tenantDb
+      .getRepository(RouteTransferLog)
+      .createQueryBuilder('log')
+      .leftJoin('log.fromSalesman', 'fromSalesman')
+      .addSelect([
+        'fromSalesman.id',
+        'fromSalesman.name',
+        'fromSalesman.email',
+        'fromSalesman.code',
+      ])
+      .leftJoin('log.toSalesman', 'toSalesman')
+      .addSelect([
+        'toSalesman.id',
+        'toSalesman.name',
+        'toSalesman.email',
+        'toSalesman.code',
+      ])
+      .leftJoinAndSelect('log.route', 'route')
+      .leftJoinAndSelect('log.pjp', 'pjp')
+      .orderBy('log.createdAt', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit);
+
+    const [result, total] = await qb.getManyAndCount();
     return { result, meta: { total, page, limit } };
   }
 
-  async view(tenantCode: string, id: string, user: { userId: string }) {
-    const job = this.tenantJobService.getJobById(id, tenantCode, user.userId);
-    if (job.jobType !== 'RETAILER_ROUTE_TRANSFER') {
-      throw new NotFoundException('Retailer route transfer job not found');
+  async view(tenantDb: DataSource, id: string) {
+    const log = await tenantDb
+      .getRepository(RouteTransferLog)
+      .createQueryBuilder('log')
+      .leftJoin('log.fromSalesman', 'fromSalesman')
+      .addSelect([
+        'fromSalesman.id',
+        'fromSalesman.name',
+        'fromSalesman.email',
+        'fromSalesman.code',
+      ])
+      .leftJoin('log.toSalesman', 'toSalesman')
+      .addSelect([
+        'toSalesman.id',
+        'toSalesman.name',
+        'toSalesman.email',
+        'toSalesman.code',
+      ])
+      .leftJoinAndSelect('log.route', 'route')
+      .leftJoinAndSelect('log.pjp', 'pjp')
+      .where('log.id = :id', { id })
+      .getOne();
+
+    if (!log) {
+      throw new NotFoundException('Route transfer log not found');
     }
-    return job;
+    return log;
   }
 
   @Cron(CronExpression.EVERY_MINUTE)
