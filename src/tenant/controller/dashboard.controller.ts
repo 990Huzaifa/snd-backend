@@ -8,11 +8,12 @@ import { TenantConnectionGuard } from 'src/common/guards/tenant-connection.guard
 import { TenantJwtGuard } from 'src/common/guards/tenant-jwt.guard';
 import { TenantConnection } from 'src/common/tenant/tenant-connection.decorator';
 import {
+  DashboardAnnualSalesForecastQueryDto,
   DashboardAttendanceQueryDto,
   DashboardOrdersQueryDto,
+  DashboardOrdersReturnsSnapshotQueryDto,
   DashboardOverviewQueryDto,
   DashboardSalesQueryDto,
-  DashboardTargetAchievementGroupBy,
   DashboardTargetAchievementQueryDto,
   DashboardTopProductsQueryDto,
 } from '../dto/dashboard/dashboard.dto';
@@ -36,6 +37,34 @@ export class DashboardController {
     @Req() req: Request,
   ) {
     return this.dashboardService.getOverview(
+      tenantDb,
+      query,
+      req.user as { userId: string },
+    );
+  }
+
+  @Get('annual-sales-ai-forecast')
+  @RequirePermissions('VIEW_DASHBOARD')
+  annualSalesAiForecast(
+    @TenantConnection() tenantDb: DataSource,
+    @Query() query: DashboardAnnualSalesForecastQueryDto,
+    @Req() req: Request,
+  ) {
+    return this.dashboardService.getAnnualSalesAiForecast(
+      tenantDb,
+      query,
+      req.user as { userId: string },
+    );
+  }
+
+  @Get('orders-returns-snapshot')
+  @RequirePermissions('VIEW_DASHBOARD')
+  ordersReturnsSnapshot(
+    @TenantConnection() tenantDb: DataSource,
+    @Query() query: DashboardOrdersReturnsSnapshotQueryDto,
+    @Req() req: Request,
+  ) {
+    return this.dashboardService.getOrdersReturnsSnapshot(
       tenantDb,
       query,
       req.user as { userId: string },

@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  HttpException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -25,6 +26,10 @@ import { RetailerLedgerService } from './retailer/retailer-ledger.service';
 import { ProductSchemeEngineService } from './product/product-scheme-engine.service';
 import { RetailerSchemeEngineService } from './retailer/retailer-scheme-engine.service';
 
+type BulkStatusResult = {
+  succeeded: string[];
+  failed: { id: string; message: string }[];
+};
 @Injectable()
 export class SaleOrderService {
   constructor(
@@ -618,20 +623,124 @@ export class SaleOrderService {
   }
 
   async updateStatus(tenantDb: DataSource, id: string, status: OrderStatus, user: { userId: string }) {
-    let order: Pick<SaleOrder, 'id' | 'orderNumber' | 'orderStatus'> | null = null;
+    const order = await this.applyStatusChange(tenantDb, id, status, user);
 
-    await tenantDb.transaction(async (manager) => {
+    await this.activityLogService.recordActivityLog(tenantDb, {
+      actorId: user.userId,
+      action: 'SALE_ORDER_STATUS_UPDATED',
+      description: `Sale order ${order.orderNumber} status updated to ${status}`,
+      metadata: { saleOrderId: order.id, status },
+    });
+
+    return {
+      message: 'Sale order status updated successfully',
+      order: {
+        id: order.id,
+        orderNumber: order.orderNumber,
+        orderStatus: order.orderStatus,
+      },
+    };
+  }
+
+  async bulkApprove(
+    tenantDb: DataSource,
+    ids: string[],
+    user: { userId: string },
+  ) {
+    return this.bulkUpdateStatus(tenantDb, ids, OrderStatus.APPROVED, user);
+  }
+
+  async bulkReject(
+    tenantDb: DataSource,
+    ids: string[],
+    user: { userId: string },
+  ) {
+    return this.bulkUpdateStatus(tenantDb, ids, OrderStatus.REJECTED, user);
+  }
+
+  private async bulkUpdateStatus(
+    tenantDb: DataSource,
+    ids: string[],
+    status: OrderStatus.APPROVED | OrderStatus.REJECTED,
+    user: { userId: string },
+  ): Promise<BulkStatusResult> {
+    const succeeded: string[] = [];
+    const failed: { id: string; message: string }[] = [];
+
+    for (const id of ids) {
+      try {
+        await this.applyStatusChange(tenantDb, id, status, user, {
+          requirePending: true,
+        });
+        succeeded.push(id);
+      } catch (error) {
+        failed.push({ id, message: this.bulkErrorMessage(error) });
+      }
+    }
+
+    await this.activityLogService.recordActivityLog(tenantDb, {
+      actorId: user.userId,
+      action: 'SALE_ORDER_BULK_STATUS_UPDATED',
+      description: `Sale orders bulk ${status.toLowerCase()}`,
+      metadata: {
+        status,
+        succeeded,
+        failed,
+      },
+    });
+
+    return { succeeded, failed };
+  }
+
+  private bulkErrorMessage(error: unknown): string {
+    if (error instanceof HttpException) {
+      return error.message;
+    }
+    if (error instanceof Error) {
+      return error.message;
+    }
+    return 'Unknown error';
+  }
+
+  private async applyStatusChange(
+    tenantDb: DataSource,
+    id: string,
+    status: OrderStatus,
+    _user: { userId: string },
+    options?: { requirePending?: boolean },
+  ): Promise<Pick<SaleOrder, 'id' | 'orderNumber' | 'orderStatus'>> {
+    return tenantDb.transaction(async (manager) => {
       const orderRepo = manager.getRepository(SaleOrder);
       const currentOrder = await orderRepo.findOne({
         where: { id },
-        select: ['id', 'orderNumber', 'orderStatus'],
+        lock: { mode: 'pessimistic_write' },
       });
       if (!currentOrder) {
         throw new NotFoundException('Sale order not found');
       }
 
+      if (options?.requirePending) {
+        if (currentOrder.orderStatus !== OrderStatus.PENDING) {
+          throw new BadRequestException(
+            status === OrderStatus.APPROVED
+              ? 'Only pending sale orders can be approved'
+              : 'Only pending sale orders can be rejected',
+          );
+        }
+      }
+
+      if (currentOrder.orderStatus === status) {
+        return {
+          id: currentOrder.id,
+          orderNumber: currentOrder.orderNumber,
+          orderStatus: currentOrder.orderStatus,
+        };
+      }
+
       const wasExecutionStatus = this.isExecutionStatus(currentOrder.orderStatus);
-      const wasReservationStatus = this.isReservationStatus(currentOrder.orderStatus);
+      const wasReservationStatus = this.isReservationStatus(
+        currentOrder.orderStatus,
+      );
 
       if (this.isReleaseStatus(status) && wasReservationStatus) {
         const orderWithItems = await orderRepo.findOne({
@@ -653,28 +762,12 @@ export class SaleOrderService {
         await this.executeSaleOrder(manager, currentOrder.id);
       }
 
-      order = currentOrder;
+      return {
+        id: currentOrder.id,
+        orderNumber: currentOrder.orderNumber,
+        orderStatus: currentOrder.orderStatus,
+      };
     });
-
-    if (!order) {
-      throw new NotFoundException('Sale order not found');
-    }
-
-    await this.activityLogService.recordActivityLog(tenantDb, {
-      actorId: user.userId,
-      action: 'SALE_ORDER_STATUS_UPDATED',
-      description: `Sale order ${order.orderNumber} status updated to ${status}`,
-      metadata: { saleOrderId: order.id, status },
-    });
-
-    return {
-      message: 'Sale order status updated successfully',
-      order: {
-        id: order.id,
-        orderNumber: order.orderNumber,
-        orderStatus: order.orderStatus,
-      },
-    };
   }
 
   async getEligibleProductSchemes(

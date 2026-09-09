@@ -20,6 +20,7 @@ import { TenantConnection } from 'src/common/tenant/tenant-connection.decorator'
 import { SaleOrderService } from '../service/saleorder.service';
 import { CreateSaleOrderDto } from '../dto/saleorder/create-saleorder.dto';
 import { UpdateSaleOrderDto } from '../dto/saleorder/update-saleorder.dto';
+import { BulkSaleOrderIdsDto } from '../dto/saleorder/bulk-sale-order-ids.dto';
 import { OrderStatus } from 'src/tenant-db/entities/saleorder.entity';
 import { GetProductSchemesDto } from '../dto/saleorder/get-product-schemes.dto';
 import { GetRetailerSchemesDto } from '../dto/saleorder/get-retailer-schemes.dto';
@@ -102,6 +103,34 @@ export class SaleOrderController {
     return this.saleOrderService.getEligibleRetailerSchemes(tenantDb, dto);
   }
 
+  @Put('bulk/approve')
+  @RequirePermissions('UPDATE_SALE_ORDER_STATUS')
+  bulkApprove(
+    @TenantConnection() tenantDb: DataSource,
+    @Body() dto: BulkSaleOrderIdsDto,
+    @Req() req: Request,
+  ) {
+    return this.saleOrderService.bulkApprove(
+      tenantDb,
+      dto.ids,
+      req.user as { userId: string },
+    );
+  }
+
+  @Put('bulk/reject')
+  @RequirePermissions('UPDATE_SALE_ORDER_STATUS')
+  bulkReject(
+    @TenantConnection() tenantDb: DataSource,
+    @Body() dto: BulkSaleOrderIdsDto,
+    @Req() req: Request,
+  ) {
+    return this.saleOrderService.bulkReject(
+      tenantDb,
+      dto.ids,
+      req.user as { userId: string },
+    );
+  }
+
   @Get(':id')
   @RequirePermissions('VIEW_SALE_ORDER')
   view(
@@ -131,5 +160,4 @@ export class SaleOrderController {
       req.user as { userId: string },
     );
   }
-
 }

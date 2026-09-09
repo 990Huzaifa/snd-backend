@@ -9,6 +9,10 @@ import {
   SaleOrder,
 } from 'src/tenant-db/entities/saleorder.entity';
 import {
+  ReturnStatus,
+  SaleReturn,
+} from 'src/tenant-db/entities/sale-return.entity';
+import {
   MetricType,
   TargetMetricEntity,
   TargetPlanAssigneeStatus,
@@ -17,8 +21,12 @@ import {
 } from 'src/tenant-db/entities/target-plan.entity';
 import { User, UserType } from 'src/tenant-db/entities/user.entity';
 import {
+  DashboardAnnualSalesForecastQueryDto,
   DashboardAttendanceQueryDto,
+  DashboardForecastPeriod,
+  DashboardForecastTab,
   DashboardOrdersQueryDto,
+  DashboardOrdersReturnsSnapshotQueryDto,
   DashboardOverviewQueryDto,
   DashboardSalesQueryDto,
   DashboardTargetAchievementGroupBy,
@@ -397,6 +405,42 @@ export class DashboardService {
     } catch (error) {
       this.logger.error(
         `getTopPerformingProducts failed: ${error instanceof Error ? error.message : error}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw error;
+    }
+  }
+
+  async getAnnualSalesAiForecast(
+    tenantDb: DataSource,
+    query: DashboardAnnualSalesForecastQueryDto,
+    _user: { userId: string },
+  ) {
+    try {
+      return await this.buildAnnualSalesAiForecast(tenantDb, query);
+    } catch (error) {
+      this.logger.error(
+        `getAnnualSalesAiForecast failed: ${
+          error instanceof Error ? error.message : error
+        }`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw error;
+    }
+  }
+
+  async getOrdersReturnsSnapshot(
+    tenantDb: DataSource,
+    query: DashboardOrdersReturnsSnapshotQueryDto,
+    _user: { userId: string },
+  ) {
+    try {
+      return await this.buildOrdersReturnsSnapshot(tenantDb, query);
+    } catch (error) {
+      this.logger.error(
+        `getOrdersReturnsSnapshot failed: ${
+          error instanceof Error ? error.message : error
+        }`,
         error instanceof Error ? error.stack : undefined,
       );
       throw error;
@@ -1205,6 +1249,583 @@ export class DashboardService {
     range: DateRange,
   ): Array<{ date: string; value: number }> {
     return this.buildDateKeys(range).map((date) => ({ date, value: 0 }));
+  }
+
+  // ---------------------------------------------------------------------------
+  // Annual sales & AI forecast
+  // ---------------------------------------------------------------------------
+
+  private async buildAnnualSalesAiForecast(
+    tenantDb: DataSource,
+    query: DashboardAnnualSalesForecastQueryDto,
+  ) {
+    const anchor = this.resolveAnchorDate(query.date);
+    const period = query.period ?? DashboardForecastPeriod.ANNUAL;
+    const tab = query.tab ?? DashboardForecastTab.SALES;
+    const distributorId = this.normalizeOptionalId(query.distributorId);
+
+    const range =
+      period === DashboardForecastPeriod.THIS_WEEK
+        ? this.getCalendarWeekRange(anchor)
+        : this.getCalendarYearRange(anchor);
+    const granularity =
+      period === DashboardForecastPeriod.THIS_WEEK ? 'DAY' : 'MONTH';
+    const buckets = this.buildForecastBuckets(range, granularity, anchor);
+
+    const [actualByBucket, targetTotal] = await Promise.all([
+      this.getForecastActualByBucket(
+        tenantDb,
+        tab,
+        range,
+        granularity,
+        distributorId,
+      ),
+      this.getForecastTargetTotal(tenantDb, tab, range),
+    ]);
+
+    const perBucketTarget =
+      buckets.length > 0
+        ? Math.round((targetTotal / buckets.length) * 100) / 100
+        : 0;
+
+    const pastActuals = buckets
+      .filter((b) => b.isPast || b.isCurrent)
+      .map((b) => actualByBucket.get(b.key) ?? 0);
+    const forecastValues = this.projectAiForecast(
+      pastActuals,
+      buckets.length,
+    );
+
+    const series = buckets.map((bucket, index) => {
+      const actualRaw = actualByBucket.get(bucket.key) ?? 0;
+      const actual = bucket.isFuture ? null : actualRaw;
+      return {
+        date: bucket.key,
+        actual,
+        target: perBucketTarget,
+        aiForecast: forecastValues[index] ?? null,
+      };
+    });
+
+    const actualTotal = series.reduce(
+      (sum, row) => sum + (row.actual ?? 0),
+      0,
+    );
+    const forecastTotal = series.reduce(
+      (sum, row) => sum + (row.aiForecast ?? 0),
+      0,
+    );
+
+    return {
+      filters: {
+        period,
+        tab,
+        date: this.toDateString(anchor),
+        dateFrom: this.toDateString(range.start),
+        dateTo: this.toDateString(range.end),
+        distributorId,
+        granularity,
+      },
+      legend: {
+        actual: 'Actual',
+        target: 'Target',
+        aiForecast: 'AI Forecast',
+      },
+      note: 'Dotted line = AI predicted trend',
+      summary: {
+        actualTotal: Math.round(actualTotal * 100) / 100,
+        targetTotal: Math.round(targetTotal * 100) / 100,
+        forecastTotal: Math.round(forecastTotal * 100) / 100,
+        achievementPercent: this.percentOf(actualTotal, targetTotal),
+      },
+      series,
+    };
+  }
+
+  private getCalendarYearRange(anchor: Date): DateRange {
+    return {
+      start: this.startOfDay(new Date(anchor.getFullYear(), 0, 1)),
+      end: this.startOfDay(new Date(anchor.getFullYear(), 11, 31)),
+    };
+  }
+
+  /** Monday–Sunday week containing the anchor date. */
+  private getCalendarWeekRange(anchor: Date): DateRange {
+    const day = this.startOfDay(anchor);
+    const dayOfWeek = day.getDay(); // 0=Sun ... 6=Sat
+    const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+    const start = new Date(day);
+    start.setDate(start.getDate() + mondayOffset);
+    const end = new Date(start);
+    end.setDate(end.getDate() + 6);
+    return { start: this.startOfDay(start), end: this.startOfDay(end) };
+  }
+
+  private buildForecastBuckets(
+    range: DateRange,
+    granularity: 'DAY' | 'MONTH',
+    anchor: Date,
+  ): Array<{
+    key: string;
+    isPast: boolean;
+    isCurrent: boolean;
+    isFuture: boolean;
+  }> {
+    const buckets: Array<{
+      key: string;
+      isPast: boolean;
+      isCurrent: boolean;
+      isFuture: boolean;
+    }> = [];
+    const anchorDay = this.startOfDay(anchor);
+
+    if (granularity === 'DAY') {
+      const cursor = new Date(range.start);
+      const last = this.startOfDay(range.end);
+      while (cursor <= last) {
+        const key = this.toDateString(cursor);
+        const isCurrent = this.isSameCalendarDay(cursor, anchorDay);
+        const isFuture = cursor > anchorDay;
+        buckets.push({
+          key,
+          isPast: !isCurrent && !isFuture,
+          isCurrent,
+          isFuture,
+        });
+        cursor.setDate(cursor.getDate() + 1);
+      }
+      return buckets;
+    }
+
+    const cursor = new Date(range.start.getFullYear(), range.start.getMonth(), 1);
+    const last = new Date(range.end.getFullYear(), range.end.getMonth(), 1);
+    const anchorMonth = new Date(anchorDay.getFullYear(), anchorDay.getMonth(), 1);
+    while (cursor <= last) {
+      const key = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}`;
+      const isCurrent =
+        cursor.getFullYear() === anchorMonth.getFullYear() &&
+        cursor.getMonth() === anchorMonth.getMonth();
+      const isFuture = cursor > anchorMonth;
+      buckets.push({
+        key,
+        isPast: !isCurrent && !isFuture,
+        isCurrent,
+        isFuture,
+      });
+      cursor.setMonth(cursor.getMonth() + 1);
+    }
+    return buckets;
+  }
+
+  private async getForecastActualByBucket(
+    tenantDb: DataSource,
+    tab: DashboardForecastTab,
+    range: DateRange,
+    granularity: 'DAY' | 'MONTH',
+    distributorId: string | null,
+  ): Promise<Map<string, number>> {
+    if (tab === DashboardForecastTab.SALES) {
+      return this.getSalesActualByBucket(
+        tenantDb,
+        range,
+        granularity,
+        distributorId,
+      );
+    }
+    if (tab === DashboardForecastTab.VISITS) {
+      return this.getVisitsActualByBucket(
+        tenantDb,
+        range,
+        granularity,
+        distributorId,
+      );
+    }
+    return this.getOrdersActualByBucket(
+      tenantDb,
+      range,
+      granularity,
+      distributorId,
+    );
+  }
+
+  private async getSalesActualByBucket(
+    tenantDb: DataSource,
+    range: DateRange,
+    granularity: 'DAY' | 'MONTH',
+    distributorId: string | null,
+  ): Promise<Map<string, number>> {
+    const byBucket = new Map<string, number>();
+    const statusList = APPROVED_SALE_ORDER_STATUSES.map((s) => `'${s}'`).join(
+      ', ',
+    );
+    const bucketExpr =
+      granularity === 'DAY'
+        ? `TO_CHAR(so."orderDate", 'YYYY-MM-DD')`
+        : `TO_CHAR(DATE_TRUNC('month', so."orderDate"), 'YYYY-MM')`;
+    const params: unknown[] = [range.start, this.endOfDay(range.end)];
+
+    let sql = `
+      SELECT ${bucketExpr} AS bucket,
+             COALESCE(SUM(so."totalAmount"), 0) AS value
+      FROM sale_orders so
+      WHERE so."orderStatus" IN (${statusList})
+        AND so."orderDate" >= $1
+        AND so."orderDate" <= $2
+    `;
+    if (distributorId) {
+      params.push(distributorId);
+      sql += ` AND so."distributorId" = $3`;
+    }
+    sql += ` GROUP BY 1 ORDER BY 1`;
+
+    const rows = (await tenantDb.query(sql, params)) as Array<{
+      bucket: string;
+      value: string | number;
+    }>;
+    for (const row of rows) {
+      byBucket.set(String(row.bucket), this.toNumber(row.value));
+    }
+    return byBucket;
+  }
+
+  private async getOrdersActualByBucket(
+    tenantDb: DataSource,
+    range: DateRange,
+    granularity: 'DAY' | 'MONTH',
+    distributorId: string | null,
+  ): Promise<Map<string, number>> {
+    const byBucket = new Map<string, number>();
+    const bucketExpr =
+      granularity === 'DAY'
+        ? `TO_CHAR(so."orderDate", 'YYYY-MM-DD')`
+        : `TO_CHAR(DATE_TRUNC('month', so."orderDate"), 'YYYY-MM')`;
+    const params: unknown[] = [range.start, this.endOfDay(range.end)];
+
+    let sql = `
+      SELECT ${bucketExpr} AS bucket,
+             COUNT(*)::int AS value
+      FROM sale_orders so
+      WHERE so."orderDate" >= $1
+        AND so."orderDate" <= $2
+    `;
+    if (distributorId) {
+      params.push(distributorId);
+      sql += ` AND so."distributorId" = $3`;
+    }
+    sql += ` GROUP BY 1 ORDER BY 1`;
+
+    const rows = (await tenantDb.query(sql, params)) as Array<{
+      bucket: string;
+      value: string | number;
+    }>;
+    for (const row of rows) {
+      byBucket.set(String(row.bucket), this.toNumber(row.value));
+    }
+    return byBucket;
+  }
+
+  private async getVisitsActualByBucket(
+    tenantDb: DataSource,
+    range: DateRange,
+    granularity: 'DAY' | 'MONTH',
+    distributorId: string | null,
+  ): Promise<Map<string, number>> {
+    const byBucket = new Map<string, number>();
+    const bucketExpr =
+      granularity === 'DAY'
+        ? `TO_CHAR(rv."createdAt", 'YYYY-MM-DD')`
+        : `TO_CHAR(DATE_TRUNC('month', rv."createdAt"), 'YYYY-MM')`;
+    const params: unknown[] = [range.start, this.endOfDay(range.end)];
+
+    let sql = `
+      SELECT ${bucketExpr} AS bucket,
+             COUNT(*)::int AS value
+      FROM retailer_visits rv
+    `;
+    if (distributorId) {
+      sql += ` INNER JOIN routes r ON r.id = rv."routeId"`;
+    }
+    sql += `
+      WHERE rv."createdAt" >= $1
+        AND rv."createdAt" <= $2
+    `;
+    if (distributorId) {
+      params.push(distributorId);
+      sql += ` AND r."distributorId" = $3`;
+    }
+    sql += ` GROUP BY 1 ORDER BY 1`;
+
+    const rows = (await tenantDb.query(sql, params)) as Array<{
+      bucket: string;
+      value: string | number;
+    }>;
+    for (const row of rows) {
+      byBucket.set(String(row.bucket), this.toNumber(row.value));
+    }
+    return byBucket;
+  }
+
+  private async getForecastTargetTotal(
+    tenantDb: DataSource,
+    tab: DashboardForecastTab,
+    range: DateRange,
+  ): Promise<number> {
+    if (tab === DashboardForecastTab.ORDERS) {
+      return 0;
+    }
+    const metricType =
+      tab === DashboardForecastTab.SALES
+        ? MetricType.SALES_VALUE
+        : MetricType.RETAILER_VISITS;
+    try {
+      const row = await tenantDb
+        .getRepository(TargetMetricEntity)
+        .createQueryBuilder('metric')
+        .innerJoin('metric.targetPlan', 'plan')
+        .select('COALESCE(SUM(CAST(metric.targetValue AS DECIMAL)), 0)', 'total')
+        .where('metric.metricType = :metricType', { metricType })
+        .andWhere('plan.status IN (:...statuses)', {
+          statuses: [TargetPlanStatus.PUBLISHED, TargetPlanStatus.LOCKED],
+        })
+        .andWhere('plan.startDate <= :rangeEnd', {
+          rangeEnd: this.endOfDay(range.end),
+        })
+        .andWhere('plan.endDate >= :rangeStart', { rangeStart: range.start })
+        .getRawOne<{ total: string }>();
+      return this.toNumber(row?.total);
+    } catch (error) {
+      this.logger.warn(
+        `Forecast target query failed; returning 0. ${
+          error instanceof Error ? error.message : error
+        }`,
+      );
+      return 0;
+    }
+  }
+
+  /**
+   * Simple trend projection: average of observed actuals with a light linear
+   * slope, then project across all buckets (past buckets stay near actual).
+   */
+  private projectAiForecast(
+    pastActuals: number[],
+    totalBuckets: number,
+  ): Array<number | null> {
+    if (totalBuckets <= 0) {
+      return [];
+    }
+    if (pastActuals.length === 0) {
+      return Array.from({ length: totalBuckets }, () => null);
+    }
+
+    const n = pastActuals.length;
+    const avg =
+      pastActuals.reduce((sum, value) => sum + value, 0) / Math.max(n, 1);
+
+    let slope = 0;
+    if (n >= 2) {
+      const xMean = (n - 1) / 2;
+      let num = 0;
+      let den = 0;
+      for (let i = 0; i < n; i += 1) {
+        num += (i - xMean) * (pastActuals[i] - avg);
+        den += (i - xMean) * (i - xMean);
+      }
+      slope = den === 0 ? 0 : num / den;
+    }
+
+    const forecast: Array<number | null> = [];
+    for (let i = 0; i < totalBuckets; i += 1) {
+      const projected = Math.max(0, avg + slope * (i - (n - 1) / 2));
+      if (i < n) {
+        // Blend actual with trend so the forecast line continues smoothly.
+        const blended = pastActuals[i] * 0.7 + projected * 0.3;
+        forecast.push(Math.round(blended * 100) / 100);
+      } else {
+        forecast.push(Math.round(projected * 100) / 100);
+      }
+    }
+    return forecast;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Orders & returns snapshot (today + pending)
+  // ---------------------------------------------------------------------------
+
+  private async buildOrdersReturnsSnapshot(
+    tenantDb: DataSource,
+    query: DashboardOrdersReturnsSnapshotQueryDto,
+  ) {
+    const anchor = this.resolveAnchorDate(query.date);
+    const dayRange = this.getDayRange(anchor);
+    const previousAnchor = new Date(anchor);
+    previousAnchor.setDate(previousAnchor.getDate() - 1);
+    const previousRange = this.getDayRange(previousAnchor);
+    const distributorId = this.normalizeOptionalId(query.distributorId);
+
+    const [
+      ordersToday,
+      ordersYesterday,
+      ordersPending,
+      returnsToday,
+      returnsYesterday,
+      returnsPending,
+    ] = await Promise.all([
+      this.getOrdersDayStats(tenantDb, dayRange, distributorId),
+      this.getOrdersDayStats(tenantDb, previousRange, distributorId),
+      this.getPendingApprovalStats(
+        tenantDb,
+        'sale_orders',
+        'orderStatus',
+        OrderStatus.PENDING,
+        distributorId,
+        dayRange.start,
+      ),
+      this.getReturnsDayStats(tenantDb, dayRange, distributorId),
+      this.getReturnsDayStats(tenantDb, previousRange, distributorId),
+      this.getPendingApprovalStats(
+        tenantDb,
+        'sale_returns',
+        'returnStatus',
+        ReturnStatus.PENDING,
+        distributorId,
+        dayRange.start,
+      ),
+    ]);
+
+    return {
+      filters: {
+        date: this.toDateString(anchor),
+        distributorId,
+      },
+      orders: {
+        today: {
+          count: ordersToday.count,
+          revenue: ordersToday.amount,
+          growthPercent: this.growthPercent(
+            ordersToday.count,
+            ordersYesterday.count,
+          ),
+          comparisonLabel: 'vs yesterday',
+        },
+        pending: {
+          count: ordersPending.count,
+          avgWaitHours: ordersPending.avgWaitHours,
+          change: ordersPending.change,
+          comparisonLabel: 'vs prior backlog',
+        },
+      },
+      returns: {
+        today: {
+          count: returnsToday.count,
+          amount: returnsToday.amount,
+          growthPercent: this.growthPercent(
+            returnsToday.count,
+            returnsYesterday.count,
+          ),
+          comparisonLabel: 'vs yesterday',
+        },
+        pending: {
+          count: returnsPending.count,
+          avgWaitHours: returnsPending.avgWaitHours,
+          change: returnsPending.change,
+          comparisonLabel: 'vs prior backlog',
+        },
+      },
+    };
+  }
+
+  private async getOrdersDayStats(
+    tenantDb: DataSource,
+    range: { start: Date; end: Date },
+    distributorId: string | null,
+  ): Promise<{ count: number; amount: number }> {
+    const qb = tenantDb
+      .getRepository(SaleOrder)
+      .createQueryBuilder('so')
+      .select('COUNT(*)', 'count')
+      .addSelect('COALESCE(SUM(so.totalAmount), 0)', 'amount')
+      .where('so.orderDate >= :start', { start: range.start })
+      .andWhere('so.orderDate < :end', { end: range.end });
+
+    if (distributorId) {
+      qb.andWhere('so.distributorId = :distributorId', { distributorId });
+    }
+
+    const row = await qb.getRawOne<{ count: string; amount: string }>();
+    return {
+      count: this.toNumber(row?.count),
+      amount: this.toNumber(row?.amount),
+    };
+  }
+
+  private async getReturnsDayStats(
+    tenantDb: DataSource,
+    range: { start: Date; end: Date },
+    distributorId: string | null,
+  ): Promise<{ count: number; amount: number }> {
+    const qb = tenantDb
+      .getRepository(SaleReturn)
+      .createQueryBuilder('sr')
+      .select('COUNT(*)', 'count')
+      .addSelect('COALESCE(SUM(sr.returnAmount), 0)', 'amount')
+      .where('sr.returnDate >= :start', { start: range.start })
+      .andWhere('sr.returnDate < :end', { end: range.end });
+
+    if (distributorId) {
+      qb.andWhere('sr.distributorId = :distributorId', { distributorId });
+    }
+
+    const row = await qb.getRawOne<{ count: string; amount: string }>();
+    return {
+      count: this.toNumber(row?.count),
+      amount: this.toNumber(row?.amount),
+    };
+  }
+
+  private async getPendingApprovalStats(
+    tenantDb: DataSource,
+    table: 'sale_orders' | 'sale_returns',
+    statusColumn: 'orderStatus' | 'returnStatus',
+    pendingStatus: string,
+    distributorId: string | null,
+    dayStart: Date,
+  ): Promise<{ count: number; avgWaitHours: number; change: number }> {
+    const params: unknown[] = [pendingStatus, dayStart];
+    let distributorClause = '';
+    if (distributorId) {
+      params.push(distributorId);
+      distributorClause = ` AND t."distributorId" = $3`;
+    }
+
+    const sql = `
+      SELECT
+        COUNT(*)::int AS count,
+        COALESCE(
+          AVG(EXTRACT(EPOCH FROM (NOW() - t."createdAt")) / 3600.0),
+          0
+        ) AS "avgWaitHours",
+        COUNT(*) FILTER (WHERE t."createdAt" >= $2)::int AS "newToday"
+      FROM ${table} t
+      WHERE t."${statusColumn}" = $1
+      ${distributorClause}
+    `;
+
+    const rows = (await tenantDb.query(sql, params)) as Array<{
+      count: string | number;
+      avgWaitHours: string | number;
+      newToday: string | number;
+    }>;
+    const row = rows[0];
+    const count = this.toNumber(row?.count);
+    const newToday = this.toNumber(row?.newToday);
+    const priorBacklog = Math.max(count - newToday, 0);
+
+    return {
+      count,
+      avgWaitHours: Math.round(this.toNumber(row?.avgWaitHours) * 10) / 10,
+      change: count - priorBacklog,
+    };
   }
 
   // ---------------------------------------------------------------------------

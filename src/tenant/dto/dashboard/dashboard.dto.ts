@@ -93,3 +93,44 @@ export class DashboardTopProductsQueryDto {
   @Max(50)
   limit?: number;
 }
+
+export enum DashboardForecastPeriod {
+  ANNUAL = 'ANNUAL',
+  THIS_WEEK = 'THIS_WEEK',
+}
+
+export enum DashboardForecastTab {
+  SALES = 'SALES',
+  VISITS = 'VISITS',
+  ORDERS = 'ORDERS',
+}
+
+export class DashboardAnnualSalesForecastQueryDto {
+  @IsOptional()
+  @IsUUID()
+  distributorId?: string;
+
+  /** Anchor date (YYYY-MM-DD). Defaults to today. */
+  @IsOptional()
+  @IsDateString()
+  date?: string;
+
+  @IsOptional()
+  @IsEnum(DashboardForecastPeriod)
+  period?: DashboardForecastPeriod;
+
+  @IsOptional()
+  @IsEnum(DashboardForecastTab)
+  tab?: DashboardForecastTab;
+}
+
+export class DashboardOrdersReturnsSnapshotQueryDto {
+  @IsOptional()
+  @IsUUID()
+  distributorId?: string;
+
+  /** Anchor date (YYYY-MM-DD). Defaults to today. */
+  @IsOptional()
+  @IsDateString()
+  date?: string;
+}
