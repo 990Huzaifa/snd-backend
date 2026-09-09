@@ -91,6 +91,7 @@ export const TENANT_PERMISSIONS = [
     name: 'View Product Sales Report',
   },
   { code: 'VIEW_DASHBOARD', name: 'View Dashboard' },
+  { code: 'VIEW_SYSTEM_SETTING', name: 'View System Setting' },
 
   { code: 'UPDATE_USER', name: 'Update Users' },
   { code: 'UPDATE_ROLE', name: 'Update Role' },
@@ -123,6 +124,7 @@ export const TENANT_PERMISSIONS = [
   { code: 'UPDATE_OPENING_STOCK', name: 'Update Opening Stock' },
   { code: 'UPDATE_PURCHASE_STOCK', name: 'Update Purchase Stock' },
   { code: 'UPDATE_TRANSFER_STOCK', name: 'Update Transfer Stock' },
+  { code: 'UPDATE_SYSTEM_SETTING', name: 'Update System Setting' },
 
   { code: 'VIEW_USER', name: 'View Users' },
   { code: 'VIEW_ROLE', name: 'View Role' },

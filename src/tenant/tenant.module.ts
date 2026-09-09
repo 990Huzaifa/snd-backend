@@ -27,6 +27,7 @@ import { ProductCategoryController } from './controller/product-category.control
 import { ProductController } from './controller/product.controller';
 import { PjpController } from './controller/pjp.controller';
 import { RegionController } from './controller/region.controller';
+import { SystemSettingController } from './controller/system-setting.controller';
 import { RouteController } from './controller/route.controller';
 import { TenantRoleController } from './controller/tenant-role.controller';
 import { TenantUserController } from './controller/tenant-user.controller';
@@ -78,6 +79,7 @@ import { ProductCategoryService } from './service/product/product-category.servi
 import { ProductService } from './service/product/product.service';
 import { PjpService } from './service/pjp.service';
 import { RegionService } from './service/region.service';
+import { SystemSettingService } from './service/system-setting.service';
 import { RouteService } from './service/route.service';
 import { TenantRoleService } from './service/tenant-role.service';
 import { UserService } from './service/user.service';
@@ -178,6 +180,7 @@ import { DashboardService } from './service/dashboard.service';
     ProductController,
     PjpController,
     RegionController,
+    SystemSettingController,
     RouteController,
     UomController,
     TenantJobController,
@@ -236,6 +239,7 @@ import { DashboardService } from './service/dashboard.service';
     ProductService,
     PjpService,
     RegionService,
+    SystemSettingService,
     RouteService,
     UomService,
     TenantUtilityService,
