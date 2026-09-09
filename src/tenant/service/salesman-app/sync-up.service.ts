@@ -344,6 +344,8 @@ export class SalesmanSyncUpService {
             image: this.normalizeOptional(shop.image),
             phone: this.normalizeOptional(shop.phone),
             CNIC: this.normalizeOptional(shop.CNIC),
+            STRN: this.normalizeOptional(shop.STRN),
+            NTN: this.normalizeOptional(shop.NTN),
             address: this.normalize(shop.address),
             locationTitle:
                 this.normalizeOptional(shop.locationTitle) ??

@@ -29,6 +29,14 @@ export class CreateRetailerShopDto {
     @IsString()
     CNIC?: string;
 
+    @IsOptional()
+    @IsString()
+    STRN?: string;
+  
+    @IsOptional()
+    @IsString()
+    NTN?: string;
+
     @IsString()
     address: string;
 
