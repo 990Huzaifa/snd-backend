@@ -82,6 +82,10 @@ export const TENANT_PERMISSIONS = [
     code: 'VIEW_SALESMAN_TRACKING_REPORT',
     name: 'View Salesman Tracking Report',
   },
+  {
+    code: 'VIEW_SALE_ORDER_SUMMARY_REPORT',
+    name: 'View Sale Order Summary Report',
+  },
   { code: 'VIEW_DASHBOARD', name: 'View Dashboard' },
 
   { code: 'UPDATE_USER', name: 'Update Users' },
