@@ -19,8 +19,13 @@ const DEFAULT_SETTINGS: Partial<SystemSetting> = {
 export class SystemSettingService {
   constructor(private readonly activityLogService: ActivityLogService) {}
 
+  /** Returns existing settings or creates the default row (no activity log). */
+  async ensure(tenantDb: DataSource): Promise<SystemSetting> {
+    return this.getOrCreate(tenantDb);
+  }
+
   async get(tenantDb: DataSource, user: any) {
-    const settings = await this.getOrCreate(tenantDb);
+    const settings = await this.ensure(tenantDb);
 
     await this.activityLogService.recordActivityLog(tenantDb, {
       actorId: user.userId,
@@ -33,7 +38,7 @@ export class SystemSettingService {
   }
 
   async update(tenantDb: DataSource, dto: UpdateSystemSettingDto, user: any) {
-    const settings = await this.getOrCreate(tenantDb);
+    const settings = await this.ensure(tenantDb);
 
     if (dto.defaultShopRadius !== undefined) {
       const radius = dto.defaultShopRadius.trim();

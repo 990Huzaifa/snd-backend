@@ -16,8 +16,12 @@ import {
   AttendenceStatus,
   TrackingLog,
 } from 'src/tenant-db/entities/attendence.entity';
+import {
+  WeekDay,
+} from 'src/tenant-db/entities/system-setting.entity';
 import { User, UserType } from 'src/tenant-db/entities/user.entity';
 import { ActivityLogService } from './activity-log.service';
+import { SystemSettingService } from './system-setting.service';
 import { AppAttendanceOverviewDto } from '../dto/attendance/app-attendance-overview.dto';
 import { AttendanceOverviewDto } from '../dto/attendance/attendance-overview.dto';
 import { CheckInAttendanceDto } from '../dto/attendance/check-in-attendance.dto';
@@ -28,6 +32,17 @@ import {
   MarkAttendanceDto,
   MarkAttendanceStatus,
 } from '../dto/attendance/mark-attendance.dto';
+
+/** JS `Date#getDay()` index for each WeekDay. */
+const WEEKDAY_TO_JS_DAY: Record<WeekDay, number> = {
+  [WeekDay.SUNDAY]: 0,
+  [WeekDay.MONDAY]: 1,
+  [WeekDay.TUESDAY]: 2,
+  [WeekDay.WEDNESDAY]: 3,
+  [WeekDay.THURSDAY]: 4,
+  [WeekDay.FRIDAY]: 5,
+  [WeekDay.SATURDAY]: 6,
+};
 
 type AttendanceDayCode = 'P' | 'A' | 'HD' | 'L' | 'W' | 'NA';
 
@@ -49,7 +64,10 @@ type AttendanceGeofence = {
 
 @Injectable()
 export class AttendanceService {
-  constructor(private readonly activityLogService: ActivityLogService) {}
+  constructor(
+    private readonly activityLogService: ActivityLogService,
+    private readonly systemSettingService: SystemSettingService,
+  ) {}
 
   private normalizePage(value?: number): number {
     const n = Number(value);
@@ -108,19 +126,37 @@ export class AttendanceService {
     return { start, end, daysInMonth: end.getDate() };
   }
 
-  private countWorkableDaysInMonth(year: number, month: number): number {
+  private holidayJsDays(weeklyHolidays: WeekDay[]): Set<number> {
+    return new Set(
+      (weeklyHolidays?.length
+        ? weeklyHolidays
+        : [WeekDay.SATURDAY, WeekDay.SUNDAY]
+      ).map((day) => WEEKDAY_TO_JS_DAY[day]),
+    );
+  }
+
+  private countWorkableDaysInMonth(
+    year: number,
+    month: number,
+    weeklyHolidays: WeekDay[],
+  ): number {
     const daysInMonth = new Date(year, month, 0).getDate();
+    const holidays = this.holidayJsDays(weeklyHolidays);
     let count = 0;
     for (let day = 1; day <= daysInMonth; day += 1) {
       const dayOfWeek = new Date(year, month - 1, day).getDay();
-      if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+      if (!holidays.has(dayOfWeek)) {
         count += 1;
       }
     }
     return count;
   }
 
-  private countElapsedWorkableDaysInMonth(year: number, month: number): number {
+  private countElapsedWorkableDaysInMonth(
+    year: number,
+    month: number,
+    weeklyHolidays: WeekDay[],
+  ): number {
     const today = this.startOfDay(new Date());
     const monthStart = this.startOfDay(new Date(year, month - 1, 1));
     const monthEnd = this.endOfDay(new Date(year, month, 0));
@@ -132,10 +168,11 @@ export class AttendanceService {
     const lastDay =
       today > monthEnd ? new Date(year, month, 0).getDate() : today.getDate();
 
+    const holidays = this.holidayJsDays(weeklyHolidays);
     let count = 0;
     for (let day = 1; day <= lastDay; day += 1) {
       const dayOfWeek = new Date(year, month - 1, day).getDay();
-      if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+      if (!holidays.has(dayOfWeek)) {
         count += 1;
       }
     }
@@ -156,9 +193,15 @@ export class AttendanceService {
     return `${year}-${month}-${day}`;
   }
 
-  private isWeekend(year: number, month: number, day: number): boolean {
+  /** True when the calendar day is a configured weekly holiday (shown as W). */
+  private isWeeklyHoliday(
+    year: number,
+    month: number,
+    day: number,
+    weeklyHolidays: WeekDay[],
+  ): boolean {
     const dayOfWeek = new Date(year, month - 1, day).getDay();
-    return dayOfWeek === 0 || dayOfWeek === 6;
+    return this.holidayJsDays(weeklyHolidays).has(dayOfWeek);
   }
 
   private weekdayLabel(year: number, month: number, day: number): string {
@@ -969,7 +1012,9 @@ export class AttendanceService {
   ) {
     const { year, month } = filters;
     const { start, end, daysInMonth } = this.getMonthDateRange(year, month);
-    const working = this.countWorkableDaysInMonth(year, month);
+    const settings = await this.systemSettingService.ensure(tenantDb);
+    const weeklyHolidays = settings.weeklyHolidays ?? [];
+    const working = this.countWorkableDaysInMonth(year, month, weeklyHolidays);
 
     const attendanceRows = await tenantDb
       .getRepository(Attendence)
@@ -1004,7 +1049,7 @@ export class AttendanceService {
     }> = [];
 
     for (let day = 1; day <= daysInMonth; day += 1) {
-      const weekend = this.isWeekend(year, month, day);
+      const weekend = this.isWeeklyHoliday(year, month, day, weeklyHolidays);
       const isFuture = this.isFutureDay(year, month, day);
       const dateKey = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
       const dayRecords = byDate.get(dateKey) ?? [];
@@ -1082,8 +1127,18 @@ export class AttendanceService {
   ) {
     const { year, month } = filters;
     const { start, end, daysInMonth } = this.getMonthDateRange(year, month);
-    const workableDays = this.countWorkableDaysInMonth(year, month);
-    const elapsedWorkableDays = this.countElapsedWorkableDaysInMonth(year, month);
+    const settings = await this.systemSettingService.ensure(tenantDb);
+    const weeklyHolidays = settings.weeklyHolidays ?? [];
+    const workableDays = this.countWorkableDaysInMonth(
+      year,
+      month,
+      weeklyHolidays,
+    );
+    const elapsedWorkableDays = this.countElapsedWorkableDaysInMonth(
+      year,
+      month,
+      weeklyHolidays,
+    );
 
     const userQb = tenantDb
       .getRepository(User)
@@ -1163,7 +1218,7 @@ export class AttendanceService {
       const days = Array.from({ length: daysInMonth }, (_, index) => {
         const day = index + 1;
         const dateKey = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-        const weekend = this.isWeekend(year, month, day);
+        const weekend = this.isWeeklyHoliday(year, month, day, weeklyHolidays);
         const isFuture = this.isFutureDay(year, month, day);
         const dayRecords = byDate.get(dateKey) ?? [];
         const primaryRecord = this.pickPrimaryAttendanceRecord(dayRecords);
@@ -1250,6 +1305,7 @@ export class AttendanceService {
       meta: {
         daysInMonth,
         workableDays,
+        weeklyHolidays,
       },
       employees,
     };
