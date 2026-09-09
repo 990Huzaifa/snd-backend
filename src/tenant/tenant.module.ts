@@ -66,6 +66,7 @@ import { RetailerCheckInReportController } from './controller/report/retailer-ch
 import { RetailerMerchandisingReportController } from './controller/report/retailer-merchandising-report.controller';
 import { SalesmanTrackingReportController } from './controller/report/salesman-tracking-report.controller';
 import { SaleOrderSummaryReportController } from './controller/report/sale-order-summary-report.controller';
+import { ProductSalesReportController } from './controller/report/product-sales-report.controller';
 import { TenantAuthService } from './service/tenant-auth.service';
 import { ActivityLogService } from './service/activity-log.service';
 import { TenantDesignationService } from './service/tenant-designation.service';
@@ -135,6 +136,7 @@ import { RetailerCheckInReportService } from './service/report/retailer-checkin-
 import { RetailerMerchandisingReportService } from './service/report/retailer-merchandising-report.service';
 import { SalesmanTrackingReportService } from './service/report/salesman-tracking-report.service';
 import { SaleOrderSummaryReportService } from './service/report/sale-order-summary-report.service';
+import { ProductSalesReportService } from './service/report/product-sales-report.service';
 import { DashboardController } from './controller/dashboard.controller';
 import { DashboardService } from './service/dashboard.service';
 
@@ -217,6 +219,7 @@ import { DashboardService } from './service/dashboard.service';
     RetailerMerchandisingReportController,
     SalesmanTrackingReportController,
     SaleOrderSummaryReportController,
+    ProductSalesReportController,
     DashboardController,
   ],
   providers: [
@@ -284,6 +287,7 @@ import { DashboardService } from './service/dashboard.service';
     RetailerMerchandisingReportService,
     SalesmanTrackingReportService,
     SaleOrderSummaryReportService,
+    ProductSalesReportService,
     DashboardService,
   ],
 })
